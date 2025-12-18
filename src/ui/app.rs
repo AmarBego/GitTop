@@ -13,7 +13,7 @@ use crate::ui::screens::{
     notifications::{NotificationMessage, NotificationsScreen},
     settings::{SettingsMessage, SettingsScreen},
 };
-use crate::ui::window_state;
+use crate::ui::{theme, window_state};
 
 /// Application state - which screen we're on.
 pub enum App {
@@ -67,6 +67,10 @@ impl App {
                     settings.set_active_account(&user.login);
                     let _ = settings.save();
 
+                    // Initialize global theme and font scale from settings
+                    theme::set_theme(settings.theme);
+                    theme::set_font_scale(settings.font_scale);
+
                     let (screen, task) = NotificationsScreen::new(client, user);
                     *self = App::Notifications(screen, settings);
                     task.map(Message::Notifications)
@@ -84,6 +88,10 @@ impl App {
                         let mut settings = AppSettings::load();
                         settings.set_active_account(&user.login);
                         let _ = settings.save();
+
+                        // Initialize global theme and font scale from settings
+                        theme::set_theme(settings.theme);
+                        theme::set_font_scale(settings.font_scale);
 
                         let (notif_screen, task) = NotificationsScreen::new(client, user);
                         *self = App::Notifications(notif_screen, settings);
@@ -155,7 +163,7 @@ impl App {
                         TrayCommand::ShowWindow => {
                             // Show and focus the window using stored ID
                             let was_hidden = window_state::restore_from_hidden();
-                            
+
                             let window_task = if let Some(id) = window_state::get_window_id() {
                                 Task::batch([
                                     window::set_mode(id, window::Mode::Windowed),
@@ -164,17 +172,19 @@ impl App {
                             } else {
                                 Task::none()
                             };
-                            
+
                             // If coming back from hidden, trigger a refresh
                             if was_hidden {
                                 if let App::Notifications(screen, _) = self {
                                     return Task::batch([
                                         window_task,
-                                        screen.update(NotificationMessage::Refresh).map(Message::Notifications),
+                                        screen
+                                            .update(NotificationMessage::Refresh)
+                                            .map(Message::Notifications),
                                     ]);
                                 }
                             }
-                            
+
                             window_task
                         }
                         TrayCommand::Quit => {
@@ -190,7 +200,7 @@ impl App {
             Message::WindowEvent(id, event) => {
                 // Store the main window ID on first event
                 window_state::set_window_id(id);
-                
+
                 if let window::Event::CloseRequested = event {
                     // Check if minimize to tray is enabled
                     let minimize_to_tray = match self {
@@ -202,7 +212,7 @@ impl App {
                     if minimize_to_tray {
                         // Hide the window to tray instead of quitting
                         window_state::set_hidden(true);
-                        
+
                         // Clear notification data to free memory
                         if let App::Notifications(screen, _) = self {
                             screen.all_notifications.clear();
@@ -216,10 +226,10 @@ impl App {
                             screen.repo_counts.clear();
                             screen.repo_counts.shrink_to_fit();
                         }
-                        
+
                         // Aggressively trim memory
                         crate::platform::trim_memory();
-                        
+
                         window::set_mode(id, window::Mode::Hidden)
                     } else {
                         // Exit the application
@@ -280,10 +290,11 @@ impl App {
     /// Subscriptions - periodic refresh, tray events, and window events.
     pub fn subscription(&self) -> Subscription<Message> {
         let is_hidden = window_state::is_hidden();
-        
+
         // Poll tray events - slower when hidden to save CPU
         let tray_poll_interval = if is_hidden { 500 } else { 100 };
-        let tray_sub = time::every(Duration::from_millis(tray_poll_interval)).map(|_| Message::TrayPoll);
+        let tray_sub =
+            time::every(Duration::from_millis(tray_poll_interval)).map(|_| Message::TrayPoll);
 
         // Subscribe to window events
         let window_sub = event::listen_with(|event, _status, id| {

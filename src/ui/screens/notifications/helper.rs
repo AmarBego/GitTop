@@ -121,9 +121,14 @@ pub fn count_by_repo(notifications: &[NotificationView]) -> Vec<(String, usize)>
         *counts.entry(n.repo_full_name.clone()).or_insert(0) += 1;
     }
 
-    // Sort by count descending
+    // Sort by count descending, then by name ascending for stability
     let mut result: Vec<_> = counts.into_iter().collect();
-    result.sort_by(|a, b| b.1.cmp(&a.1));
+    result.sort_by(|a, b| {
+        match b.1.cmp(&a.1) {
+            std::cmp::Ordering::Equal => a.0.cmp(&b.0), // alphabetical when equal
+            other => other,
+        }
+    });
     result
 }
 

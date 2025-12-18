@@ -363,27 +363,28 @@ impl NotificationsScreen {
     }
 
     fn view_content_header(&self, icon_theme: IconTheme) -> Element<'_, NotificationMessage> {
+        let p = theme::palette();
         let unread_count = self
             .filtered_notifications
             .iter()
             .filter(|n| n.unread)
             .count();
 
-        let title = text("Notifications").size(18).color(theme::TEXT_PRIMARY);
+        let title = text("Notifications").size(18).color(p.text_primary);
 
         let sync_status: Element<'_, NotificationMessage> = if self.is_loading {
             row![
-                icons::icon_refresh(11.0, theme::TEXT_MUTED, icon_theme),
+                icons::icon_refresh(11.0, p.text_muted, icon_theme),
                 Space::new().width(4),
-                text("Syncing...").size(11).color(theme::TEXT_MUTED),
+                text("Syncing...").size(11).color(p.text_muted),
             ]
             .align_y(Alignment::Center)
             .into()
         } else {
             row![
-                icons::icon_check(11.0, theme::ACCENT_GREEN, icon_theme),
+                icons::icon_check(11.0, p.accent_success, icon_theme),
                 Space::new().width(4),
-                text("Synced").size(11).color(theme::ACCENT_GREEN),
+                text("Synced").size(11).color(p.accent_success),
             ]
             .align_y(Alignment::Center)
             .into()
@@ -395,40 +396,40 @@ impl NotificationsScreen {
             } else {
                 "Unread"
             })
-            .size(11),
+            .size(12),
         )
         .style(theme::secondary_button)
-        .padding([4, 8])
+        .padding([6, 10])
         .on_press(NotificationMessage::ToggleShowAll);
 
         let mark_all_btn = if unread_count > 0 {
             button(
                 row![
-                    icons::icon_check(11.0, theme::TEXT_SECONDARY, icon_theme),
+                    icons::icon_check(11.0, p.text_secondary, icon_theme),
                     Space::new().width(4),
-                    text("Mark all read").size(11),
+                    text("Mark all read").size(12),
                 ]
                 .align_y(Alignment::Center),
             )
             .style(theme::ghost_button)
-            .padding([4, 8])
+            .padding([6, 10])
             .on_press(NotificationMessage::MarkAllAsRead)
         } else {
             button(
                 row![
-                    icons::icon_check(11.0, theme::TEXT_MUTED, icon_theme),
+                    icons::icon_check(11.0, p.text_muted, icon_theme),
                     Space::new().width(4),
-                    text("Mark all read").size(11).color(theme::TEXT_MUTED),
+                    text("Mark all read").size(12).color(p.text_muted),
                 ]
                 .align_y(Alignment::Center),
             )
             .style(theme::ghost_button)
-            .padding([4, 8])
+            .padding([6, 10])
         };
 
-        let refresh_btn = button(icons::icon_refresh(14.0, theme::TEXT_SECONDARY, icon_theme))
+        let refresh_btn = button(icons::icon_refresh(14.0, p.text_secondary, icon_theme))
             .style(theme::ghost_button)
-            .padding(6)
+            .padding(8)
             .on_press(NotificationMessage::Refresh);
 
         let header_row = row![
@@ -437,13 +438,13 @@ impl NotificationsScreen {
             sync_status,
             Space::new().width(Fill),
             filter_btn,
-            Space::new().width(4),
+            Space::new().width(6),
             mark_all_btn,
-            Space::new().width(4),
+            Space::new().width(6),
             refresh_btn,
         ]
         .align_y(Alignment::Center)
-        .padding([12, 16]);
+        .padding([14, 16]);
 
         container(header_row)
             .width(Fill)

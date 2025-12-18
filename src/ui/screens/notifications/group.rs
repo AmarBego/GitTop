@@ -15,26 +15,28 @@ pub fn view_group_header<'a>(
     group_index: usize,
     icon_theme: IconTheme,
 ) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
+
     let chevron = if group.is_expanded {
-        icons::icon_chevron_down(12.0, theme::TEXT_MUTED, icon_theme)
+        icons::icon_chevron_down(12.0, p.text_muted, icon_theme)
     } else {
-        icons::icon_chevron_right(12.0, theme::TEXT_MUTED, icon_theme)
+        icons::icon_chevron_right(12.0, p.text_muted, icon_theme)
     };
 
     button(
         row![
             chevron,
             Space::new().width(8),
-            text(&group.title).size(12).color(theme::TEXT_SECONDARY),
-            Space::new().width(4),
+            text(&group.title).size(13).color(p.text_secondary),
+            Space::new().width(6),
             text(format!("({})", group.notifications.len()))
-                .size(11)
-                .color(theme::TEXT_MUTED),
+                .size(12)
+                .color(p.text_muted),
         ]
         .align_y(Alignment::Center),
     )
     .style(theme::ghost_button)
-    .padding(4)
+    .padding([6, 8])
     .on_press(NotificationMessage::ToggleGroup(group_index))
     .width(Fill)
     .into()
@@ -51,5 +53,5 @@ pub fn view_group_items<'a>(
         .enumerate()
         .map(|(idx, n)| (idx, notification_item(n, icon_theme)));
 
-    keyed_column(items).spacing(2).into()
+    keyed_column(items).spacing(4).into()
 }

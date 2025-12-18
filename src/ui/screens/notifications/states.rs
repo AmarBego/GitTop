@@ -9,10 +9,11 @@ use crate::ui::{icons, theme};
 
 /// Render the loading state.
 pub fn view_loading<'a>() -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
     container(
         text("Loading notifications...")
             .size(14)
-            .color(theme::TEXT_SECONDARY),
+            .color(p.text_secondary),
     )
     .width(Fill)
     .height(Fill)
@@ -24,14 +25,15 @@ pub fn view_loading<'a>() -> Element<'a, NotificationMessage> {
 
 /// Render the error state with retry button.
 pub fn view_error<'a>(error: &'a str, icon_theme: IconTheme) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
     let content = column![
-        icons::icon_alert(32.0, theme::ACCENT_ORANGE, icon_theme),
+        icons::icon_alert(32.0, p.accent_warning, icon_theme),
         Space::new().height(16),
         text("Failed to load notifications")
             .size(16)
-            .color(theme::TEXT_PRIMARY),
+            .color(p.text_primary),
         Space::new().height(8),
-        text(error).size(12).color(theme::TEXT_SECONDARY),
+        text(error).size(12).color(p.text_secondary),
         Space::new().height(24),
         button(text("Retry").size(14))
             .style(theme::primary_button)
@@ -51,6 +53,7 @@ pub fn view_error<'a>(error: &'a str, icon_theme: IconTheme) -> Element<'a, Noti
 
 /// Render the empty state (no notifications).
 pub fn view_empty<'a>(show_all: bool, icon_theme: IconTheme) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
     let message = if show_all {
         "No notifications yet"
     } else {
@@ -58,13 +61,13 @@ pub fn view_empty<'a>(show_all: bool, icon_theme: IconTheme) -> Element<'a, Noti
     };
 
     let content = column![
-        icons::icon_circle_check(48.0, theme::ACCENT_GREEN, icon_theme),
+        icons::icon_circle_check(48.0, p.accent_success, icon_theme),
         Space::new().height(16),
-        text(message).size(16).color(theme::TEXT_PRIMARY),
+        text(message).size(16).color(p.text_primary),
         Space::new().height(8),
         text("You have no unread notifications")
             .size(12)
-            .color(theme::TEXT_SECONDARY),
+            .color(p.text_secondary),
     ]
     .align_x(Alignment::Center);
 

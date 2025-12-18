@@ -91,9 +91,11 @@ impl LoginScreen {
     }
 
     pub fn view(&self) -> Element<'_, LoginMessage> {
-        let logo = text("GitTop").size(32).color(theme::TEXT_PRIMARY);
+        let p = theme::palette();
 
-        let tagline = text("Runs lighter than your IDE’s status bar.")
+        let logo = text("GitTop").size(32).color(p.text_primary);
+
+        let tagline = text("Runs lighter than your IDE's status bar.")
             .size(14)
             .style(theme::secondary_text);
 
@@ -127,7 +129,7 @@ impl LoginScreen {
         };
 
         let error_text: Element<'_, LoginMessage> = if let Some(ref error) = self.error_message {
-            text(error).size(12).color(theme::ACCENT_RED).into()
+            text(error).size(12).color(p.accent_danger).into()
         } else {
             Space::new().width(0).height(0).into()
         };

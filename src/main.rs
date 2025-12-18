@@ -20,7 +20,7 @@ const SINGLE_INSTANCE_MUTEX: &str = "GitTop-SingleInstance-Mutex-7a8b9c0d";
 fn main() -> iced::Result {
     // Check for existing instance
     let instance = SingleInstance::new(SINGLE_INSTANCE_MUTEX).unwrap();
-    
+
     if !instance.is_single() {
         // Another instance is running - try to focus it and exit
         platform::focus_existing_window();
@@ -38,7 +38,7 @@ fn main() -> iced::Result {
         .title(|app: &App| app.title())
         .theme(|app: &App| app.theme())
         .subscription(App::subscription)
-        .window_size(Size::new(420.0, 640.0))
+        .window_size(Size::new(800.0, 640.0))
         .antialiasing(true)
         .default_font(Font::DEFAULT)
         .exit_on_close_request(false)

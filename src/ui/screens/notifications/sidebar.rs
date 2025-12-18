@@ -53,15 +53,16 @@ pub fn view_sidebar<'a>(
     container(content)
         .width(Length::Fixed(SIDEBAR_WIDTH as f32))
         .height(Fill)
-        .style(sidebar_style)
+        .style(theme::sidebar)
         .into()
 }
 
 fn view_branding<'a>(icon_theme: IconTheme) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
     row![
-        icons::icon_brand(20.0, theme::ACCENT_BLUE, icon_theme),
+        icons::icon_brand(20.0, p.accent, icon_theme),
         Space::new().width(8),
-        text("GitTop").size(18).color(theme::TEXT_PRIMARY),
+        text("GitTop").size(18).color(p.text_primary),
     ]
     .align_y(Alignment::Center)
     .into()
@@ -73,12 +74,14 @@ fn view_types_section(
     total_count: usize,
     icon_theme: IconTheme,
 ) -> Element<'static, NotificationMessage> {
+    let p = theme::palette();
+
     let mut col = column![
-        text("Types").size(11).color(theme::TEXT_MUTED),
+        text("Types").size(11).color(p.text_secondary),
         Space::new().height(8),
         // "All" option
         sidebar_item(
-            icons::icon_inbox(14.0, theme::TEXT_SECONDARY, icon_theme),
+            icons::icon_inbox(14.0, p.text_primary, icon_theme),
             "All".to_owned(),
             total_count,
             selected_type.is_none(),
@@ -91,9 +94,9 @@ fn view_types_section(
     for (subject_type, count) in type_counts {
         let is_selected = selected_type == Some(*subject_type);
         let icon_color = if is_selected {
-            theme::TEXT_PRIMARY
+            p.accent
         } else {
-            theme::TEXT_SECONDARY
+            p.text_primary
         };
         col = col.push(sidebar_item(
             subject_type_icon(*subject_type, icon_color, icon_theme),
@@ -112,8 +115,10 @@ fn view_repos_section(
     selected_repo: Option<&str>,
     icon_theme: IconTheme,
 ) -> Element<'static, NotificationMessage> {
+    let p = theme::palette();
+
     let mut col = column![
-        text("Repositories").size(11).color(theme::TEXT_MUTED),
+        text("Repositories").size(11).color(p.text_secondary),
         Space::new().height(8),
     ]
     .spacing(2);
@@ -122,9 +127,9 @@ fn view_repos_section(
     for (repo, count) in repo_counts.iter().take(10) {
         let is_selected = selected_repo == Some(repo.as_str());
         let icon_color = if is_selected {
-            theme::TEXT_PRIMARY
+            p.accent
         } else {
-            theme::TEXT_SECONDARY
+            p.text_primary
         };
         // Extract just the repo name (after the /)
         let short_name = repo.split('/').next_back().unwrap_or(repo).to_owned();
@@ -138,7 +143,7 @@ fn view_repos_section(
     }
 
     if repo_counts.is_empty() {
-        col = col.push(text("No repositories").size(11).color(theme::TEXT_MUTED));
+        col = col.push(text("No repositories").size(11).color(p.text_muted));
     }
 
     col.into()
@@ -148,26 +153,28 @@ fn view_user_section<'a>(
     user: &'a UserInfo,
     icon_theme: IconTheme,
 ) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
+
     column![
         container(Space::new().height(1))
             .width(Fill)
-            .style(|_| container::Style {
-                background: Some(iced::Background::Color(theme::BORDER)),
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(p.border)),
                 ..Default::default()
             }),
         Space::new().height(12),
         row![
-            icons::icon_user(14.0, theme::TEXT_SECONDARY, icon_theme),
+            icons::icon_user(14.0, p.text_secondary, icon_theme),
             Space::new().width(8),
-            text(&user.login).size(12).color(theme::TEXT_SECONDARY),
+            text(&user.login).size(13).color(p.text_primary),
             Space::new().width(Fill),
-            button(icons::icon_settings(12.0, theme::TEXT_MUTED, icon_theme))
+            button(icons::icon_settings(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
-                .padding([4, 8])
+                .padding([6, 8])
                 .on_press(NotificationMessage::OpenSettings),
-            button(icons::icon_power(12.0, theme::TEXT_MUTED, icon_theme))
+            button(icons::icon_power(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
-                .padding([4, 8])
+                .padding([6, 8])
                 .on_press(NotificationMessage::Logout),
         ]
         .align_y(Alignment::Center),
@@ -201,24 +208,28 @@ fn sidebar_item<'a>(
     is_selected: bool,
     on_press: NotificationMessage,
 ) -> Element<'a, NotificationMessage> {
-    let text_color = if is_selected {
-        theme::TEXT_PRIMARY
-    } else {
-        theme::TEXT_SECONDARY
-    };
+    let p = theme::palette();
+    // Use primary text for all items - much more readable
+    let text_color = p.text_primary;
+
+    // Use scaled font sizes (f32 for iced Pixels)
+    let label_size = theme::scaled(13.0);
+    let count_size = theme::scaled(11.0);
 
     let content = row![
         icon,
         Space::new().width(8),
-        text(label).size(12).color(text_color),
+        text(label).size(label_size).color(text_color),
         Space::new().width(Fill),
-        text(format!("{}", count)).size(11).color(theme::TEXT_MUTED),
+        text(format!("{}", count))
+            .size(count_size)
+            .color(p.text_secondary),
     ]
     .align_y(Alignment::Center)
-    .padding([6, 8]);
+    .padding([8, 10]);
 
     button(content)
-        .style(move |theme, status| sidebar_button_style(theme, status, is_selected))
+        .style(move |theme, status| (theme::sidebar_button(is_selected))(theme, status))
         .on_press(on_press)
         .width(Fill)
         .into()
@@ -234,43 +245,5 @@ fn subject_type_label(t: SubjectType) -> &'static str {
         SubjectType::Release => "Releases",
         SubjectType::RepositoryVulnerabilityAlert => "Security",
         SubjectType::Unknown => "Other",
-    }
-}
-
-fn sidebar_style(_: &iced::Theme) -> container::Style {
-    container::Style {
-        background: Some(iced::Background::Color(theme::BG_CARD)),
-        border: iced::Border {
-            color: theme::BORDER,
-            width: 0.0,
-            radius: 0.0.into(),
-        },
-        ..Default::default()
-    }
-}
-
-fn sidebar_button_style(
-    _: &iced::Theme,
-    status: button::Status,
-    is_selected: bool,
-) -> button::Style {
-    let bg = if is_selected {
-        theme::BG_CONTROL
-    } else {
-        match status {
-            button::Status::Hovered => theme::BG_HOVER,
-            button::Status::Pressed => theme::BG_CONTROL,
-            _ => iced::Color::TRANSPARENT,
-        }
-    };
-
-    button::Style {
-        background: Some(iced::Background::Color(bg)),
-        text_color: theme::TEXT_PRIMARY,
-        border: iced::Border {
-            radius: 4.0.into(),
-            ..Default::default()
-        },
-        ..Default::default()
     }
 }
