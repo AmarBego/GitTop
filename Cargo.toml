@@ -52,6 +52,10 @@ open = "5"
 # Image loading for avatars
 image = "0.25"
 
+# SVG icons - Lucide icon set for CPU-efficient rendering
+icondata_lu = "0.1"
+icondata_core = "0.1"
+
 [profile.release]
 opt-level = 3
 lto = true

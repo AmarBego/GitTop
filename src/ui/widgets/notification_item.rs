@@ -5,7 +5,7 @@ use iced::{Alignment, Color, Element, Fill};
 
 use crate::github::types::{NotificationView, SubjectType};
 use crate::ui::screens::notifications::NotificationMessage;
-use crate::ui::theme;
+use crate::ui::{icons, theme};
 
 /// Get color for subject type
 fn get_subject_color(subject_type: SubjectType) -> Color {
@@ -20,6 +20,21 @@ fn get_subject_color(subject_type: SubjectType) -> Color {
     }
 }
 
+/// Get the SVG icon for a subject type.
+fn subject_type_icon(subject_type: SubjectType) -> iced::widget::Svg<'static> {
+    let color = get_subject_color(subject_type);
+    match subject_type {
+        SubjectType::Issue => icons::icon_issue(14.0, color),
+        SubjectType::PullRequest => icons::icon_pull_request(14.0, color),
+        SubjectType::Release => icons::icon_release(14.0, color),
+        SubjectType::Discussion => icons::icon_discussion(14.0, color),
+        SubjectType::CheckSuite => icons::icon_check_suite(14.0, color),
+        SubjectType::Commit => icons::icon_commit(14.0, color),
+        SubjectType::RepositoryVulnerabilityAlert => icons::icon_security(14.0, color),
+        SubjectType::Unknown => icons::icon_unknown(14.0, color),
+    }
+}
+
 /// Creates a notification item widget - optimized for minimal allocations.
 pub fn notification_item(notif: &NotificationView) -> Element<'_, NotificationMessage> {
     // Title row
@@ -27,9 +42,7 @@ pub fn notification_item(notif: &NotificationView) -> Element<'_, NotificationMe
 
     // Meta row: icon + repo + reason
     let meta = row![
-        text(notif.subject_type.icon())
-            .size(14)
-            .color(get_subject_color(notif.subject_type)),
+        subject_type_icon(notif.subject_type),
         Space::new().width(4),
         text(&notif.repo_full_name)
             .size(11)

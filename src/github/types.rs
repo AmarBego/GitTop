@@ -36,7 +36,7 @@ pub struct NotificationSubject {
 }
 
 /// The type of notification subject.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy, Hash)]
 pub enum SubjectType {
     Issue,
     PullRequest,
@@ -85,18 +85,36 @@ impl SubjectType {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationReason {
+    /// You were requested to review and approve a deployment.
+    ApprovalRequested,
+    /// You were assigned to the issue.
     Assign,
+    /// You created the thread.
     Author,
-    Comment,
-    Invitation,
-    Manual,
-    Mention,
-    ReviewRequested,
-    SecurityAlert,
-    StateChange,
-    Subscribed,
-    TeamMention,
+    /// A GitHub Actions workflow run that you triggered was completed.
     CiActivity,
+    /// You commented on the thread.
+    Comment,
+    /// You accepted an invitation to contribute to the repository.
+    Invitation,
+    /// You subscribed to the thread (via an issue or pull request).
+    Manual,
+    /// Organization members have requested to enable a feature such as Copilot.
+    MemberFeatureRequested,
+    /// You were specifically @mentioned in the content.
+    Mention,
+    /// You, or a team you're a member of, were requested to review a pull request.
+    ReviewRequested,
+    /// You were credited for contributing to a security advisory.
+    SecurityAdvisoryCredit,
+    /// GitHub discovered a security vulnerability in your repository.
+    SecurityAlert,
+    /// You changed the thread state (for example, closing an issue or merging a PR).
+    StateChange,
+    /// You're watching the repository.
+    Subscribed,
+    /// You were on a team that was mentioned.
+    TeamMention,
     /// Catch-all for unknown reasons.
     #[serde(other)]
     Unknown,
@@ -105,18 +123,21 @@ pub enum NotificationReason {
 impl NotificationReason {
     pub fn label(&self) -> &'static str {
         match self {
+            Self::ApprovalRequested => "approval requested",
             Self::Assign => "assigned",
             Self::Author => "author",
+            Self::CiActivity => "CI activity",
             Self::Comment => "commented",
             Self::Invitation => "invited",
             Self::Manual => "subscribed",
+            Self::MemberFeatureRequested => "feature requested",
             Self::Mention => "mentioned",
             Self::ReviewRequested => "review requested",
+            Self::SecurityAdvisoryCredit => "security credit",
             Self::SecurityAlert => "security",
             Self::StateChange => "state changed",
             Self::Subscribed => "watching",
             Self::TeamMention => "team mentioned",
-            Self::CiActivity => "CI activity",
             Self::Unknown => "notification",
         }
     }
@@ -138,6 +159,17 @@ pub struct Repository {
 pub struct Owner {
     pub login: String,
     pub avatar_url: String,
+}
+
+/// Thread subscription status from the notifications API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThreadSubscription {
+    pub subscribed: bool,
+    pub ignored: bool,
+    pub reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub url: String,
+    pub thread_url: String,
 }
 
 /// Frontend-friendly notification format for the UI.

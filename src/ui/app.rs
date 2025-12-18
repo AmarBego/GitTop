@@ -23,8 +23,6 @@ pub enum App {
 /// Top-level application messages.
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Startup: attempt to restore saved session.
-    TryRestore,
     /// Restore result.
     RestoreComplete(Option<(GitHubClient, UserInfo)>),
     /// Login screen messages.
@@ -50,11 +48,6 @@ impl App {
     /// Update application state.
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::TryRestore => Task::perform(
-                async { AuthManager::try_restore().await.ok().flatten() },
-                Message::RestoreComplete,
-            ),
-
             Message::RestoreComplete(result) => match result {
                 Some((client, user)) => {
                     let (screen, task) = NotificationsScreen::new(client, user);
