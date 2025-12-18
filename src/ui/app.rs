@@ -1,16 +1,25 @@
 //! Main application state and logic.
 
+use std::sync::OnceLock;
 use std::time::Duration;
 
-use iced::{time, Element, Subscription, Task, Theme};
+use iced::window::Id as WindowId;
+use iced::{event, exit, time, window, Element, Event, Subscription, Task, Theme};
 
 use crate::github::{AuthManager, GitHubClient, UserInfo};
 use crate::settings::AppSettings;
+use crate::tray::{TrayCommand, TrayManager};
 use crate::ui::screens::{
     login::{LoginMessage, LoginScreen},
     notifications::{NotificationMessage, NotificationsScreen},
     settings::{SettingsMessage, SettingsScreen},
 };
+
+/// Global storage for the main window ID
+static MAIN_WINDOW_ID: OnceLock<WindowId> = OnceLock::new();
+
+/// Track if window is currently hidden (minimized to tray)
+static IS_WINDOW_HIDDEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Application state - which screen we're on.
 pub enum App {
@@ -37,6 +46,10 @@ pub enum Message {
     Settings(SettingsMessage),
     /// Periodic refresh tick.
     Tick,
+    /// Tray event poll tick.
+    TrayPoll,
+    /// Window event.
+    WindowEvent(WindowId, window::Event),
 }
 
 impl App {
@@ -140,6 +153,70 @@ impl App {
                 }
                 Task::none()
             }
+
+            Message::TrayPoll => {
+                // Poll tray events
+                if let Some(cmd) = TrayManager::poll_global_events() {
+                    match cmd {
+                        TrayCommand::ShowWindow => {
+                            // Show and focus the window using stored ID
+                            let was_hidden = IS_WINDOW_HIDDEN.swap(false, std::sync::atomic::Ordering::Relaxed);
+                            
+                            let window_task = if let Some(&id) = MAIN_WINDOW_ID.get() {
+                                Task::batch([
+                                    window::set_mode(id, window::Mode::Windowed),
+                                    window::gain_focus(id),
+                                ])
+                            } else {
+                                Task::none()
+                            };
+                            
+                            // If coming back from hidden, trigger a refresh
+                            if was_hidden {
+                                if let App::Notifications(screen, _) = self {
+                                    return Task::batch([
+                                        window_task,
+                                        screen.update(NotificationMessage::Refresh).map(Message::Notifications),
+                                    ]);
+                                }
+                            }
+                            
+                            window_task
+                        }
+                        TrayCommand::Quit => {
+                            // Exit the application
+                            exit()
+                        }
+                    }
+                } else {
+                    Task::none()
+                }
+            }
+
+            Message::WindowEvent(id, event) => {
+                // Store the main window ID on first event
+                let _ = MAIN_WINDOW_ID.set(id);
+                
+                if let window::Event::CloseRequested = event {
+                    // Check if minimize to tray is enabled
+                    let minimize_to_tray = match self {
+                        App::Notifications(_, settings) => settings.minimize_to_tray,
+                        App::Settings(screen, _, _) => screen.settings.minimize_to_tray,
+                        _ => AppSettings::load().minimize_to_tray,
+                    };
+
+                    if minimize_to_tray {
+                        // Hide the window to tray instead of quitting
+                        IS_WINDOW_HIDDEN.store(true, std::sync::atomic::Ordering::Relaxed);
+                        window::set_mode(id, window::Mode::Hidden)
+                    } else {
+                        // Exit the application
+                        exit()
+                    }
+                } else {
+                    Task::none()
+                }
+            }
         }
     }
 
@@ -188,14 +265,39 @@ impl App {
         Theme::TokyoNightStorm
     }
 
-    /// Subscriptions - periodic refresh.
+    /// Subscriptions - periodic refresh, tray events, and window events.
     pub fn subscription(&self) -> Subscription<Message> {
+        let is_hidden = IS_WINDOW_HIDDEN.load(std::sync::atomic::Ordering::Relaxed);
+        
+        // Poll tray events - slower when hidden to save CPU
+        let tray_poll_interval = if is_hidden { 500 } else { 100 };
+        let tray_sub = time::every(Duration::from_millis(tray_poll_interval)).map(|_| Message::TrayPoll);
+
+        // Subscribe to window events
+        let window_sub = event::listen_with(|event, _status, id| {
+            if let Event::Window(window_event) = event {
+                Some(Message::WindowEvent(id, window_event))
+            } else {
+                None
+            }
+        });
+
         match self {
             App::Notifications(_, _) => {
-                // Refresh every 60 seconds
-                time::every(Duration::from_secs(60)).map(|_| Message::Tick)
+                if is_hidden {
+                    // When hidden, only poll tray and listen for window events
+                    // Skip auto-refresh to save memory and CPU
+                    Subscription::batch([tray_sub, window_sub])
+                } else {
+                    // Refresh every 60 seconds + tray events + window events
+                    Subscription::batch([
+                        time::every(Duration::from_secs(60)).map(|_| Message::Tick),
+                        tray_sub,
+                        window_sub,
+                    ])
+                }
             }
-            _ => Subscription::none(),
+            _ => Subscription::batch([tray_sub, window_sub]),
         }
     }
 }

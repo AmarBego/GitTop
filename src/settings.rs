@@ -28,6 +28,13 @@ pub struct StoredAccount {
 pub struct AppSettings {
     pub icon_theme: IconTheme,
     pub accounts: Vec<StoredAccount>,
+    /// Whether closing the window minimizes to tray instead of quitting.
+    #[serde(default = "default_minimize_to_tray")]
+    pub minimize_to_tray: bool,
+}
+
+fn default_minimize_to_tray() -> bool {
+    true
 }
 
 impl Default for AppSettings {
@@ -35,6 +42,7 @@ impl Default for AppSettings {
         Self {
             icon_theme: IconTheme::Svg,
             accounts: Vec::new(),
+            minimize_to_tray: true,
         }
     }
 }

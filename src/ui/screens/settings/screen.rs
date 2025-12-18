@@ -19,6 +19,8 @@ pub enum SettingsMessage {
     Back,
     /// Toggle icon theme.
     ToggleIconTheme(bool),
+    /// Toggle minimize to tray.
+    ToggleMinimizeToTray(bool),
     /// Remove an account.
     RemoveAccount(String),
 }
@@ -40,6 +42,11 @@ impl SettingsScreen {
                 } else {
                     IconTheme::Emoji
                 };
+                let _ = self.settings.save();
+                Task::none()
+            }
+            SettingsMessage::ToggleMinimizeToTray(enabled) => {
+                self.settings.minimize_to_tray = enabled;
                 let _ = self.settings.save();
                 Task::none()
             }
@@ -96,9 +103,13 @@ impl SettingsScreen {
 
     fn view_content(&self) -> Element<'_, SettingsMessage> {
         let content = column![
-            // Icon Theme Section
+            // Appearance Section
             self.view_section_header("Appearance"),
             self.view_icon_theme_setting(),
+            Space::new().height(24),
+            // Behavior Section
+            self.view_section_header("Behavior"),
+            self.view_minimize_to_tray_setting(),
             Space::new().height(24),
             // Accounts Section
             self.view_section_header("Accounts"),
@@ -137,6 +148,41 @@ impl SettingsScreen {
                 .width(Fill),
                 toggler(use_svg)
                     .on_toggle(SettingsMessage::ToggleIconTheme)
+                    .size(20),
+            ]
+            .align_y(Alignment::Center)
+            .padding(12),
+        )
+        .style(|_| container::Style {
+            background: Some(iced::Background::Color(theme::BG_CARD)),
+            border: iced::Border {
+                radius: 8.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+    }
+
+    fn view_minimize_to_tray_setting(&self) -> Element<'_, SettingsMessage> {
+        let enabled = self.settings.minimize_to_tray;
+
+        let description = if enabled {
+            "App stays in system tray when you close the window"
+        } else {
+            "App exits completely when you close the window"
+        };
+
+        container(
+            row![
+                column![
+                    text("Minimize to Tray").size(14).color(theme::TEXT_PRIMARY),
+                    Space::new().height(4),
+                    text(description).size(11).color(theme::TEXT_SECONDARY),
+                ]
+                .width(Fill),
+                toggler(enabled)
+                    .on_toggle(SettingsMessage::ToggleMinimizeToTray)
                     .size(20),
             ]
             .align_y(Alignment::Center)
