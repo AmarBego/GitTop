@@ -50,6 +50,12 @@ pub enum SubjectType {
     Unknown,
 }
 
+impl std::fmt::Display for SubjectType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.label())
+    }
+}
+
 impl SubjectType {
     /// Returns a human-readable label for the subject type.
     #[allow(unused)]
@@ -161,6 +167,21 @@ pub struct Owner {
     pub avatar_url: String,
 }
 
+/// A comment from an issue or pull request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Comment {
+    pub id: u64,
+    pub body: String,
+    pub user: CommentUser,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Minimal user info for comments.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommentUser {
+    pub login: String,
+}
+
 /// Thread subscription status from the notifications API.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThreadSubscription {
@@ -185,6 +206,7 @@ pub struct NotificationView {
     pub updated_at: DateTime<Utc>,
     pub time_ago: String,
     pub url: Option<String>,
+    pub latest_comment_url: Option<String>,
     pub avatar_url: String,
     pub is_private: bool,
 }
@@ -202,6 +224,7 @@ impl From<Notification> for NotificationView {
             updated_at: n.updated_at,
             time_ago: format_time_ago(n.updated_at),
             url: n.subject.url,
+            latest_comment_url: n.subject.latest_comment_url,
             avatar_url: n.repository.owner.avatar_url,
             is_private: n.repository.private,
         }

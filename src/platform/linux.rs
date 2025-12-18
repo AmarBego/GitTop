@@ -31,3 +31,47 @@ pub fn trim_memory() {
         let _ = malloc_trim(0);
     }
 }
+
+/// Send a native Linux notification via DBus.
+/// 
+/// Uses notify-rust which:
+/// - Talks to the system notification daemon via DBus
+/// - No polling required
+/// - No background threads once fired
+/// - Zero persistent memory cost
+/// 
+/// If `url` is provided, adds an "Open" action that opens the URL.
+/// Works with: notify-osd, dunst, xfce4-notifyd, KDE, GNOME, etc.
+pub fn notify(title: &str, body: &str, url: Option<&str>) {
+    use notify_rust::Notification;
+    
+    let mut notification = Notification::new();
+    notification
+        .summary(title)
+        .body(body)
+        .appname("GitTop")
+        .timeout(5000); // 5 seconds
+    
+    // Add action if URL provided
+    if let Some(url) = url {
+        notification.action("open", "Open");
+        notification.hint(notify_rust::Hint::ActionIcons(true));
+        
+        // Show and handle action
+        if let Ok(handle) = notification.show() {
+            // Clone URL for the closure
+            let url_owned = url.to_string();
+            // Spawn a thread to wait for action (non-blocking)
+            std::thread::spawn(move || {
+                handle.wait_for_action(|action| {
+                    if action == "open" || action == "default" {
+                        let _ = open::that(&url_owned);
+                    }
+                });
+            });
+        }
+    } else {
+        // Simple fire and forget
+        let _ = notification.show();
+    }
+}

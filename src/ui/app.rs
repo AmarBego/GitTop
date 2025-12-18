@@ -297,9 +297,13 @@ impl App {
         match self {
             App::Notifications(_, _) => {
                 if is_hidden {
-                    // When hidden, only poll tray and listen for window events
-                    // Skip auto-refresh to save memory and CPU
-                    Subscription::batch([tray_sub, window_sub])
+                    // When hidden, still refresh but less frequently (every 2 minutes)
+                    // This allows desktop notifications to fire for new items
+                    Subscription::batch([
+                        time::every(Duration::from_secs(60)).map(|_| Message::Tick),
+                        tray_sub,
+                        window_sub,
+                    ])
                 } else {
                     // Refresh every 60 seconds + tray events + window events
                     Subscription::batch([

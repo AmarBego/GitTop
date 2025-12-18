@@ -19,3 +19,43 @@ pub fn trim_memory() {
     // Could potentially call jemalloc's purge functions.
     // For now, this is a no-op - the OS handles memory pressure.
 }
+
+/// Send a native FreeBSD notification via DBus.
+/// 
+/// Uses notify-rust which:
+/// - Talks to the system notification daemon via DBus
+/// - No polling required
+/// - No background threads once fired
+/// - Zero persistent memory cost
+/// 
+/// If `url` is provided, adds an "Open" action that opens the URL.
+/// Works with any DBus-compatible notification daemon.
+pub fn notify(title: &str, body: &str, url: Option<&str>) {
+    use notify_rust::Notification;
+    
+    let mut notification = Notification::new();
+    notification
+        .summary(title)
+        .body(body)
+        .appname("GitTop")
+        .timeout(5000); // 5 seconds
+    
+    // Add action if URL provided
+    if let Some(url) = url {
+        notification.action("open", "Open");
+        
+        // Show and handle action
+        if let Ok(handle) = notification.show() {
+            let url_owned = url.to_string();
+            std::thread::spawn(move || {
+                handle.wait_for_action(|action| {
+                    if action == "open" || action == "default" {
+                        let _ = open::that(&url_owned);
+                    }
+                });
+            });
+        }
+    } else {
+        let _ = notification.show();
+    }
+}

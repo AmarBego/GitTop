@@ -9,7 +9,7 @@ use iced::{Alignment, Element, Fill, Task};
 
 use crate::github::{GitHubClient, GitHubError, NotificationView, SubjectType, UserInfo};
 use crate::settings::IconTheme;
-use crate::ui::{icons, theme};
+use crate::ui::{icons, theme, window_state};
 
 use super::group::{view_group_header, view_group_items};
 use super::helper::{
@@ -18,6 +18,8 @@ use super::helper::{
 };
 use super::sidebar::view_sidebar;
 use super::states::{view_empty, view_error, view_loading};
+
+use std::collections::HashMap;
 
 /// Notifications screen state.
 #[derive(Debug, Clone)]
@@ -34,6 +36,9 @@ pub struct NotificationsScreen {
     pub type_counts: Vec<(SubjectType, usize)>,
     /// Cached counts by repository (computed on data change).
     pub repo_counts: Vec<(String, usize)>,
+    /// Track seen notifications by ID -> updated_at timestamp.
+    /// This detects both new notifications AND updates to existing ones.
+    seen_notification_timestamps: HashMap<String, chrono::DateTime<chrono::Utc>>,
 }
 
 /// Notifications screen messages.
@@ -74,6 +79,7 @@ impl NotificationsScreen {
             error_message: None,
             type_counts: Vec::new(),
             repo_counts: Vec::new(),
+            seen_notification_timestamps: HashMap::new(),
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -97,6 +103,73 @@ impl NotificationsScreen {
         // Then group by time
         self.groups = group_by_time(&self.filtered_notifications);
     }
+    
+    /// Send desktop notifications for new or updated unread notifications.
+    /// Only called when window is hidden in tray.
+    fn send_desktop_notifications(&self, notifications: &[NotificationView]) {
+        eprintln!("[DEBUG] send_desktop_notifications called with {} notifications", notifications.len());
+        
+        // Find new or updated unread notifications
+        // A notification is "new" if:
+        // 1. We've never seen this ID before, OR
+        // 2. The updated_at timestamp is newer than what we recorded
+        let new_notifications: Vec<_> = notifications
+            .iter()
+            .filter(|n| {
+                if !n.unread {
+                    return false;
+                }
+                match self.seen_notification_timestamps.get(&n.id) {
+                    None => true, // Never seen this ID
+                    Some(last_seen) => n.updated_at > *last_seen, // Updated since last seen
+                }
+            })
+            .collect();
+        
+        eprintln!("[DEBUG] Found {} new/updated unread notifications (seen count: {})", 
+            new_notifications.len(), self.seen_notification_timestamps.len());
+        
+        if new_notifications.is_empty() {
+            eprintln!("[DEBUG] No new notifications to show, returning");
+            return;
+        }
+        
+        // If there's just one new notification, show it directly
+        if new_notifications.len() == 1 {
+            let notif = &new_notifications[0];
+            let title = format!("{} - {}", notif.repo_full_name, notif.subject_type);
+            let url = notif.url.as_ref().map(|u| api_url_to_web_url(u));
+            
+            // Include reason in body for context (e.g., "mentioned", "review requested")
+            let body = format!("{}\n{}", notif.title, notif.reason.label());
+            
+            eprintln!("[DEBUG] Sending single notification: {:?}", title);
+            crate::platform::notify(
+                &title,
+                &body,
+                url.as_deref(),
+            );
+        } else {
+            // Multiple notifications - show a summary
+            let title = format!("{} new GitHub notifications", new_notifications.len());
+            let body = new_notifications
+                .iter()
+                .take(3) // Show first 3
+                .map(|n| format!("• {}", n.title))
+                .collect::<Vec<_>>()
+                .join("\n");
+            
+            let body = if new_notifications.len() > 3 {
+                format!("{}\\n...and {} more", body, new_notifications.len() - 3)
+            } else {
+                body
+            };
+            
+            eprintln!("[DEBUG] Sending summary notification: {:?}", title);
+            // No specific URL for summary - just notify
+            crate::platform::notify(&title, &body, None);
+        }
+    }
 
     pub fn update(&mut self, message: NotificationMessage) -> Task<NotificationMessage> {
         match message {
@@ -109,8 +182,34 @@ impl NotificationsScreen {
                 self.is_loading = false;
                 match result {
                     Ok(notifications) => {
-                        self.all_notifications = notifications;
-                        self.rebuild_groups();
+                        eprintln!("[DEBUG] RefreshComplete: got {} notifications", notifications.len());
+                        
+                        // Check for new notifications to send desktop notifications
+                        // Only notify when window is hidden (in tray)
+                        let is_hidden = window_state::is_hidden();
+                        eprintln!("[DEBUG] is_hidden = {}", is_hidden);
+                        
+                        if is_hidden {
+                            self.send_desktop_notifications(&notifications);
+                        } else {
+                            eprintln!("[DEBUG] Window is visible, skipping desktop notifications");
+                        }
+                        
+                        // Update seen timestamps with current notifications
+                        for n in &notifications {
+                            self.seen_notification_timestamps.insert(n.id.clone(), n.updated_at);
+                        }
+                        
+                        // If hidden, don't store the data - keep memory minimal
+                        // The data will be fetched fresh when window is restored
+                        if is_hidden {
+                            // Don't update all_notifications - keep it empty
+                            // Aggressively trim memory after the API call
+                            crate::platform::trim_memory();
+                        } else {
+                            self.all_notifications = notifications;
+                            self.rebuild_groups();
+                        }
                         self.error_message = None;
                     }
                     Err(e) => {

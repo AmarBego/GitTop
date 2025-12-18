@@ -4,7 +4,7 @@ use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT}
 use serde::Deserialize;
 use thiserror::Error;
 
-use super::types::{Notification, NotificationView, UserInfo};
+use super::types::{Comment, Notification, NotificationView, UserInfo};
 
 /// GitHub API base URL.
 const GITHUB_API_URL: &str = "https://api.github.com";
@@ -222,6 +222,17 @@ impl GitHubClient {
                 status: status.as_u16(),
                 message,
             })
+        }
+    }
+
+    /// Fetches a comment by its API URL.
+    /// Returns the comment body and author, or None if the request fails.
+    pub async fn get_comment(&self, url: &str) -> Option<Comment> {
+        let response = self.client.get(url).send().await.ok()?;
+        if response.status().is_success() {
+            response.json().await.ok()
+        } else {
+            None
         }
     }
 

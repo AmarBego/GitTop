@@ -111,3 +111,38 @@ pub fn trim_working_set() {
         }
     }
 }
+
+/// Send a native Windows toast notification.
+/// 
+/// Uses WinRT toast notifications which:
+/// - Don't require a background service
+/// - Don't keep anything resident
+/// - Fire and exit
+/// 
+/// If `url` is provided, clicking the notification opens that URL.
+pub fn notify(title: &str, body: &str, url: Option<&str>) {
+    use tauri_winrt_notification::{Duration, Toast};
+    
+    eprintln!("[DEBUG] notify() called: title={:?}, body={:?}, url={:?}", title, body, url);
+    
+    let mut toast = Toast::new(Toast::POWERSHELL_APP_ID)
+        .title(title)
+        .text1(body)
+        .duration(Duration::Short);
+    
+    // If URL provided, open it when notification is clicked
+    if let Some(url) = url {
+        let url_owned = url.to_string();
+        toast = toast.on_activated(move |_action| {
+            eprintln!("[DEBUG] Toast activated! Opening URL");
+            let _ = open::that(&url_owned);
+            Ok(())
+        });
+    }
+    
+    // Fire and forget - no handles kept, no memory retained
+    match toast.show() {
+        Ok(()) => eprintln!("[DEBUG] Toast shown successfully"),
+        Err(e) => eprintln!("[DEBUG] Toast show FAILED: {:?}", e),
+    }
+}

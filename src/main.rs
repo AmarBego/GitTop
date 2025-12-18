@@ -1,4 +1,5 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Temporarily disabled for debugging - enables console output in release builds
+// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 //! GitTop - A beautiful native GitHub notification manager
 //! No browser engine required. Pure Rust. Pure performance.

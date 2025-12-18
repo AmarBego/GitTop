@@ -1,7 +1,7 @@
 //! Platform-specific functionality.
 //!
 //! This module provides cross-platform abstractions for OS-specific features
-//! like memory management, window focusing, and theme settings.
+//! like memory management, window focusing, theme settings, and notifications.
 
 #[cfg(windows)]
 mod windows;
@@ -64,4 +64,33 @@ pub fn trim_memory() {
     
     #[cfg(target_os = "freebsd")]
     freebsd::trim_memory();
+}
+
+/// Send a native desktop notification.
+/// 
+/// This is a fire-and-forget operation:
+/// - Sends the notification to the system
+/// - Returns immediately
+/// - Allocates nothing long-lived
+/// - Zero persistent memory cost
+/// 
+/// If `url` is provided, clicking the notification will open that URL.
+/// 
+/// Platform implementations:
+/// - Windows: WinRT toast notifications
+/// - macOS: NSUserNotificationCenter / UNUserNotificationCenter  
+/// - Linux: DBus via notify-rust
+/// - FreeBSD: DBus via notify-rust
+pub fn notify(title: &str, body: &str, url: Option<&str>) {
+    #[cfg(windows)]
+    windows::notify(title, body, url);
+    
+    #[cfg(target_os = "macos")]
+    macos::notify(title, body, url);
+    
+    #[cfg(target_os = "linux")]
+    linux::notify(title, body, url);
+    
+    #[cfg(target_os = "freebsd")]
+    freebsd::notify(title, body, url);
 }

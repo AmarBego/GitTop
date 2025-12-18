@@ -77,19 +77,23 @@ windows = { version = "0.62.2", features = [
     "Win32_System_LibraryLoader",
     "Win32_System_Threading",
 ] }
+# Windows toast notifications (WinRT) - with on_activated callback support
+tauri-winrt-notification = "0.7"
 
-# macOS-specific APIs (placeholder for future native integrations)
+# macOS-specific APIs
 [target.'cfg(target_os = "macos")'.dependencies]
-# objc2 = "0.5"  # Uncomment when implementing native macOS features
+# Native macOS notifications via Objective-C runtime
+mac-notification-sys = "0.6"
 
-# Linux-specific APIs (placeholder for future native integrations)
+# Linux-specific APIs
 [target.'cfg(target_os = "linux")'.dependencies]
-# x11 = "2.21"   # Uncomment when implementing X11 window activation
-# wayland-client = "0.31"  # Uncomment for Wayland support
+# DBus notifications - zero-cost after send
+notify-rust = "4"
 
-# FreeBSD-specific APIs (placeholder for future native integrations)
+# FreeBSD-specific APIs
 [target.'cfg(target_os = "freebsd")'.dependencies]
-# Similar to Linux, would use X11 or other display protocols
+# DBus notifications - same as Linux
+notify-rust = "4"
 
 [profile.release]
 opt-level = 3
