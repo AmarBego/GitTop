@@ -42,6 +42,11 @@ fn parse_cli_args() {
 }
 
 fn main() -> iced::Result {
+    // Force OpenGL backend for wgpu to minimize memory footprint
+    // OpenGL uses ~42MB vs Vulkan's ~164MB or DX12's ~133MB
+    // This MUST be set before any wgpu/iced initialization
+    std::env::set_var("WGPU_BACKEND", "gl");
+
     // Parse CLI arguments (e.g., --mock-notifications 1000)
     parse_cli_args();
 

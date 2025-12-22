@@ -1,12 +1,11 @@
 //! Notification group component - collapsible time-based groups.
 
-use iced::widget::{button, container, keyed_column, row, text, Space};
+use iced::widget::{button, container, row, text, Space};
 use iced::{Alignment, Color, Element, Fill};
 
 use super::helper::NotificationGroup;
 use super::screen::NotificationMessage;
 use crate::settings::IconTheme;
-use crate::ui::widgets::notification_item;
 use crate::ui::{icons, theme};
 
 /// Render a collapsible notification group header.
@@ -80,22 +79,4 @@ pub fn view_group_header<'a>(
     } else {
         header_btn.into()
     }
-}
-
-/// Render the notification items within an expanded group.
-pub fn view_group_items<'a>(
-    group: &'a NotificationGroup,
-    icon_theme: IconTheme,
-    dense: bool,
-) -> Element<'a, NotificationMessage> {
-    let is_priority = group.is_priority;
-    let items = group
-        .notifications
-        .iter()
-        .enumerate()
-        .map(|(idx, p)| (idx, notification_item(p, icon_theme, dense, is_priority)));
-
-    keyed_column(items)
-        .spacing(if dense { 0 } else { 4 }) // No spacing in dense mode for list feel
-        .into()
 }
