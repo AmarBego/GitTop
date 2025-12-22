@@ -1,7 +1,7 @@
 //! Notification Rule Engine - complex filtering rules for Power Mode.
 //!
-//! Provides time-based, account-based, and type-based notification filtering
-//! with priority organization support and schedule-based quiet hours.
+//! Provides account-based and type-based notification filtering
+//! with priority organization support.
 
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
@@ -88,100 +88,111 @@ pub struct HighImpactRule {
     pub priority: i32,
 }
 
-/// Helper to check if current time string "HH:MM" is in range [start, end].
-/// Handles wrap-around (e.g. 22:00 -> 07:00).
-fn is_time_in_range(current: &str, start: &str, end: &str) -> bool {
-    if start <= end {
-        current >= start && current <= end
-    } else {
-        // crossing midnight
-        current >= start || current <= end
-    }
-}
-
 // ============================================================================
 // RULE TYPES
 // ============================================================================
 
-/// Time-based quiet hours rule.
-/// TODO: v0.2+ Refactor time parsing to use a dedicated TimeHM struct to handle validation and locale issues.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TimeRule {
-    pub id: String,
-    pub name: String,
-    pub enabled: bool,
-    /// Start time in HH:MM format (24h).
-    pub start_time: String,
-    /// End time in HH:MM format (24h).
-    pub end_time: String,
-    #[serde(default = "default_priority")]
-    pub priority: i32,
-    pub action: RuleAction,
+/// Behavior when outside of the active schedule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum OutsideScheduleBehavior {
+    /// **Suppress**: Hide notifications completely (Action::Hide).
+    #[default]
+    Suppress,
+    /// **Defer**: Do not notify, but keep in list (Action::Silent).
+    Defer,
 }
 
-impl TimeRule {
-    pub fn new(name: impl Into<String>, start: impl Into<String>, end: impl Into<String>) -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            name: name.into(),
-            enabled: true,
-            start_time: start.into(),
-            end_time: end.into(),
-            priority: PRIORITY_DEFAULT,
-            action: RuleAction::Silent,
+impl std::fmt::Display for OutsideScheduleBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Suppress => write!(f, "Suppress notifications"),
+            Self::Defer => write!(f, "Defer until next active window"),
         }
     }
 }
 
-/// Day-of-week schedule rule.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScheduleRule {
-    pub id: String,
-    pub name: String,
-    pub enabled: bool,
-    /// Days this rule applies (0 = Sunday, 6 = Saturday).
-    pub days: Vec<u8>,
-    /// Optional time range within those days.
-    pub start_time: Option<String>,
-    pub end_time: Option<String>,
-    #[serde(default = "default_priority")]
-    pub priority: i32,
-    pub action: RuleAction,
-}
-
-impl ScheduleRule {
-    pub fn weekend_silent() -> Self {
-        Self {
-            id: Uuid::new_v4().to_string(),
-            name: "Weekend Mode".into(),
-            enabled: false,
-            days: vec![0, 6], // Sunday, Saturday
-            start_time: None,
-            end_time: None,
-            priority: PRIORITY_DEFAULT,
-            action: RuleAction::Silent,
-        }
-    }
-}
-
-/// Per-account notification preferences.
+/// Per-account notification schedule.
+/// Controls when notifications from this account are shown vs suppressed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountRule {
     pub id: String,
+    /// Master switch for this account's schedule enforcement.
+    /// If false, account is treated as "Not Active" (suppressed/hidden).
     pub enabled: bool,
     /// GitHub username.
     pub account: String,
-    pub action: RuleAction,
+    /// Days when notifications from this account are ACTIVE (shown).
+    /// Contains days 0-6 (Sun=0, Sat=6). Empty = show all days (if enabled).
+    #[serde(default = "default_active_days")]
+    pub active_days: Vec<u8>,
+    /// Optional: Start time when notifications are shown (e.g., "09:00").
+    #[serde(default)]
+    pub start_time: Option<String>,
+    /// Optional: End time when notifications are shown (e.g., "18:00").
+    #[serde(default)]
+    pub end_time: Option<String>,
+    /// Behavior when outside active schedule.
+    #[serde(default)]
+    pub outside_behavior: OutsideScheduleBehavior,
+}
+
+fn default_active_days() -> Vec<u8> {
+    vec![0, 1, 2, 3, 4, 5, 6] // All days active by default
 }
 
 impl AccountRule {
+    #[allow(dead_code)]
     pub fn new(account: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             enabled: true,
             account: account.into(),
-            action: RuleAction::Show,
+            active_days: default_active_days(),
+            start_time: None,
+            end_time: None,
+            outside_behavior: OutsideScheduleBehavior::Suppress,
         }
+    }
+
+    /// Check if the account is currently in active schedule.
+    pub fn is_active_now(&self) -> bool {
+        // Master Kill Switch: If account is disabled, it is NOT active.
+        if !self.enabled {
+            return false;
+        }
+
+        use chrono::{Datelike, Local, Timelike};
+        let now = Local::now();
+        let day = now.weekday().num_days_from_sunday() as u8;
+
+        // Check active days
+        if !self.active_days.contains(&day) {
+            return false;
+        }
+
+        // Check time range if specified
+        if let (Some(start), Some(end)) = (&self.start_time, &self.end_time) {
+            if let (Ok(start_h), Ok(end_h)) = (
+                start.split(':').next().unwrap_or("0").parse::<u32>(),
+                end.split(':').next().unwrap_or("23").parse::<u32>(),
+            ) {
+                let hour = now.hour();
+                // Simple hour check for now
+                if start_h <= end_h {
+                    if hour < start_h || hour >= end_h {
+                        return false;
+                    }
+                } else {
+                    // Crossing midnight (e.g. 22:00 to 07:00)
+                    // Active if >= 22 OR < 7
+                    if hour < start_h && hour >= end_h {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
@@ -250,18 +261,21 @@ impl TypeRule {
 /// Complete notification rule configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NotificationRuleSet {
+    /// Rule set name for organization (e.g., "Work", "On-Call", "Weekend").
+    #[serde(default = "default_rule_set_name")]
+    pub name: String,
     /// Global enable/disable for all rules.
     pub enabled: bool,
-    /// Time-based quiet hours.
-    pub time_rules: Vec<TimeRule>,
-    /// Day-of-week scheduling.
-    pub schedule_rules: Vec<ScheduleRule>,
     /// Per-account filtering.
     pub account_rules: Vec<AccountRule>,
     /// Organization priority rules.
     pub org_rules: Vec<OrgRule>,
     /// Notification type filtering.
     pub type_rules: Vec<TypeRule>,
+}
+
+fn default_rule_set_name() -> String {
+    "Default".to_string()
 }
 
 impl NotificationRuleSet {
@@ -295,9 +309,7 @@ impl NotificationRuleSet {
         if !self.enabled {
             return 0;
         }
-        self.time_rules.iter().filter(|r| r.enabled).count()
-            + self.schedule_rules.iter().filter(|r| r.enabled).count()
-            + self.account_rules.iter().filter(|r| r.enabled).count()
+        self.account_rules.iter().filter(|r| r.enabled).count()
             + self.org_rules.iter().filter(|r| r.enabled).count()
             + self.type_rules.iter().filter(|r| r.enabled).count()
     }
@@ -312,20 +324,15 @@ impl NotificationRuleSet {
             return 0;
         }
         let mut count = 0;
-        count += self
-            .time_rules
-            .iter()
-            .filter(|r| r.enabled && r.action == RuleAction::Hide)
-            .count();
-        count += self
-            .schedule_rules
-            .iter()
-            .filter(|r| r.enabled && r.action == RuleAction::Hide)
-            .count();
+        // Account Rules contribute suppression when they are effectively active (enforced) and outside schedule
         count += self
             .account_rules
             .iter()
-            .filter(|r| r.enabled && r.action == RuleAction::Hide)
+            .filter(|r| {
+                r.enabled
+                    && !r.is_active_now()
+                    && r.outside_behavior == OutsideScheduleBehavior::Suppress
+            })
             .count();
         count += self
             .org_rules
@@ -347,62 +354,19 @@ impl NotificationRuleSet {
         }
         let mut count = 0;
         count += self
-            .time_rules
-            .iter()
-            .filter(|r| r.enabled && r.priority >= PRIORITY_HIGH)
-            .count();
-        count += self
-            .schedule_rules
-            .iter()
-            .filter(|r| r.enabled && r.priority >= PRIORITY_HIGH)
-            .count();
-        count += self
             .org_rules
             .iter()
-            .filter(|r| r.enabled && r.priority >= PRIORITY_HIGH)
+            .filter(|r| {
+                r.enabled && (r.priority >= PRIORITY_HIGH || r.action == RuleAction::Priority)
+            })
             .count();
         count += self
             .type_rules
             .iter()
-            .filter(|r| r.enabled && r.priority >= PRIORITY_HIGH)
+            .filter(|r| {
+                r.enabled && (r.priority >= PRIORITY_HIGH || r.action == RuleAction::Priority)
+            })
             .count();
-        count
-    }
-
-    /// Count time/schedule rules that are currently active based on current time.
-    pub fn count_active_time_based_rules(&self, now: &chrono::DateTime<chrono::Local>) -> usize {
-        use chrono::Datelike;
-
-        if !self.enabled {
-            return 0;
-        }
-
-        let time_str = now.format("%H:%M").to_string();
-        let weekday = now.weekday().num_days_from_sunday() as u8;
-
-        let mut count = 0;
-
-        // Check time rules
-        for rule in &self.time_rules {
-            if rule.enabled && is_time_in_range(&time_str, &rule.start_time, &rule.end_time) {
-                count += 1;
-            }
-        }
-
-        // Check schedule rules
-        for rule in &self.schedule_rules {
-            if rule.enabled && rule.days.contains(&weekday) {
-                let in_time = if let (Some(start), Some(end)) = (&rule.start_time, &rule.end_time) {
-                    is_time_in_range(&time_str, start, end)
-                } else {
-                    true
-                };
-                if in_time {
-                    count += 1;
-                }
-            }
-        }
-
         count
     }
 
@@ -414,37 +378,17 @@ impl NotificationRuleSet {
 
         let mut rules = Vec::new();
 
-        // Time rules with Hide or high priority
-        for rule in &self.time_rules {
-            if rule.enabled && (rule.action == RuleAction::Hide || rule.priority >= PRIORITY_HIGH) {
-                rules.push(HighImpactRule {
-                    name: rule.name.clone(),
-                    rule_type: "Time".to_string(),
-                    action: rule.action,
-                    priority: rule.priority,
-                });
-            }
-        }
-
-        // Schedule rules with Hide or high priority
-        for rule in &self.schedule_rules {
-            if rule.enabled && (rule.action == RuleAction::Hide || rule.priority >= PRIORITY_HIGH) {
-                rules.push(HighImpactRule {
-                    name: rule.name.clone(),
-                    rule_type: "Schedule".to_string(),
-                    action: rule.action,
-                    priority: rule.priority,
-                });
-            }
-        }
-
-        // Account rules with Hide action (accounts don't have priority)
+        // Account rules that are currently suppressing (outside schedule)
         for rule in &self.account_rules {
-            if rule.enabled && rule.action == RuleAction::Hide {
+            if rule.enabled && !rule.is_active_now() {
+                let action = match rule.outside_behavior {
+                    OutsideScheduleBehavior::Suppress => RuleAction::Hide,
+                    OutsideScheduleBehavior::Defer => RuleAction::Silent,
+                };
                 rules.push(HighImpactRule {
                     name: rule.account.clone(),
-                    rule_type: "Account".to_string(),
-                    action: rule.action,
+                    rule_type: "Account Schedule".to_string(),
+                    action,
                     priority: 0,
                 });
             }
@@ -452,7 +396,11 @@ impl NotificationRuleSet {
 
         // Org rules with Hide or high priority
         for rule in &self.org_rules {
-            if rule.enabled && (rule.action == RuleAction::Hide || rule.priority >= PRIORITY_HIGH) {
+            if rule.enabled
+                && (rule.action == RuleAction::Hide
+                    || rule.action == RuleAction::Priority
+                    || rule.priority >= PRIORITY_HIGH)
+            {
                 rules.push(HighImpactRule {
                     name: rule.org.clone(),
                     rule_type: "Org".to_string(),
@@ -464,7 +412,11 @@ impl NotificationRuleSet {
 
         // Type rules with Hide or high priority
         for rule in &self.type_rules {
-            if rule.enabled && (rule.action == RuleAction::Hide || rule.priority >= PRIORITY_HIGH) {
+            if rule.enabled
+                && (rule.action == RuleAction::Hide
+                    || rule.action == RuleAction::Priority
+                    || rule.priority >= PRIORITY_HIGH)
+            {
                 let name = if let Some(acc) = &rule.account {
                     format!("{} ({})", rule.notification_type, acc)
                 } else {
@@ -530,55 +482,49 @@ impl RuleEngine {
 
         let mut matching_actions: Vec<(i32, RuleAction, String, RuleDecisionReason)> = Vec::new();
 
-        // 1. Time Rules
-        let time_str = now.format("%H:%M").to_string();
-        for rule in &self.rules.time_rules {
-            if rule.enabled && self.is_time_in_range(&time_str, &rule.start_time, &rule.end_time) {
-                matching_actions.push((
-                    rule.priority,
-                    rule.action,
-                    rule.id.clone(),
-                    RuleDecisionReason::TimeRule(rule.name.clone()),
-                ));
-            }
-        }
-
-        // 2. Schedule Rules
-        let weekday = now.weekday().num_days_from_sunday() as u8; // 0=Sun, 6=Sat
-        for rule in &self.rules.schedule_rules {
-            if rule.enabled && rule.days.contains(&weekday) {
-                let in_time = if let (Some(start), Some(end)) = (&rule.start_time, &rule.end_time) {
-                    self.is_time_in_range(&time_str, start, end)
-                } else {
-                    true
-                };
-
-                if in_time {
-                    matching_actions.push((
-                        rule.priority,
-                        rule.action,
-                        rule.id.clone(),
-                        RuleDecisionReason::ScheduleRule(rule.name.clone()),
-                    ));
-                }
-            }
-        }
-
-        // 3. Account Rules
+        // 1. Account Rules (Schedule Gating)
+        // This is the primary gate.
         if let Some(acc) = account {
             for rule in &self.rules.account_rules {
-                if rule.enabled && rule.account.eq_ignore_ascii_case(acc) {
-                    matching_actions.push((
-                        PRIORITY_DEFAULT,
-                        rule.action,
-                        rule.id.clone(),
-                        RuleDecisionReason::AccountRule(rule.account.clone()),
-                    ));
+                if rule.account.eq_ignore_ascii_case(acc) {
+                    // if rule is NOT enabled, it is inactive (Suppress/Hide)
+                    if !rule.enabled {
+                        matching_actions.push((
+                            PRIORITY_DEFAULT,
+                            RuleAction::Hide, // Disabled account = Suppress
+                            rule.id.clone(),
+                            RuleDecisionReason::AccountRule(format!("{} (Disabled)", rule.account)),
+                        ));
+                        continue;
+                    }
+
+                    // Rule is enabled, check schedule
+                    if rule.is_active_now() {
+                        // Account is active, show.
+                        matching_actions.push((
+                            PRIORITY_DEFAULT,
+                            RuleAction::Show,
+                            rule.id.clone(),
+                            RuleDecisionReason::AccountRule(rule.account.clone()),
+                        ));
+                    } else {
+                        // Account is inactive (outside schedule). Apply configured behavior.
+                        let action = match rule.outside_behavior {
+                            OutsideScheduleBehavior::Suppress => RuleAction::Hide,
+                            OutsideScheduleBehavior::Defer => RuleAction::Silent,
+                        };
+                        matching_actions.push((
+                            PRIORITY_DEFAULT,
+                            action,
+                            rule.id.clone(),
+                            RuleDecisionReason::AccountRule(rule.account.clone()),
+                        ));
+                    }
                 }
             }
         }
 
-        // 4. Org Rules
+        // 2. Org Rules
         if let Some(owner) = repo_owner {
             for rule in &self.rules.org_rules {
                 if rule.enabled && rule.org.eq_ignore_ascii_case(owner) {
@@ -592,7 +538,7 @@ impl RuleEngine {
             }
         }
 
-        // 5. Type Rules
+        // 3. Type Rules
         for rule in &self.rules.type_rules {
             if rule.enabled
                 && rule
@@ -626,9 +572,32 @@ impl RuleEngine {
         // Get max priority
         let max_priority = matching_actions[0].0;
 
-        // Iterate through matching actions to find the winner
-        // We only care about rules with the max priority level
-        // Conflict Resolution: Priority > Hide > Silent > Show
+        // *** PRIORITY OVERRIDE ***
+        // If ANY rule has Priority action, it OVERRIDES all suppression rules.
+        // This is the key feature of Priority - it ignores account schedules, time rules, etc.
+        let has_priority_rule = matching_actions
+            .iter()
+            .any(|(_, action, _, _)| *action == RuleAction::Priority);
+
+        if has_priority_rule {
+            // Find the highest priority rule with Priority action
+            for (p, action, id, reason) in matching_actions.iter() {
+                if *action == RuleAction::Priority {
+                    return (
+                        RuleAction::Priority,
+                        Some(RuleDecision {
+                            applied_rule_id: id.clone(),
+                            action: RuleAction::Priority,
+                            priority: *p,
+                            reason: reason.clone(),
+                        }),
+                    );
+                }
+            }
+        }
+
+        // Standard conflict resolution (no Priority rule found)
+        // Priority > Hide > Silent > Show
 
         // Optimization: Find the best action within the max priority band without cloning
         let mut best_action = RuleAction::Show;
@@ -665,17 +634,6 @@ impl RuleEngine {
 
         (best_action, best_decision)
     }
-
-    /// Helper to check if current time string "HH:MM" is in range [start, end].
-    /// Handles wrap-around (e.g. 22:00 -> 07:00).
-    fn is_time_in_range(&self, current: &str, start: &str, end: &str) -> bool {
-        if start <= end {
-            current >= start && current <= end
-        } else {
-            // crossing midnight
-            current >= start || current <= end
-        }
-    }
 }
 
 /// Trace of why a specific rule was applied.
@@ -689,8 +647,6 @@ pub struct RuleDecision {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RuleDecisionReason {
-    TimeRule(String),
-    ScheduleRule(String),
     AccountRule(String),
     OrgRule(String),
     TypeRule(String),
@@ -708,150 +664,46 @@ mod tests {
     }
 
     #[test]
-    fn test_time_rule_creation() {
-        let rule = TimeRule::new("Night Mode", "22:00", "07:00");
-        assert!(rule.enabled);
-        assert_eq!(rule.start_time, "22:00");
-        assert_eq!(rule.end_time, "07:00");
-    }
-
-    #[test]
-    fn test_priority_resolution() {
+    fn test_active_schedule_logic() {
         let mut rules = NotificationRuleSet::default();
         rules.enabled = true;
 
-        // 1. High Priority Org Rule (Priority 50) -> Show
+        let mut acc_rule = AccountRule::new("Amar");
+        acc_rule.enabled = true;
+        acc_rule.outside_behavior = OutsideScheduleBehavior::Suppress;
+        // Make it active only on Monday (Day 1)
+        acc_rule.active_days = vec![1];
+        rules.account_rules.push(acc_rule);
+    }
+
+    #[test]
+    fn test_priority_action_override() {
+        // High priority rule (Org) vs Schedule suppression
+        let mut rules = NotificationRuleSet::default();
+        rules.enabled = true;
+
+        let mut acc_rule = AccountRule::new("WorkAcc");
+        acc_rule.enabled = true;
+        acc_rule.active_days = vec![]; // Never active
+        acc_rule.outside_behavior = OutsideScheduleBehavior::Suppress;
+        rules.account_rules.push(acc_rule);
+
         let org_rule = OrgRule {
             id: "org1".to_string(),
             enabled: true,
             org: "WorkOrg".to_string(),
             priority: 50,
-            action: RuleAction::Show,
+            action: RuleAction::Priority, // Force show!
         };
         rules.org_rules.push(org_rule);
 
-        // 2. Default Priority Time Rule (Priority 0) -> Silent
-        // This simulates "Night Mode" which usually defaults to 0 priority
-        let time_rule = TimeRule {
-            id: "time1".to_string(),
-            name: "Night".to_string(),
-            enabled: true,
-            start_time: "00:00".to_string(),
-            end_time: "23:59".to_string(), // Always active
-            priority: PRIORITY_DEFAULT,
-            action: RuleAction::Silent,
-        };
-        rules.time_rules.push(time_rule);
-
         let engine = RuleEngine::new(rules);
         let now = chrono::Local::now();
 
-        // Evaluate for WorkOrg
-        // Org Rule (50) > Time Rule (0). Action should be Show (from Org Rule).
-        let (action, decision) = engine.evaluate_detailed("mention", Some("WorkOrg"), None, &now);
-
-        assert_eq!(action, RuleAction::Show);
-        let decision = decision.expect("Should have a decision");
-
-        // Check for context in reason
-        match decision.reason {
-            RuleDecisionReason::OrgRule(ref r) => assert_eq!(r, "WorkOrg"),
-            _ => panic!("Expected OrgRule reason"),
-        }
-        assert_eq!(decision.priority, 50);
-    }
-
-    #[test]
-    fn test_action_conflict_resolution() {
-        // Test: Same priority, different actions. Priority > Hide > Silent > Show
-        let mut rules = NotificationRuleSet::default();
-        rules.enabled = true;
-
-        // 1. Type Rule: Hide (Priority 0)
-        let type_rule = TypeRule {
-            id: "type1".to_string(),
-            enabled: true,
-            notification_type: "ci_activity".to_string(),
-            account: None,
-            priority: 0,
-            action: RuleAction::Hide,
-        };
-        rules.type_rules.push(type_rule);
-
-        // 2. Time Rule: Silent (Priority 0)
-        let time_rule = TimeRule {
-            id: "time1".to_string(),
-            name: "Always".to_string(),
-            enabled: true,
-            start_time: "00:00".to_string(),
-            end_time: "23:59".to_string(),
-            priority: 0,
-            action: RuleAction::Silent,
-        };
-        rules.time_rules.push(time_rule);
-
-        let engine = RuleEngine::new(rules);
-        let now = chrono::Local::now();
-
-        // Both apply with Priority 0.
-        // Hide > Silent. Should be Hide.
-        let (action, decision) = engine.evaluate_detailed("ci_activity", None, None, &now);
-
-        assert_eq!(action, RuleAction::Hide);
-        let decision = decision.expect("Should have a decision");
-
-        match decision.reason {
-            RuleDecisionReason::TypeRule(ref t) => assert_eq!(t, "ci_activity"),
-            _ => panic!("Expected TypeRule reason"),
-        }
-    }
-
-    #[test]
-    fn test_priority_action_does_not_override_higher_numeric_priority() {
-        // Regression test: A rule with RuleAction::Priority should NOT override a rule with higher numeric priority.
-        let mut rules = NotificationRuleSet::default();
-        rules.enabled = true;
-
-        // 1. Low Priority Rule with "Priority" action (Priority -10)
-        // Using TypeRule for this
-        let low_prio_rule = TypeRule {
-            id: "low_prio".to_string(),
-            enabled: true,
-            notification_type: "review_requested".to_string(),
-            account: None,
-            priority: -10,
-            action: RuleAction::Priority,
-        };
-        rules.type_rules.push(low_prio_rule);
-
-        // 2. High Priority Rule with "Silent" action (Priority 50)
-        // Using OrgRule
-        let high_prio_rule = OrgRule {
-            id: "high_prio".to_string(),
-            enabled: true,
-            org: "WorkOrg".to_string(),
-            priority: 50,
-            action: RuleAction::Silent,
-        };
-        rules.org_rules.push(high_prio_rule);
-
-        let engine = RuleEngine::new(rules);
-        let now = chrono::Local::now();
-
-        // Evaluate
-        // High Prio (50) > Low Prio (-10), even though Low Prio has Action::Priority.
-        // The numeric priority band wins first.
-        let (action, decision) =
-            engine.evaluate_detailed("review_requested", Some("WorkOrg"), None, &now);
-
-        assert_eq!(action, RuleAction::Silent);
-        let decision = decision.expect("Should have a decision");
-
-        // Assert that the high priority rule won
-        assert_eq!(decision.priority, 50);
-        match decision.reason {
-            RuleDecisionReason::OrgRule(ref o) => assert_eq!(o, "WorkOrg"),
-            _ => panic!("Expected OrgRule to win due to higher numeric priority"),
-        }
+        // Account rule says Hide. Org rule says Priority.
+        // Priority should win.
+        let (action, _) =
+            engine.evaluate_detailed("mention", Some("WorkOrg"), Some("WorkAcc"), &now);
+        assert_eq!(action, RuleAction::Priority);
     }
 }

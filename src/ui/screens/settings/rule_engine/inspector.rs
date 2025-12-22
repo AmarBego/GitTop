@@ -6,7 +6,7 @@ use iced::{Alignment, Element, Fill, Length};
 use crate::settings::IconTheme;
 use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::{
-    AccountRule, NotificationRuleSet, OrgRule, RuleAction, ScheduleRule, TimeRule, TypeRule,
+    AccountRule, NotificationRuleSet, OrgRule, OutsideScheduleBehavior, RuleAction, TypeRule,
 };
 use crate::ui::theme;
 
@@ -15,8 +15,6 @@ use super::messages::RuleEngineMessage;
 /// Result of finding a rule by ID across all rule types.
 #[derive(Debug, Clone)]
 pub enum FoundRule {
-    Time(TimeRule),
-    Schedule(ScheduleRule),
     Account(AccountRule),
     Org(OrgRule),
     Type(TypeRule),
@@ -26,8 +24,6 @@ impl FoundRule {
     /// Get the rule's ID.
     pub fn id(&self) -> &str {
         match self {
-            FoundRule::Time(r) => &r.id,
-            FoundRule::Schedule(r) => &r.id,
             FoundRule::Account(r) => &r.id,
             FoundRule::Org(r) => &r.id,
             FoundRule::Type(r) => &r.id,
@@ -37,8 +33,6 @@ impl FoundRule {
     /// Get whether the rule is enabled.
     pub fn enabled(&self) -> bool {
         match self {
-            FoundRule::Time(r) => r.enabled,
-            FoundRule::Schedule(r) => r.enabled,
             FoundRule::Account(r) => r.enabled,
             FoundRule::Org(r) => r.enabled,
             FoundRule::Type(r) => r.enabled,
@@ -48,9 +42,16 @@ impl FoundRule {
     /// Get the rule's action.
     pub fn action(&self) -> RuleAction {
         match self {
-            FoundRule::Time(r) => r.action,
-            FoundRule::Schedule(r) => r.action,
-            FoundRule::Account(r) => r.action,
+            FoundRule::Account(r) => {
+                if r.is_active_now() {
+                    RuleAction::Show
+                } else {
+                    match r.outside_behavior {
+                        OutsideScheduleBehavior::Suppress => RuleAction::Hide,
+                        OutsideScheduleBehavior::Defer => RuleAction::Silent,
+                    }
+                }
+            }
             FoundRule::Org(r) => r.action,
             FoundRule::Type(r) => r.action,
         }
@@ -59,8 +60,6 @@ impl FoundRule {
     /// Get the rule type label.
     pub fn type_label(&self) -> &'static str {
         match self {
-            FoundRule::Time(_) => "Time Rule",
-            FoundRule::Schedule(_) => "Schedule Rule",
             FoundRule::Account(_) => "Account Rule",
             FoundRule::Org(_) => "Org Rule",
             FoundRule::Type(_) => "Type Rule",
@@ -70,12 +69,6 @@ impl FoundRule {
 
 /// Find a rule by ID across all rule types.
 pub fn find_rule_by_id(rules: &NotificationRuleSet, id: &str) -> Option<FoundRule> {
-    if let Some(r) = rules.time_rules.iter().find(|r| r.id == id) {
-        return Some(FoundRule::Time(r.clone()));
-    }
-    if let Some(r) = rules.schedule_rules.iter().find(|r| r.id == id) {
-        return Some(FoundRule::Schedule(r.clone()));
-    }
     if let Some(r) = rules.account_rules.iter().find(|r| r.id == id) {
         return Some(FoundRule::Account(r.clone()));
     }
@@ -179,7 +172,7 @@ pub fn view_inspector(
         }
         RuleAction::Hide => "Notification is completely hidden from the list.",
         RuleAction::Priority => {
-            "Notification is highlighted and always triggers desktop notification."
+            "OVERRIDES all suppression rules. Always shown and highlights with desktop notification."
         }
     };
 
@@ -221,47 +214,16 @@ pub fn view_inspector(
 
     // Rule-specific details
     let details_section = match &rule {
-        FoundRule::Time(r) => column![
-            text("Time Range").size(11).color(p.text_muted),
-            text(format!("{} - {}", r.start_time, r.end_time))
-                .size(13)
-                .color(p.text_primary),
-            Space::new().height(8),
-            text("Priority").size(11).color(p.text_muted),
-            text(format!("{}", r.priority))
-                .size(13)
-                .color(p.text_primary),
-        ],
-        FoundRule::Schedule(r) => {
-            let days_str: Vec<&str> = r
-                .days
-                .iter()
-                .map(|d| match d {
-                    0 => "Sun",
-                    1 => "Mon",
-                    2 => "Tue",
-                    3 => "Wed",
-                    4 => "Thu",
-                    5 => "Fri",
-                    6 => "Sat",
-                    _ => "?",
-                })
-                .collect();
-            column![
-                text("Days").size(11).color(p.text_muted),
-                text(days_str.join(", ")).size(13).color(p.text_primary),
-                Space::new().height(8),
-                text("Priority").size(11).color(p.text_muted),
-                text(format!("{}", r.priority))
-                    .size(13)
-                    .color(p.text_primary),
-            ]
-        }
         FoundRule::Account(r) => {
             let account_name = r.account.clone();
             column![
                 text("Account").size(11).color(p.text_muted),
                 text(account_name).size(13).color(p.text_primary),
+                Space::new().height(8),
+                text("Outside Schedule").size(11).color(p.text_muted),
+                text(format!("{}", r.outside_behavior))
+                    .size(13)
+                    .color(p.text_primary),
             ]
         }
         FoundRule::Org(r) => {

@@ -40,9 +40,19 @@ fn main() -> iced::Result {
 
     // Load settings to restore window state
     let settings = AppSettings::load();
-    let window_size = Size::new(settings.window_width, settings.window_height);
+    
+    // Validate window size (Windows reports 0x0 when minimized)
+    let window_size = if settings.window_width >= 100.0 && settings.window_height >= 100.0 {
+        Size::new(settings.window_width, settings.window_height)
+    } else {
+        Size::new(800.0, 640.0) // Default size
+    };
+    
+    // Validate window position (Windows reports -32000 when minimized)
     let window_position = match (settings.window_x, settings.window_y) {
-        (Some(x), Some(y)) => Position::Specific(Point::new(x as f32, y as f32)),
+        (Some(x), Some(y)) if x > -10000 && y > -10000 => {
+            Position::Specific(Point::new(x as f32, y as f32))
+        }
         _ => Position::Centered,
     };
 

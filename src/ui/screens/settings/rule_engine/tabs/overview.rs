@@ -1,311 +1,309 @@
 //! Overview tab for Rule Engine - System health and high-impact rules.
 
-use chrono::Local;
-use iced::widget::{column, container, row, text, Space};
-use iced::{Element, Fill};
+use iced::widget::{button, column, container, row, text, Space};
+use iced::{Element, Fill, Length};
 
 use crate::settings::IconTheme;
 use crate::ui::icons;
-use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, RuleAction};
+use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::theme;
 
-use super::super::components::view_stat_card;
 use super::super::messages::RuleEngineMessage;
 
 pub fn view_overview_tab(
     rules: &NotificationRuleSet,
     icon_theme: IconTheme,
+    explain_test_type: &str,
 ) -> Element<'static, RuleEngineMessage> {
     let p = theme::palette();
-    let now = Local::now();
 
     // System health stats
     let active_count = rules.active_rule_count();
     let suppress_count = rules.count_suppress_rules();
     let high_priority_count = rules.count_high_priority_rules();
-    let time_based_active = rules.count_active_time_based_rules(&now);
 
     // ========================================================================
-    // Header
+    // Header & Greeting
     // ========================================================================
     let header = column![
-        text("Overview").size(20).color(p.text_primary),
-        text("System health and high-impact rules at a glance.")
-            .size(12)
+        text("Overview").size(24).color(p.text_primary),
+        text("System health and rule performance metrics.")
+            .size(14)
             .color(p.text_secondary),
     ]
     .spacing(4);
 
     // ========================================================================
-    // System Health Section
+    // 1. Status Strip (Inline, no cards)
     // ========================================================================
-    let health_title = text("System Health").size(14).color(p.text_primary);
 
-    let status_badge = if rules.enabled {
+    // Helper for status items
+    let status_item = |label: &'static str,
+                       value: String,
+                       icon: Element<'static, RuleEngineMessage>,
+                       color: iced::Color| {
         row![
-            icons::icon_check(12.0, p.accent_success, icon_theme),
-            Space::new().width(4),
-            text("Rule Engine Active").size(12).color(p.accent_success),
-        ]
-        .align_y(iced::Alignment::Center)
-    } else {
-        row![
-            icons::icon_x(12.0, p.text_muted, icon_theme),
-            Space::new().width(4),
-            text("Rule Engine Disabled").size(12).color(p.text_muted),
+            icon,
+            Space::new().width(6),
+            text(value)
+                .font(iced::Font {
+                    weight: iced::font::Weight::Bold,
+                    ..Default::default()
+                })
+                .size(14)
+                .color(color),
+            Space::new().width(6),
+            text(label).size(14).color(p.text_secondary),
         ]
         .align_y(iced::Alignment::Center)
     };
 
-    // Stat items with icons
-    let active_stat = row![
-        icons::icon_check(12.0, p.accent, icon_theme),
-        Space::new().width(6),
-        text(format!("{} active rules", active_count))
-            .size(12)
-            .color(p.text_primary),
+    let divider = || text("•").size(14).color(p.text_muted);
+
+    let status_strip = row![
+        // Active Rules
+        status_item(
+            "Active",
+            active_count.to_string(),
+            icons::icon_check(16.0, p.accent_success, icon_theme),
+            p.text_primary
+        ),
+        Space::new().width(16),
+        divider(),
+        Space::new().width(16),
+        // Suppressed
+        status_item(
+            "Suppressed",
+            suppress_count.to_string(),
+            if suppress_count > 0 {
+                icons::icon_eye_off(16.0, p.accent_warning, icon_theme)
+            } else {
+                icons::icon_check(16.0, p.text_muted, icon_theme)
+            },
+            if suppress_count > 0 {
+                p.accent_warning
+            } else {
+                p.text_primary
+            }
+        ),
+        Space::new().width(16),
+        divider(),
+        Space::new().width(16),
+        // Priority
+        status_item(
+            "Priority",
+            high_priority_count.to_string(),
+            if high_priority_count > 0 {
+                icons::icon_zap(16.0, p.accent, icon_theme)
+            } else {
+                icons::icon_check(16.0, p.text_muted, icon_theme)
+            },
+            if high_priority_count > 0 {
+                p.text_primary
+            } else {
+                p.text_primary
+            }
+        ),
     ]
     .align_y(iced::Alignment::Center);
 
-    let suppress_stat = if suppress_count > 0 {
-        row![
-            icons::icon_alert(12.0, p.accent_warning, icon_theme),
-            Space::new().width(6),
-            text(format!("{} suppress notifications", suppress_count))
-                .size(12)
-                .color(p.accent_warning),
-        ]
-        .align_y(iced::Alignment::Center)
-    } else {
-        row![
-            icons::icon_check(12.0, p.text_muted, icon_theme),
-            Space::new().width(6),
-            text("No suppression rules").size(12).color(p.text_muted),
-        ]
-        .align_y(iced::Alignment::Center)
-    };
+    // ========================================================================
+    // 2. Rule Distribution (Text Row)
+    // ========================================================================
 
-    let priority_stat = if high_priority_count > 0 {
+    // Helper for distribution items
+    let dist_item = |label: &'static str, count: usize| {
+        let text_color = if count > 0 {
+            p.text_primary
+        } else {
+            p.text_muted
+        };
         row![
-            icons::icon_zap(12.0, p.accent_warning, icon_theme),
-            Space::new().width(6),
-            text(format!("{} priority overrides", high_priority_count))
-                .size(12)
-                .color(p.accent_warning),
-        ]
-        .align_y(iced::Alignment::Center)
-    } else {
-        row![
-            icons::icon_check(12.0, p.text_muted, icon_theme),
-            Space::new().width(6),
-            text("No priority overrides").size(12).color(p.text_muted),
-        ]
-        .align_y(iced::Alignment::Center)
-    };
-
-    let time_stat = if time_based_active > 0 {
-        row![
-            icons::icon_clock(12.0, p.accent, icon_theme),
-            Space::new().width(6),
-            text(format!("{} time-based active now", time_based_active))
-                .size(12)
-                .color(p.accent),
-        ]
-        .align_y(iced::Alignment::Center)
-    } else {
-        row![
-            icons::icon_clock(12.0, p.text_muted, icon_theme),
-            Space::new().width(6),
-            text("No time-based rules active")
-                .size(12)
-                .color(p.text_muted),
-        ]
-        .align_y(iced::Alignment::Center)
-    };
-
-    let health_content = column![
-        status_badge,
-        Space::new().height(12),
-        active_stat,
-        Space::new().height(6),
-        suppress_stat,
-        Space::new().height(6),
-        priority_stat,
-        Space::new().height(6),
-        time_stat,
-    ];
-
-    let health_section =
-        container(column![health_title, Space::new().height(12), health_content,].padding(16))
-            .style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_card)),
-                border: iced::Border {
-                    radius: 8.0.into(),
+            text(label).size(13).color(p.text_secondary),
+            Space::new().width(4),
+            text(format!("({})", count))
+                .size(13)
+                .color(text_color)
+                .font(iced::Font {
+                    weight: iced::font::Weight::Bold,
                     ..Default::default()
-                },
-                ..Default::default()
-            });
-
-    // ========================================================================
-    // Rule Counts Section
-    // ========================================================================
-    let counts_title = text("Rule Counts").size(14).color(p.text_primary);
-
-    let counts_row1 = row![
-        view_stat_card("Time Rules", rules.time_rules.len()),
-        Space::new().width(8),
-        view_stat_card("Schedule Rules", rules.schedule_rules.len()),
-        Space::new().width(8),
-        view_stat_card("Account Rules", rules.account_rules.len()),
-    ];
-
-    let counts_row2 = row![
-        view_stat_card("Org Rules", rules.org_rules.len()),
-        Space::new().width(8),
-        view_stat_card("Type Rules", rules.type_rules.len()),
-    ];
-
-    let counts_section = container(
-        column![
-            counts_title,
-            Space::new().height(12),
-            counts_row1,
-            Space::new().height(8),
-            counts_row2,
+                }),
         ]
-        .padding(16),
+        .align_y(iced::Alignment::Center)
+    };
+
+    let dist_divider = || {
+        container(Space::new().width(1).height(12)).style(move |_| container::Style {
+            background: Some(iced::Background::Color(p.text_muted)),
+            ..Default::default()
+        })
+    };
+
+    let distribution_row = row![
+        dist_item("Account", rules.account_rules.len()),
+        Space::new().width(12),
+        dist_divider(),
+        Space::new().width(12),
+        dist_item("Org", rules.org_rules.len()),
+        Space::new().width(12),
+        dist_divider(),
+        Space::new().width(12),
+        dist_item("Type", rules.type_rules.len()),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    // ========================================================================
+    // 3. Test Lab (Primary Action Surface)
+    // ========================================================================
+
+    // Keep the existing selector logic, just restyle container
+    use crate::github::types::NotificationReason;
+    let type_options: Vec<(&'static str, &'static str)> = vec![
+        (NotificationReason::Mention.label(), "Mention"),
+        (NotificationReason::ReviewRequested.label(), "Review"),
+        (NotificationReason::Assign.label(), "Assign"),
+        (NotificationReason::Comment.label(), "Comment"),
+        (NotificationReason::CiActivity.label(), "CI"),
+        (NotificationReason::Author.label(), "Author"),
+        (NotificationReason::TeamMention.label(), "Team"),
+        (NotificationReason::StateChange.label(), "State"),
+    ];
+
+    let type_owned = explain_test_type.to_string();
+    let mut type_buttons = row![].spacing(8);
+
+    for (value, display_label) in type_options {
+        let is_selected = value == explain_test_type;
+        let value_owned = value.to_string();
+
+        let btn = button(text(display_label).size(12).color(if is_selected {
+            p.text_primary
+        } else {
+            p.text_secondary
+        }))
+        .style(if is_selected {
+            theme::primary_button
+        } else {
+            theme::ghost_button
+        })
+        .padding([6, 12])
+        .on_press(RuleEngineMessage::SetExplainTestType(value_owned));
+
+        type_buttons = type_buttons.push(btn);
+    }
+
+    let explain_panel =
+        super::super::explain_decision::view_explain_panel(rules, &type_owned, None, icon_theme);
+
+    let test_lab = container(
+        column![
+            row![
+                icons::icon_filter(16.0, p.accent, icon_theme),
+                Space::new().width(8),
+                text("Test Lab")
+                    .size(16)
+                    .color(p.text_primary)
+                    .font(iced::Font {
+                        weight: iced::font::Weight::Bold,
+                        ..Default::default()
+                    }),
+            ]
+            .align_y(iced::Alignment::Center),
+            Space::new().height(4),
+            text("Simulate a notification to see which rules apply.")
+                .size(13)
+                .color(p.text_secondary),
+            Space::new().height(20),
+            type_buttons,
+            Space::new().height(24),
+            explain_panel,
+        ]
+        .padding(24),
     )
+    .width(Fill)
     .style(move |_| container::Style {
         background: Some(iced::Background::Color(p.bg_card)),
         border: iced::Border {
             radius: 8.0.into(),
-            ..Default::default()
+            width: 1.0,
+            color: p.border_subtle,
         },
         ..Default::default()
     });
 
     // ========================================================================
-    // High-Impact Rules Section
+    // 4. High Impact Sidebar (Flat List)
     // ========================================================================
+
     let high_impact_rules = rules.get_high_impact_rules();
 
-    let high_impact_section = if high_impact_rules.is_empty() {
-        container(
-            column![
-                row![
-                    icons::icon_alert(14.0, p.text_muted, icon_theme),
-                    Space::new().width(8),
-                    text("High-Impact Rules").size(14).color(p.text_primary),
-                ]
-                .align_y(iced::Alignment::Center),
-                Space::new().height(12),
-                text("No high-impact rules active.")
-                    .size(12)
-                    .color(p.text_muted),
-                text("Rules that hide notifications or have high priority will appear here.")
-                    .size(11)
-                    .color(p.text_muted),
-            ]
-            .padding(16),
-        )
-        .style(move |_| container::Style {
-            background: Some(iced::Background::Color(p.bg_card)),
-            border: iced::Border {
-                radius: 8.0.into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+    let list_content: Element<'static, RuleEngineMessage> = if high_impact_rules.is_empty() {
+        column![text("No high-impact rules active.")
+            .size(12)
+            .color(p.text_muted),]
+        .into()
     } else {
-        let high_impact_title = row![
-            icons::icon_alert(14.0, p.accent_warning, icon_theme),
-            Space::new().width(8),
-            text("High-Impact Rules").size(14).color(p.text_primary),
-            Space::new().width(8),
-            text(format!("({})", high_impact_rules.len()))
-                .size(12)
-                .color(p.text_muted),
-        ]
-        .align_y(iced::Alignment::Center);
-
-        let mut rules_list = column![].spacing(6);
-
-        for rule in high_impact_rules.iter().take(10) {
-            // Limit display to 10
-            let action_color = match rule.action {
-                RuleAction::Hide => p.accent_warning,
-                RuleAction::Priority => p.accent_warning,
-                _ => p.text_secondary,
-            };
-
-            let action_icon = match rule.action {
-                RuleAction::Hide => icons::icon_eye_off(11.0, action_color, icon_theme),
-                RuleAction::Priority => icons::icon_zap(11.0, action_color, icon_theme),
-                _ => icons::icon_check(11.0, action_color, icon_theme),
-            };
-
-            // Clone strings to avoid lifetime issues with local variable
-            let rule_name = rule.name.clone();
-            let rule_type = rule.rule_type.clone();
-            let action_label = rule.action.display_label();
-
-            let rule_row = row![
-                action_icon,
-                Space::new().width(6),
-                text(rule_name).size(12).color(p.text_primary),
-                Space::new().width(8),
-                text(rule_type).size(10).color(p.text_muted),
-                Space::new().width(Fill),
-                text(action_label).size(11).color(action_color),
-            ]
-            .align_y(iced::Alignment::Center)
-            .padding([4, 8]);
-
-            let rule_container = container(rule_row).style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_control)),
-                border: iced::Border {
-                    radius: 4.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-
-            rules_list = rules_list.push(rule_container);
-        }
-
-        if high_impact_rules.len() > 10 {
-            rules_list = rules_list.push(
-                text(format!("... and {} more", high_impact_rules.len() - 10))
-                    .size(11)
-                    .color(p.text_muted),
-            );
-        }
-
-        container(column![high_impact_title, Space::new().height(12), rules_list,].padding(16))
-            .style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_card)),
-                border: iced::Border {
-                    radius: 8.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+        column(
+            high_impact_rules
+                .iter()
+                .take(6)
+                .map(|r| {
+                    let action_label = r.action.display_label();
+                    // Flat text row
+                    button(
+                        row![
+                            text("•").size(14).color(p.text_secondary),
+                            Space::new().width(8),
+                            column![
+                                text(r.name.clone()).size(13).color(p.text_primary),
+                                text(action_label).size(11).color(p.text_muted)
+                            ]
+                        ]
+                        .align_y(iced::Alignment::Start),
+                    )
+                    .padding(4)
+                    .style(theme::ghost_button)
+                    // Future: .on_press(NavigateToRule(id))
+                    .into()
+                })
+                .collect::<Vec<Element<'_, RuleEngineMessage>>>(),
+        )
+        .spacing(8)
+        .into()
     };
 
+    let high_impact_section = column![
+        text("HIGH IMPACT")
+            .size(11)
+            .color(p.text_muted)
+            .font(iced::Font {
+                weight: iced::font::Weight::Bold,
+                ..Default::default()
+            }),
+        Space::new().height(12),
+        list_content
+    ]
+    .width(Length::Fixed(240.0));
+
     // ========================================================================
-    // Assemble Layout
+    // Final Layout Assembly
     // ========================================================================
+
+    let left_column = column![
+        status_strip,
+        Space::new().height(24),
+        distribution_row,
+        Space::new().height(24),
+        test_lab
+    ]
+    .width(Fill);
+
     column![
         header,
-        Space::new().height(24),
-        health_section,
-        Space::new().height(16),
-        counts_section,
-        Space::new().height(16),
-        high_impact_section,
+        Space::new().height(32),
+        row![left_column, Space::new().width(48), high_impact_section]
     ]
-    .spacing(0)
-    .padding(24)
+    .padding(40) // More outer padding
     .width(Fill)
     .into()
 }

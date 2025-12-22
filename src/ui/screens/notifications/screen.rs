@@ -9,12 +9,13 @@ use iced::{Alignment, Color, Element, Fill, Task};
 
 use crate::github::{GitHubClient, GitHubError, NotificationView, SubjectType, UserInfo};
 use crate::settings::IconTheme;
+use crate::ui::screens::settings::rule_engine::NotificationRuleSet;
 use crate::ui::{icons, theme, window_state};
 
 use super::group::{view_group_header, view_group_items};
 use super::helper::{
-    api_url_to_web_url, apply_filters, count_by_repo, count_by_type, group_by_time, FilterSettings,
-    NotificationGroup,
+    api_url_to_web_url, apply_filters, count_by_repo, count_by_type, group_processed_notifications,
+    process_with_rules, FilterSettings, NotificationGroup, ProcessedNotification,
 };
 use super::sidebar::view_sidebar;
 use super::states::{view_empty, view_error, view_loading};
@@ -27,7 +28,10 @@ pub struct NotificationsScreen {
     pub client: GitHubClient,
     pub user: UserInfo,
     pub all_notifications: Vec<NotificationView>,
+    /// Notifications after filtering (by type, repo, read status).
     pub filtered_notifications: Vec<NotificationView>,
+    /// Processed notifications with rule actions applied.
+    pub processed_notifications: Vec<ProcessedNotification>,
     pub groups: Vec<NotificationGroup>,
     pub filters: FilterSettings,
     pub is_loading: bool,
@@ -39,6 +43,11 @@ pub struct NotificationsScreen {
     /// Track seen notifications by ID -> updated_at timestamp.
     /// This detects both new notifications AND updates to existing ones.
     seen_notification_timestamps: HashMap<String, chrono::DateTime<chrono::Utc>>,
+    /// Cached rule set for evaluation.
+    rules: NotificationRuleSet,
+    /// Priority notifications from ALL accounts (persists across account switches).
+    /// These are always shown at the top, regardless of current account.
+    cross_account_priority: Vec<ProcessedNotification>,
 }
 
 /// Notifications screen messages.
@@ -79,6 +88,7 @@ impl NotificationsScreen {
             user,
             all_notifications: Vec::new(),
             filtered_notifications: Vec::new(),
+            processed_notifications: Vec::new(),
             groups: Vec::new(),
             filters: FilterSettings::default(),
             is_loading: true,
@@ -86,6 +96,8 @@ impl NotificationsScreen {
             type_counts: Vec::new(),
             repo_counts: Vec::new(),
             seen_notification_timestamps: HashMap::new(),
+            rules: NotificationRuleSet::load(),
+            cross_account_priority: Vec::new(),
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -94,8 +106,9 @@ impl NotificationsScreen {
     fn fetch_notifications(&self) -> Task<NotificationMessage> {
         let client = self.client.clone();
         let show_all = self.filters.show_all;
+        let account = self.user.login.clone();
         Task::perform(
-            async move { client.get_notification_views(show_all).await },
+            async move { client.get_notification_views(show_all, &account).await },
             NotificationMessage::RefreshComplete,
         )
     }
@@ -107,44 +120,167 @@ impl NotificationsScreen {
         }
     }
 
+    /// Reload rules from disk (called when settings change).
+    pub fn reload_rules(&mut self) {
+        self.rules = NotificationRuleSet::load();
+        self.rebuild_groups();
+    }
+
+    /// Get the cross-account priority notifications (for passing to new screen on account switch).
+    pub fn get_cross_account_priority(&self) -> Vec<ProcessedNotification> {
+        self.cross_account_priority.clone()
+    }
+
+    /// Set cross-account priority notifications (from previous screen on account switch).
+    pub fn set_cross_account_priority(&mut self, priority: Vec<ProcessedNotification>) {
+        self.cross_account_priority = priority;
+        self.rebuild_groups();
+    }
+
+    /// Extract priority notifications from current account and add to cross-account store.
+    /// Only tracks UNREAD priority notifications.
+    fn update_cross_account_priority(&mut self) {
+        use crate::ui::screens::settings::rule_engine::RuleAction;
+
+        // Get unread priority notifications from current account's processed list
+        let current_priority: Vec<ProcessedNotification> = self
+            .processed_notifications
+            .iter()
+            .filter(|p| p.action == RuleAction::Priority && p.notification.unread)
+            .cloned()
+            .collect();
+
+        // Merge with existing cross-account priority (remove duplicates by ID)
+        // and remove old entries from the same account (they'll be replaced)
+        let current_account = &self.user.login;
+        self.cross_account_priority
+            .retain(|p| p.notification.account != *current_account);
+
+        // Add current account's unread priority notifications
+        self.cross_account_priority.extend(current_priority);
+    }
+
     fn rebuild_groups(&mut self) {
+        use crate::ui::screens::settings::rule_engine::RuleAction;
+
         // Recompute cached counts from all notifications
         self.type_counts = count_by_type(&self.all_notifications);
         self.repo_counts = count_by_repo(&self.all_notifications);
-        // Apply filters
+        // Apply filters (type, repo, read status)
         self.filtered_notifications = apply_filters(&self.all_notifications, &self.filters);
-        // Then group by time
-        self.groups = group_by_time(&self.filtered_notifications);
+        // Process through rule engine (applies actions, filters hidden)
+        self.processed_notifications =
+            process_with_rules(&self.filtered_notifications, &self.rules);
+
+        // Update cross-account priority store with current account's priority notifications
+        // (only track unread priority notifications)
+        self.update_cross_account_priority();
+
+        // Only show cross-account priority in "Unread" mode, not "All"
+        let all_processed = if self.filters.show_all {
+            // In "All" mode, just show current account's notifications without cross-account priority
+            self.processed_notifications.clone()
+        } else {
+            // In "Unread" mode, merge cross-account priority notifications from other accounts
+            let current_account = &self.user.login;
+            let other_account_priority: Vec<ProcessedNotification> = self
+                .cross_account_priority
+                .iter()
+                .filter(|p| p.notification.account != *current_account && p.notification.unread)
+                .cloned()
+                .collect();
+
+            // Combine current account's processed notifications with other accounts' priority
+            let mut combined = self.processed_notifications.clone();
+
+            // Add other account priority notifications (they're already marked as Priority action)
+            for p in other_account_priority {
+                // Avoid duplicates by ID
+                if !combined.iter().any(|existing| existing.notification.id == p.notification.id) {
+                    combined.push(p);
+                }
+            }
+            combined
+        };
+
+        // Group by time. Priority group only shown in "Unread" mode (not "All").
+        let show_priority_group = !self.filters.show_all;
+        self.groups = group_processed_notifications(&all_processed, show_priority_group);
     }
 
     /// Send desktop notifications for new or updated unread notifications.
     /// Only called when window is hidden in tray.
+    /// Respects rule engine: Silent/Hide actions suppress desktop notifications.
     fn send_desktop_notifications(&self, notifications: &[NotificationView]) {
+        use crate::ui::screens::settings::rule_engine::{RuleAction, RuleEngine};
+
         eprintln!(
             "[DEBUG] send_desktop_notifications called with {} notifications",
             notifications.len()
         );
 
-        // Find new or updated unread notifications
+        // Process through rule engine to determine which should trigger desktop notifications
+        let engine = RuleEngine::new(self.rules.clone());
+        let now = chrono::Local::now();
+
+        // Find new or updated unread notifications that should trigger desktop notifications
         // A notification is "new" if:
         // 1. We've never seen this ID before, OR
         // 2. The updated_at timestamp is newer than what we recorded
+        // AND:
+        // 3. The rule action is Show or Priority (not Silent or Hide)
         let new_notifications: Vec<_> = notifications
             .iter()
             .filter(|n| {
                 if !n.unread {
                     return false;
                 }
-                match self.seen_notification_timestamps.get(&n.id) {
+
+                // Check if notification is new/updated
+                let is_new = match self.seen_notification_timestamps.get(&n.id) {
                     None => true,                                 // Never seen this ID
                     Some(last_seen) => n.updated_at > *last_seen, // Updated since last seen
+                };
+
+                if !is_new {
+                    return false;
                 }
+
+                // Check rule engine for action
+                // Use the reason's label for matching (e.g., "Mentioned", "Commented")
+                let reason_label = n.reason.label();
+                let (action, _) = engine.evaluate_detailed(
+                    reason_label,
+                    Some(n.repo_owner()),
+                    Some(&n.account),
+                    &now,
+                );
+
+                // Only show desktop notification for Show and Priority actions
+                // Priority always triggers notification (that's the point!)
+                matches!(action, RuleAction::Show | RuleAction::Priority)
+            })
+            .collect();
+
+        // Separate priority notifications (they should always be prominent)
+        let priority_notifications: Vec<_> = new_notifications
+            .iter()
+            .filter(|n| {
+                let reason_label = n.reason.label();
+                let (action, _) = engine.evaluate_detailed(
+                    reason_label,
+                    Some(n.repo_owner()),
+                    Some(&n.account),
+                    &now,
+                );
+                action == RuleAction::Priority
             })
             .collect();
 
         eprintln!(
-            "[DEBUG] Found {} new/updated unread notifications (seen count: {})",
+            "[DEBUG] Found {} new notifications ({} priority) (seen count: {})",
             new_notifications.len(),
+            priority_notifications.len(),
             self.seen_notification_timestamps.len()
         );
 
@@ -153,9 +289,34 @@ impl NotificationsScreen {
             return;
         }
 
-        // If there's just one new notification, show it directly
-        if new_notifications.len() == 1 {
-            let notif = &new_notifications[0];
+        // If there are priority notifications, show them first/prominently
+        if !priority_notifications.is_empty() {
+            for notif in &priority_notifications {
+                let title = format!("Priority: {} - {}", notif.repo_full_name, notif.subject_type);
+                let url = notif.url.as_ref().map(|u| api_url_to_web_url(u));
+                let body = format!("{}\n{}", notif.title, notif.reason.label());
+                eprintln!("[DEBUG] Sending priority notification: {:?}", title);
+                crate::platform::notify(&title, &body, url.as_deref());
+            }
+            // If all notifications are priority, we're done
+            if priority_notifications.len() == new_notifications.len() {
+                return;
+            }
+        }
+
+        // Handle remaining (non-priority) notifications
+        let regular_notifications: Vec<_> = new_notifications
+            .iter()
+            .filter(|n| !priority_notifications.contains(n))
+            .collect();
+
+        if regular_notifications.is_empty() {
+            return;
+        }
+
+        // If there's just one regular notification, show it directly
+        if regular_notifications.len() == 1 {
+            let notif = regular_notifications[0];
             let title = format!("{} - {}", notif.repo_full_name, notif.subject_type);
             let url = notif.url.as_ref().map(|u| api_url_to_web_url(u));
 
@@ -166,16 +327,16 @@ impl NotificationsScreen {
             crate::platform::notify(&title, &body, url.as_deref());
         } else {
             // Multiple notifications - show a summary
-            let title = format!("{} new GitHub notifications", new_notifications.len());
-            let body = new_notifications
+            let title = format!("{} new GitHub notifications", regular_notifications.len());
+            let body = regular_notifications
                 .iter()
                 .take(3) // Show first 3
                 .map(|n| format!("• {}", n.title))
                 .collect::<Vec<_>>()
                 .join("\n");
 
-            let body = if new_notifications.len() > 3 {
-                format!("{}\\n...and {} more", body, new_notifications.len() - 3)
+            let body = if regular_notifications.len() > 3 {
+                format!("{}\\n...and {} more", body, regular_notifications.len() - 3)
             } else {
                 body
             };
@@ -629,7 +790,8 @@ impl NotificationsScreen {
             return view_error(error, icon_theme);
         }
 
-        if self.filtered_notifications.is_empty() {
+        // Check processed notifications (after rule filtering) for empty state
+        if self.processed_notifications.is_empty() {
             return view_empty(self.filters.show_all, icon_theme);
         }
 

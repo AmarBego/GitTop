@@ -178,7 +178,7 @@ pub struct Owner {
 }
 
 /// Frontend-friendly notification format for the UI.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NotificationView {
     pub id: String,
     pub title: String,
@@ -197,15 +197,18 @@ pub struct NotificationView {
     pub avatar_url: String,
     #[allow(dead_code)] // Reserved for private repo indicator
     pub is_private: bool,
+    /// The GitHub account (username) this notification belongs to.
+    pub account: String,
 }
 
-impl From<Notification> for NotificationView {
-    fn from(n: Notification) -> Self {
+impl NotificationView {
+    /// Create a NotificationView from a Notification with the account name.
+    pub fn from_notification(n: Notification, account: impl Into<String>) -> Self {
         Self {
             id: n.id,
             title: n.subject.title,
             repo_name: n.repository.name,
-            repo_full_name: n.repository.full_name,
+            repo_full_name: n.repository.full_name.clone(),
             subject_type: n.subject.subject_type,
             reason: n.reason,
             unread: n.unread,
@@ -215,7 +218,22 @@ impl From<Notification> for NotificationView {
             latest_comment_url: n.subject.latest_comment_url,
             avatar_url: n.repository.owner.avatar_url,
             is_private: n.repository.private,
+            account: account.into(),
         }
+    }
+
+    /// Get the repository owner (org or user) from the full name.
+    pub fn repo_owner(&self) -> &str {
+        self.repo_full_name
+            .split('/')
+            .next()
+            .unwrap_or(&self.repo_full_name)
+    }
+}
+
+impl From<Notification> for NotificationView {
+    fn from(n: Notification) -> Self {
+        Self::from_notification(n, String::new())
     }
 }
 

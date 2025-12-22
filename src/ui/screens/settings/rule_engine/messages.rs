@@ -11,27 +11,26 @@ pub enum RuleEngineMessage {
     ToggleEnabled(bool),
 
     // ========================================================================
-    // Time Rules
+    // Account Rules (New Design)
     // ========================================================================
-    ToggleTimeRule(String, bool),
-    AddTimeRule,
-    DeleteTimeRule(String),
-    DuplicateTimeRule(String),
+    /// Select an account in the Accounts tab to view/edit schedule.
+    SelectAccount(String), // account rule ID
 
-    // ========================================================================
-    // Schedule Rules
-    // ========================================================================
-    ToggleScheduleRule(String, bool),
-    AddWeekendRule,
-    DeleteScheduleRule(String),
-    DuplicateScheduleRule(String),
+    // Master switch
+    ToggleAccountEnabled(String, bool),
 
-    // ========================================================================
-    // Account Rules
-    // ========================================================================
-    ToggleAccountRule(String, bool),
-    DeleteAccountRule(String),
-    DuplicateAccountRule(String),
+    // Weekly Schedule Grid
+    ToggleAccountDay(String, u8), // id, day(0-6)
+
+    // Time Windows
+    SetAccountTimeWindow(String, Option<String>, Option<String>), // id, start, end
+    SetAccountTimeWindowExpanded(String, bool),                   // id, is_expanded
+
+    // Outside Schedule Behavior
+    SetOutsideScheduleBehavior(
+        String,
+        crate::ui::screens::settings::rule_engine::rules::OutsideScheduleBehavior,
+    ),
 
     // ========================================================================
     // Org Rules
@@ -63,6 +62,14 @@ pub enum RuleEngineMessage {
     SelectRule(String),
     /// Clear rule selection (close inspector)
     ClearRuleSelection,
+
+    // Rule Sets
+    /// Rename the current rule set
+    RenameRuleSet(String),
+
+    // Explain Decision
+    /// Set the test notification type for explain decision
+    SetExplainTestType(String),
 }
 
 /// Rule Engine tabs for navigation.
@@ -70,8 +77,6 @@ pub enum RuleEngineMessage {
 pub enum RuleTab {
     #[default]
     Overview,
-    TimeRules,
-    ScheduleRules,
     AccountRules,
     OrgRules,
     TypeRules,

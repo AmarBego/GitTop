@@ -152,14 +152,17 @@ impl GitHubClient {
     }
 
     /// Fetches notifications and converts them to frontend-friendly format.
+    /// The account parameter identifies which GitHub account these notifications belong to.
     pub async fn get_notification_views(
         &self,
         all: bool,
+        account: &str,
     ) -> Result<Vec<NotificationView>, GitHubError> {
         let notifications = self.get_notifications(all).await?;
+        let account = account.to_string();
         Ok(notifications
             .into_iter()
-            .map(NotificationView::from)
+            .map(|n| NotificationView::from_notification(n, account.clone()))
             .collect())
     }
 

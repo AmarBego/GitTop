@@ -5,7 +5,7 @@ use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::settings::{AppSettings, IconTheme};
 use crate::ui::screens::settings::rule_engine::rules::{
-    NotificationRuleSet, RuleAction, ScheduleRule, TimeRule, TypeRule,
+    NotificationRuleSet, OutsideScheduleBehavior, RuleAction, TypeRule,
 };
 use crate::ui::{icons, theme};
 
@@ -22,6 +22,9 @@ pub struct RuleEngineScreen {
     pub sidebar_font_scale: f32,
     pub accounts: Vec<String>,
 
+    pub selected_account_id: Option<String>,
+    pub expanded_account_time_windows: std::collections::HashSet<String>,
+
     // Type Rule Creation State
     pub new_type_rule_type: crate::github::types::NotificationReason,
     pub new_type_rule_account: String,
@@ -33,27 +36,50 @@ pub struct RuleEngineScreen {
 
     // Rule Inspector State
     pub selected_rule_id: Option<String>,
+
+    // Explain Decision State
+    pub explain_test_type: String,
 }
 
 impl RuleEngineScreen {
-    pub fn new(rules: NotificationRuleSet, settings: AppSettings) -> Self {
+    pub fn new(mut rules: NotificationRuleSet, settings: AppSettings) -> Self {
+        let accounts: Vec<String> = settings
+            .accounts
+            .iter()
+            .map(|a| a.username.clone())
+            .collect();
+
+        // Ensure every signed-in account has a rule entry
+        for account in &accounts {
+            if !rules
+                .account_rules
+                .iter()
+                .any(|r| r.account.eq_ignore_ascii_case(account))
+            {
+                use crate::ui::screens::settings::rule_engine::rules::AccountRule;
+                rules.account_rules.push(AccountRule::new(account));
+            }
+        }
+
         Self {
             rules,
             selected_tab: RuleTab::default(),
             icon_theme: settings.icon_theme,
             sidebar_width: settings.sidebar_width,
             sidebar_font_scale: settings.sidebar_font_scale,
-            accounts: settings
-                .accounts
-                .iter()
-                .map(|a| a.username.clone())
-                .collect(),
+            accounts,
+
+            selected_account_id: None,
+            expanded_account_time_windows: std::collections::HashSet::new(),
+
             new_type_rule_type: crate::github::types::NotificationReason::Mention,
             new_type_rule_account: "Global".to_string(),
             new_type_rule_priority: 0,
             new_type_rule_action: RuleAction::Show,
             expanded_type_groups: std::collections::HashSet::new(),
             selected_rule_id: None,
+
+            explain_test_type: "Mentioned".to_string(),
         }
     }
 
@@ -71,101 +97,50 @@ impl RuleEngineScreen {
             }
 
             // ================================================================
-            // Time Rules
+            // Account Rules (New Design)
             // ================================================================
-            RuleEngineMessage::ToggleTimeRule(id, enabled) => {
-                if let Some(rule) = self.rules.time_rules.iter_mut().find(|r| r.id == id) {
-                    rule.enabled = enabled;
-                }
-                let _ = self.rules.save();
+            RuleEngineMessage::SelectAccount(id) => {
+                self.selected_account_id = Some(id);
                 Task::none()
             }
-            RuleEngineMessage::AddTimeRule => {
-                let rule = TimeRule::new("Night Mode", "22:00", "07:00");
-                self.rules.time_rules.push(rule);
-                let _ = self.rules.save();
-                Task::none()
-            }
-            RuleEngineMessage::DeleteTimeRule(id) => {
-                self.rules.time_rules.retain(|r| r.id != id);
-                let _ = self.rules.save();
-                Task::none()
-            }
-            RuleEngineMessage::DuplicateTimeRule(id) => {
-                if let Some(rule) = self.rules.time_rules.iter().find(|r| r.id == id).cloned() {
-                    let mut new_rule = rule;
-                    new_rule.id = uuid::Uuid::new_v4().to_string();
-                    new_rule.name = format!("{} (Copy)", new_rule.name);
-                    self.rules.time_rules.push(new_rule);
-                    let _ = self.rules.save();
-                }
-                Task::none()
-            }
-
-            // ================================================================
-            // Schedule Rules
-            // ================================================================
-            RuleEngineMessage::ToggleScheduleRule(id, enabled) => {
-                if let Some(rule) = self.rules.schedule_rules.iter_mut().find(|r| r.id == id) {
-                    rule.enabled = enabled;
-                }
-                let _ = self.rules.save();
-                Task::none()
-            }
-            RuleEngineMessage::AddWeekendRule => {
-                let rule = ScheduleRule::weekend_silent();
-                self.rules.schedule_rules.push(rule);
-                let _ = self.rules.save();
-                Task::none()
-            }
-            RuleEngineMessage::DeleteScheduleRule(id) => {
-                self.rules.schedule_rules.retain(|r| r.id != id);
-                let _ = self.rules.save();
-                Task::none()
-            }
-            RuleEngineMessage::DuplicateScheduleRule(id) => {
-                if let Some(rule) = self
-                    .rules
-                    .schedule_rules
-                    .iter()
-                    .find(|r| r.id == id)
-                    .cloned()
-                {
-                    let mut new_rule = rule;
-                    new_rule.id = uuid::Uuid::new_v4().to_string();
-                    new_rule.name = format!("{} (Copy)", new_rule.name);
-                    self.rules.schedule_rules.push(new_rule);
-                    let _ = self.rules.save();
-                }
-                Task::none()
-            }
-
-            // ================================================================
-            // Account Rules
-            // ================================================================
-            RuleEngineMessage::ToggleAccountRule(id, enabled) => {
+            RuleEngineMessage::ToggleAccountEnabled(id, enabled) => {
                 if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
                     rule.enabled = enabled;
+                    let _ = self.rules.save();
                 }
-                let _ = self.rules.save();
                 Task::none()
             }
-            RuleEngineMessage::DeleteAccountRule(id) => {
-                self.rules.account_rules.retain(|r| r.id != id);
-                let _ = self.rules.save();
+            RuleEngineMessage::ToggleAccountDay(id, day) => {
+                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
+                    if rule.active_days.contains(&day) {
+                        rule.active_days.retain(|d| *d != day);
+                    } else {
+                        rule.active_days.push(day);
+                        rule.active_days.sort();
+                    }
+                    let _ = self.rules.save();
+                }
                 Task::none()
             }
-            RuleEngineMessage::DuplicateAccountRule(id) => {
-                if let Some(rule) = self
-                    .rules
-                    .account_rules
-                    .iter()
-                    .find(|r| r.id == id)
-                    .cloned()
-                {
-                    let mut new_rule = rule;
-                    new_rule.id = uuid::Uuid::new_v4().to_string();
-                    self.rules.account_rules.push(new_rule);
+            RuleEngineMessage::SetAccountTimeWindow(id, start, end) => {
+                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
+                    rule.start_time = start;
+                    rule.end_time = end;
+                    let _ = self.rules.save();
+                }
+                Task::none()
+            }
+            RuleEngineMessage::SetAccountTimeWindowExpanded(id, expanded) => {
+                if expanded {
+                    self.expanded_account_time_windows.insert(id);
+                } else {
+                    self.expanded_account_time_windows.remove(&id);
+                }
+                Task::none()
+            }
+            RuleEngineMessage::SetOutsideScheduleBehavior(id, behavior) => {
+                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
+                    rule.outside_behavior = behavior;
                     let _ = self.rules.save();
                 }
                 Task::none()
@@ -278,6 +253,16 @@ impl RuleEngineScreen {
                 self.selected_rule_id = None;
                 Task::none()
             }
+
+            RuleEngineMessage::RenameRuleSet(name) => {
+                self.rules.name = name;
+                self.rules.save();
+                Task::none()
+            }
+            RuleEngineMessage::SetExplainTestType(test_type) => {
+                self.explain_test_type = test_type;
+                Task::none()
+            }
         }
     }
 
@@ -338,7 +323,7 @@ impl RuleEngineScreen {
 
         let header_row = row![
             back_btn,
-            Space::new().width(Fill),
+            Space::new().width(16),
             title,
             Space::new().width(Fill),
             enabled_toggle,
@@ -370,16 +355,7 @@ impl RuleEngineScreen {
                 RuleTab::Overview,
                 icons::icon_chart(icon_size, self.nav_icon_color(RuleTab::Overview), t)
             ),
-            self.view_nav_item(
-                "Time Rules",
-                RuleTab::TimeRules,
-                icons::icon_clock(icon_size, self.nav_icon_color(RuleTab::TimeRules), t)
-            ),
-            self.view_nav_item(
-                "Schedule",
-                RuleTab::ScheduleRules,
-                icons::icon_calendar(icon_size, self.nav_icon_color(RuleTab::ScheduleRules), t)
-            ),
+            // Removed Time and Schedule items
             self.view_nav_item(
                 "Accounts",
                 RuleTab::AccountRules,
@@ -463,36 +439,82 @@ impl RuleEngineScreen {
         let p = theme::palette();
         let t = self.icon_theme;
 
-        let content: Element<'_, RuleEngineMessage> = match self.selected_tab {
-            RuleTab::Overview => tabs::view_overview_tab(&self.rules, t),
-            RuleTab::TimeRules => tabs::view_time_rules_tab(&self.rules, t),
-            RuleTab::ScheduleRules => tabs::view_schedule_rules_tab(&self.rules, t),
-            RuleTab::AccountRules => tabs::view_account_rules_tab(&self.rules, t),
-            RuleTab::OrgRules => tabs::view_org_rules_tab(&self.rules, t),
-            RuleTab::TypeRules => tabs::view_type_rules_tab(
-                &self.rules,
-                t,
-                self.new_type_rule_type,
-                &self.new_type_rule_account,
-                &self.accounts,
-                self.new_type_rule_priority,
-                self.new_type_rule_action,
-                &self.expanded_type_groups,
-            ),
-        };
-
-        let scrollable_content = scrollable(content)
-            .width(Fill)
-            .height(Fill)
-            .style(theme::scrollbar);
-
-        container(scrollable_content)
-            .width(Fill)
-            .height(Fill)
-            .style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_base)),
-                ..Default::default()
-            })
-            .into()
+        match self.selected_tab {
+            RuleTab::Overview => {
+                let content = tabs::view_overview_tab(&self.rules, t, &self.explain_test_type);
+                container(
+                    scrollable(content)
+                        .width(Fill)
+                        .height(Fill)
+                        .style(theme::scrollbar),
+                )
+                .width(Fill)
+                .height(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_base)),
+                    ..Default::default()
+                })
+                .into()
+            }
+            RuleTab::AccountRules => {
+                // Account rules tab handles its own scrolling internally (3-pane layout)
+                let content = tabs::view_account_rules_tab(
+                    &self.rules,
+                    t,
+                    &self.selected_account_id,
+                    &self.expanded_account_time_windows,
+                    &self.accounts,
+                );
+                container(content)
+                    .width(Fill)
+                    .height(Fill)
+                    .style(move |_| container::Style {
+                        background: Some(iced::Background::Color(p.bg_base)),
+                        ..Default::default()
+                    })
+                    .into()
+            }
+            RuleTab::OrgRules => {
+                let content = tabs::view_org_rules_tab(&self.rules, t);
+                container(
+                    scrollable(content)
+                        .width(Fill)
+                        .height(Fill)
+                        .style(theme::scrollbar),
+                )
+                .width(Fill)
+                .height(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_base)),
+                    ..Default::default()
+                })
+                .into()
+            }
+            RuleTab::TypeRules => {
+                let content = tabs::view_type_rules_tab(
+                    &self.rules,
+                    t,
+                    self.new_type_rule_type,
+                    &self.new_type_rule_account,
+                    &self.accounts,
+                    self.new_type_rule_priority,
+                    self.new_type_rule_action,
+                    &self.expanded_type_groups,
+                );
+                container(
+                    scrollable(content)
+                        .width(Fill)
+                        .height(Fill)
+                        .style(theme::scrollbar),
+                )
+                .width(Fill)
+                .height(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_base)),
+                    ..Default::default()
+                })
+                .into()
+            }
+        }
     }
 }

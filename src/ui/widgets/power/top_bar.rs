@@ -25,7 +25,7 @@ pub fn view_top_bar<'a>(
     let p = theme::palette();
 
     // Context Switcher (Account / Workspace selector)
-    let context_switch: Element<'_, _, _, iced::Renderer> = if accounts.len() > 1 {
+    let context_switch: Element<'_, NotificationMessage> = if accounts.len() > 1 {
         // Dropdown for switching
         let account_names: Vec<String> = accounts.iter().map(|a| a.username.clone()).collect();
 

@@ -421,6 +421,30 @@ pub fn ghost_button(_: &Theme, status: button::Status) -> button::Style {
     })
 }
 
+/// Button style for priority group headers - uses warning/orange accent.
+pub fn priority_header_button(_: &Theme, status: button::Status) -> button::Style {
+    with_palette(|p| {
+        let base_bg = Color::from_rgba(p.accent_warning.r, p.accent_warning.g, p.accent_warning.b, 0.05);
+        let hover_bg = Color::from_rgba(p.accent_warning.r, p.accent_warning.g, p.accent_warning.b, 0.1);
+        let active_bg = Color::from_rgba(p.accent_warning.r, p.accent_warning.g, p.accent_warning.b, 0.15);
+        
+        button::Style {
+            background: Some(Background::Color(hover_active(
+                status,
+                base_bg,
+                hover_bg,
+                active_bg,
+            ))),
+            text_color: match status {
+                button::Status::Pressed => p.accent_warning,
+                _ => p.text_primary,
+            },
+            border: card_border(6.0),
+            ..Default::default()
+        }
+    })
+}
+
 pub fn notification_button(_: &Theme, status: button::Status) -> button::Style {
     with_palette(|p| button::Style {
         background: Some(Background::Color(hover_active(

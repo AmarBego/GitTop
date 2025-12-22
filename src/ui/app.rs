@@ -260,13 +260,20 @@ impl App {
                     }
                 }
 
+                // Preserve cross-account priority notifications before switching
+                let cross_account_priority = screen.get_cross_account_priority();
+
                 // Set new active account
                 ctx.sessions.set_primary(&username);
 
                 // Navigate to notifications with new session
                 if let Some(session) = ctx.sessions.primary() {
-                    let (notif_screen, task) =
+                    let (mut notif_screen, task) =
                         NotificationsScreen::new(session.client.clone(), session.user.clone());
+                    
+                    // Pass cross-account priority notifications to new screen
+                    notif_screen.set_cross_account_priority(cross_account_priority);
+                    
                     *self = App::Authenticated(Screen::Notifications(notif_screen), AppContext {
                         settings: ctx.settings.clone(),
                         sessions: ctx.sessions.clone(),
@@ -482,19 +489,25 @@ impl App {
             }
 
             window::Event::Moved(position) => {
-                if let Some(settings) = self.get_settings_mut() {
-                    settings.window_x = Some(position.x as i32);
-                    settings.window_y = Some(position.y as i32);
-                    save_settings(settings);
+                // Windows reports -32000, -32000 when window is minimized - ignore these
+                if position.x > -10000.0 && position.y > -10000.0 {
+                    if let Some(settings) = self.get_settings_mut() {
+                        settings.window_x = Some(position.x as i32);
+                        settings.window_y = Some(position.y as i32);
+                        save_settings(settings);
+                    }
                 }
                 Task::none()
             }
 
             window::Event::Resized(size) => {
-                if let Some(settings) = self.get_settings_mut() {
-                    settings.window_width = size.width;
-                    settings.window_height = size.height;
-                    save_settings(settings);
+                // Windows reports 0x0 when window is minimized - ignore these
+                if size.width > 100.0 && size.height > 100.0 {
+                    if let Some(settings) = self.get_settings_mut() {
+                        settings.window_width = size.width;
+                        settings.window_height = size.height;
+                        save_settings(settings);
+                    }
                 }
                 Task::none()
             }

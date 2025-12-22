@@ -192,7 +192,6 @@ fn view_user_section<'a>(
         )
         .text_size(13)
         .padding([4, 8])
-        .width(Fill)
         .style(theme::pick_list_style)
         .into()
     } else {
@@ -212,7 +211,7 @@ fn view_user_section<'a>(
             icons::icon_user(14.0, p.text_secondary, icon_theme),
             Space::new().width(8),
             account_control,
-            Space::new().width(8), // Small gap before buttons
+            Space::new().width(Fill), // Push buttons to the right
             button(icons::icon_settings(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
                 .padding([6, 8])
