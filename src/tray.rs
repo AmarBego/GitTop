@@ -96,6 +96,7 @@ impl TrayManager {
     pub fn poll_global_events() -> Option<TrayCommand> {
         // Check for menu events
         if let Ok(event) = MenuEvent::receiver().try_recv() {
+            eprintln!("[DEBUG] Tray menu event: {:?}", event);
             // Check against globally stored menu IDs
             if let Some(show_id) = SHOW_MENU_ID.get() {
                 if event.id == *show_id {
@@ -109,19 +110,13 @@ impl TrayManager {
             }
         }
 
-        // Check for tray icon click events
-        if let Ok(
-            TrayIconEvent::Click {
-                button: tray_icon::MouseButton::Left,
-                ..
+        // Drain tray icon events but don't act on clicks
+        // Window should only be shown via the menu "Show" item
+        // Trim memory on Leave event to prevent accumulation
+        while let Ok(event) = TrayIconEvent::receiver().try_recv() {
+            if matches!(event, TrayIconEvent::Leave { .. }) {
+                crate::platform::trim_memory();
             }
-            | TrayIconEvent::DoubleClick {
-                button: tray_icon::MouseButton::Left,
-                ..
-            },
-        ) = TrayIconEvent::receiver().try_recv()
-        {
-            return Some(TrayCommand::ShowWindow);
         }
 
         None

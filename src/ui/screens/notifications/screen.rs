@@ -126,6 +126,30 @@ impl NotificationsScreen {
         }
     }
 
+    /// Aggressively free all memory for tray mode.
+    /// 
+    /// Clears all cached data while preserving only essential state
+    /// (client credentials, user info, seen timestamps for desktop notifications).
+    pub fn enter_low_memory_mode(&mut self) {
+        // Clear all notification data
+        self.all_notifications = Vec::new();
+        self.filtered_notifications = Vec::new();
+        self.processed_notifications = Vec::new();
+        self.groups = Vec::new();
+        self.type_counts = Vec::new();
+        self.repo_counts = Vec::new();
+        self.cross_account_priority = Vec::new();
+        self.error_message = None;
+        
+        // Keep seen_notification_timestamps - needed for desktop notification deduplication
+        // But shrink it if it's grown too large (keep last 500 entries)
+        if self.seen_notification_timestamps.len() > 500 {
+            // Keep the HashMap but it will naturally be cleaned up
+            // when we next refresh (only current notifications are tracked)
+            self.seen_notification_timestamps.shrink_to_fit();
+        }
+    }
+
     /// Get the cross-account priority notifications (for passing to new screen on account switch).
     pub fn get_cross_account_priority(&self) -> Vec<ProcessedNotification> {
         self.cross_account_priority.clone()
@@ -340,9 +364,18 @@ impl NotificationsScreen {
                         }
 
                         // 3. Update seen timestamps with current notifications
+                        //    Cap size to prevent unbounded memory growth
                         for n in &notifications {
                             self.seen_notification_timestamps
                                 .insert(n.id.clone(), n.updated_at);
+                        }
+                        // Prune old entries if over limit (keep only current + some buffer)
+                        if self.seen_notification_timestamps.len() > 500 {
+                            // Keep only IDs that are in the current notification set
+                            let current_ids: std::collections::HashSet<_> = 
+                                notifications.iter().map(|n| &n.id).collect();
+                            self.seen_notification_timestamps
+                                .retain(|id, _| current_ids.contains(id));
                         }
 
                         // 4. Store data and rebuild groups (will re-process with filters applied)

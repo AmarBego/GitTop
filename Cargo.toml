@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Why spin up a browser just to check your GitHub notifications? 5MB memory footprint and 1MB in tray"
 authors = ["Amar"]
-license = "MIT"
+license = "AGPL-3.0-only"
 
 [dependencies]
 # Iced GUI framework - using software renderer (tiny-skia) for minimal memory footprint

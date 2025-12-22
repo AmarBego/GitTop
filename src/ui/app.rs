@@ -461,8 +461,11 @@ impl App {
             return Task::none();
         };
 
+        eprintln!("[DEBUG] Tray command received: {:?}", cmd);
+
         match cmd {
             TrayCommand::ShowWindow => {
+                eprintln!("[DEBUG] Processing ShowWindow command, is_hidden={}", window_state::is_hidden());
                 let was_hidden = window_state::restore_from_hidden();
 
                 let window_task = if let Some(id) = window_state::get_window_id() {
@@ -497,6 +500,11 @@ impl App {
     fn handle_window_event(&mut self, id: WindowId, event: window::Event) -> Task<Message> {
         // Store the main window ID on first event
         window_state::set_window_id(id);
+
+        // Debug: log all window events when hidden to find what's restoring the window
+        if window_state::is_hidden() {
+            eprintln!("[DEBUG] Window event while hidden: {:?}", event);
+        }
 
         match event {
             window::Event::CloseRequested => {
@@ -623,16 +631,8 @@ impl App {
         // Clear notification data to free memory
         if let App::Authenticated(boxed_screen, _) = self {
             if let Screen::Notifications(screen) = &mut **boxed_screen {
-                screen.all_notifications.clear();
-                screen.all_notifications.shrink_to_fit();
-                screen.filtered_notifications.clear();
-                screen.filtered_notifications.shrink_to_fit();
-                screen.groups.clear();
-                screen.groups.shrink_to_fit();
-                screen.type_counts.clear();
-                screen.type_counts.shrink_to_fit();
-                screen.repo_counts.clear();
-                screen.repo_counts.shrink_to_fit();
+                // Use the aggressive low-memory mode
+                screen.enter_low_memory_mode();
             }
         }
 

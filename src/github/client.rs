@@ -68,8 +68,13 @@ impl GitHubClient {
                 .map_err(|_| GitHubError::Unauthorized)?,
         );
 
+        // Configure for low memory usage in tray mode:
+        // - pool_idle_timeout: Connections released after 30s idle (default: 90s)
+        // - pool_max_idle_per_host: Only keep 1 idle connection (default: unlimited)
         let client = reqwest::Client::builder()
             .default_headers(headers)
+            .pool_idle_timeout(std::time::Duration::from_secs(30))
+            .pool_max_idle_per_host(1)
             .build()?;
 
         Ok(Self { client, token })
