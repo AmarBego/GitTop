@@ -4,9 +4,7 @@ use iced::widget::{button, column, container, row, scrollable, text, toggler, Sp
 use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::settings::{AppSettings, IconTheme};
-use crate::ui::screens::settings::rule_engine::rules::{
-    NotificationRuleSet, OutsideScheduleBehavior, RuleAction, TypeRule,
-};
+use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, RuleAction, TypeRule};
 use crate::ui::{icons, theme};
 
 use super::messages::{RuleEngineMessage, RuleTab};
@@ -254,11 +252,6 @@ impl RuleEngineScreen {
                 Task::none()
             }
 
-            RuleEngineMessage::RenameRuleSet(name) => {
-                self.rules.name = name;
-                self.rules.save();
-                Task::none()
-            }
             RuleEngineMessage::SetExplainTestType(test_type) => {
                 self.explain_test_type = test_type;
                 Task::none()

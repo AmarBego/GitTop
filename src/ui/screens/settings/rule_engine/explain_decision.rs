@@ -3,13 +3,13 @@
 //! This component allows users to test their rules by simulating a notification
 //! and seeing which rules would match and in what priority order.
 
-use iced::widget::{button, column, container, pick_list, row, text, Space};
-use iced::{Alignment, Element, Fill, Length};
+use iced::widget::{column, container, row, text, Space};
+use iced::{Alignment, Element, Fill};
 
 use crate::settings::IconTheme;
 use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::{
-    NotificationRuleSet, OutsideScheduleBehavior, RuleAction, RuleEngine, PRIORITY_HIGH,
+    NotificationRuleSet, OutsideScheduleBehavior, RuleAction,
 };
 use crate::ui::theme;
 

@@ -22,13 +22,13 @@ mod freebsd;
 pub fn focus_existing_window() {
     #[cfg(windows)]
     windows::focus_existing_window();
-    
+
     #[cfg(target_os = "macos")]
     macos::focus_existing_window();
-    
+
     #[cfg(target_os = "linux")]
     linux::focus_existing_window();
-    
+
     #[cfg(target_os = "freebsd")]
     freebsd::focus_existing_window();
 }
@@ -38,13 +38,13 @@ pub fn focus_existing_window() {
 pub fn enable_dark_mode() {
     #[cfg(windows)]
     windows::enable_dark_mode();
-    
+
     #[cfg(target_os = "macos")]
     macos::enable_dark_mode();
-    
+
     #[cfg(target_os = "linux")]
     linux::enable_dark_mode();
-    
+
     #[cfg(target_os = "freebsd")]
     freebsd::enable_dark_mode();
 }
@@ -55,27 +55,27 @@ pub fn enable_dark_mode() {
 pub fn trim_memory() {
     #[cfg(windows)]
     windows::trim_working_set();
-    
+
     #[cfg(target_os = "macos")]
     macos::trim_memory();
-    
+
     #[cfg(target_os = "linux")]
     linux::trim_memory();
-    
+
     #[cfg(target_os = "freebsd")]
     freebsd::trim_memory();
 }
 
 /// Send a native desktop notification.
-/// 
+///
 /// This is a fire-and-forget operation:
 /// - Sends the notification to the system
 /// - Returns immediately
 /// - Allocates nothing long-lived
 /// - Zero persistent memory cost
-/// 
+///
 /// If `url` is provided, clicking the notification will open that URL.
-/// 
+///
 /// Platform implementations:
 /// - Windows: WinRT toast notifications
 /// - macOS: NSUserNotificationCenter / UNUserNotificationCenter  
@@ -84,13 +84,13 @@ pub fn trim_memory() {
 pub fn notify(title: &str, body: &str, url: Option<&str>) {
     #[cfg(windows)]
     windows::notify(title, body, url);
-    
+
     #[cfg(target_os = "macos")]
     macos::notify(title, body, url);
-    
+
     #[cfg(target_os = "linux")]
     linux::notify(title, body, url);
-    
+
     #[cfg(target_os = "freebsd")]
     freebsd::notify(title, body, url);
 }

@@ -270,14 +270,17 @@ impl App {
                 if let Some(session) = ctx.sessions.primary() {
                     let (mut notif_screen, task) =
                         NotificationsScreen::new(session.client.clone(), session.user.clone());
-                    
+
                     // Pass cross-account priority notifications to new screen
                     notif_screen.set_cross_account_priority(cross_account_priority);
-                    
-                    *self = App::Authenticated(Screen::Notifications(notif_screen), AppContext {
-                        settings: ctx.settings.clone(),
-                        sessions: ctx.sessions.clone(),
-                    });
+
+                    *self = App::Authenticated(
+                        Screen::Notifications(notif_screen),
+                        AppContext {
+                            settings: ctx.settings.clone(),
+                            sessions: ctx.sessions.clone(),
+                        },
+                    );
                     return task.map(Message::Notifications);
                 }
                 Task::none()
@@ -344,7 +347,9 @@ impl App {
 
                 // If we still have an account, ensure settings match the new primary
                 if let Some(primary) = ctx.sessions.primary() {
-                    screen.settings.set_active_account(&primary.username.clone());
+                    screen
+                        .settings
+                        .set_active_account(&primary.username.clone());
                     save_settings(&screen.settings);
                 }
             }
@@ -665,12 +670,8 @@ impl App {
                             .map(Message::Notifications)
                     }
                 }
-                Screen::Settings(settings_screen) => {
-                    settings_screen.view().map(Message::Settings)
-                }
-                Screen::RuleEngine(rule_screen, _) => {
-                    rule_screen.view().map(Message::RuleEngine)
-                }
+                Screen::Settings(settings_screen) => settings_screen.view().map(Message::Settings),
+                Screen::RuleEngine(rule_screen, _) => rule_screen.view().map(Message::RuleEngine),
             },
         }
     }

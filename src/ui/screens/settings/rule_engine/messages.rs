@@ -63,10 +63,6 @@ pub enum RuleEngineMessage {
     /// Clear rule selection (close inspector)
     ClearRuleSelection,
 
-    // Rule Sets
-    /// Rename the current rule set
-    RenameRuleSet(String),
-
     // Explain Decision
     /// Set the test notification type for explain decision
     SetExplainTestType(String),

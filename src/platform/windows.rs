@@ -9,21 +9,21 @@ pub fn focus_existing_window() {
         EnumWindows, GetWindowTextA, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow,
         SW_RESTORE, SW_SHOW,
     };
-    
+
     unsafe extern "system" fn enum_callback(hwnd: HWND, _lparam: LPARAM) -> windows::core::BOOL {
         unsafe {
             // Skip invisible windows
             if !IsWindowVisible(hwnd).as_bool() {
                 return windows::core::BOOL::from(true);
             }
-            
+
             // Get window title
             let mut title = [0u8; 256];
             let len = GetWindowTextA(hwnd, &mut title);
-            
+
             if len > 0 {
                 let title_str = std::str::from_utf8(&title[..len as usize]).unwrap_or("");
-                
+
                 // Check if this is a GitTop window
                 if title_str.contains("GitTop") {
                     // Restore if minimized
@@ -32,19 +32,19 @@ pub fn focus_existing_window() {
                     } else {
                         let _ = ShowWindow(hwnd, SW_SHOW);
                     }
-                    
+
                     // Bring to foreground
                     let _ = SetForegroundWindow(hwnd);
-                    
+
                     // Stop enumeration
                     return windows::core::BOOL::from(false);
                 }
             }
-            
+
             windows::core::BOOL::from(true)
         }
     }
-    
+
     unsafe {
         let _ = EnumWindows(Some(enum_callback), LPARAM(0));
     }
@@ -56,22 +56,22 @@ pub fn enable_dark_mode() {
     // SetPreferredAppMode ordinal 135 in uxtheme.dll
     // 0 = Default, 1 = AllowDark, 2 = ForceDark, 3 = ForceLight, 4 = Max
     const APPMODE_FORCEDARK: i32 = 2;
-    
+
     type SetPreferredAppModeFn = unsafe extern "system" fn(i32) -> i32;
-    
+
     unsafe {
         let lib_name = CString::new("uxtheme.dll").unwrap();
         let lib = windows::Win32::System::LibraryLoader::LoadLibraryA(
-            windows::core::PCSTR::from_raw(lib_name.as_ptr() as *const u8)
+            windows::core::PCSTR::from_raw(lib_name.as_ptr() as *const u8),
         );
-        
+
         if let Ok(handle) = lib {
             // GetProcAddress with ordinal 135
             let func = windows::Win32::System::LibraryLoader::GetProcAddress(
                 handle,
-                windows::core::PCSTR::from_raw(135 as *const u8)
+                windows::core::PCSTR::from_raw(135 as *const u8),
             );
-            
+
             if let Some(f) = func {
                 let set_preferred_app_mode: SetPreferredAppModeFn = std::mem::transmute(f);
                 set_preferred_app_mode(APPMODE_FORCEDARK);
@@ -84,26 +84,26 @@ pub fn enable_dark_mode() {
 /// This moves pages to the page file, making the process appear to use less memory.
 pub fn trim_working_set() {
     use windows::Win32::System::Threading::GetCurrentProcess;
-    
+
     // Use K32EmptyWorkingSet which is simpler and more effective
     type EmptyWorkingSetFn = unsafe extern "system" fn(windows::Win32::Foundation::HANDLE) -> i32;
-    
+
     unsafe {
         let process = GetCurrentProcess();
-        
+
         // Try to load K32EmptyWorkingSet from kernel32.dll
         let lib_name = CString::new("kernel32.dll").unwrap();
         let lib = windows::Win32::System::LibraryLoader::LoadLibraryA(
-            windows::core::PCSTR::from_raw(lib_name.as_ptr() as *const u8)
+            windows::core::PCSTR::from_raw(lib_name.as_ptr() as *const u8),
         );
-        
+
         if let Ok(handle) = lib {
             let func_name = CString::new("K32EmptyWorkingSet").unwrap();
             let func = windows::Win32::System::LibraryLoader::GetProcAddress(
                 handle,
-                windows::core::PCSTR::from_raw(func_name.as_ptr() as *const u8)
+                windows::core::PCSTR::from_raw(func_name.as_ptr() as *const u8),
             );
-            
+
             if let Some(f) = func {
                 let empty_working_set: EmptyWorkingSetFn = std::mem::transmute(f);
                 empty_working_set(process);
@@ -113,23 +113,26 @@ pub fn trim_working_set() {
 }
 
 /// Send a native Windows toast notification.
-/// 
+///
 /// Uses WinRT toast notifications which:
 /// - Don't require a background service
 /// - Don't keep anything resident
 /// - Fire and exit
-/// 
+///
 /// If `url` is provided, clicking the notification opens that URL.
 pub fn notify(title: &str, body: &str, url: Option<&str>) {
     use tauri_winrt_notification::{Duration, Toast};
-    
-    eprintln!("[DEBUG] notify() called: title={:?}, body={:?}, url={:?}", title, body, url);
-    
+
+    eprintln!(
+        "[DEBUG] notify() called: title={:?}, body={:?}, url={:?}",
+        title, body, url
+    );
+
     let mut toast = Toast::new(Toast::POWERSHELL_APP_ID)
         .title(title)
         .text1(body)
         .duration(Duration::Short);
-    
+
     // If URL provided, open it when notification is clicked
     if let Some(url) = url {
         let url_owned = url.to_string();
@@ -139,7 +142,7 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) {
             Ok(())
         });
     }
-    
+
     // Fire and forget - no handles kept, no memory retained
     match toast.show() {
         Ok(()) => eprintln!("[DEBUG] Toast shown successfully"),

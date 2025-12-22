@@ -7,8 +7,8 @@
 mod cache;
 mod github;
 mod platform;
-
 mod settings;
+mod specs;
 mod tray;
 mod ui;
 
@@ -16,12 +16,37 @@ use iced::window::Position;
 use iced::{application, Font, Point, Size};
 use settings::AppSettings;
 use single_instance::SingleInstance;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use ui::App;
 
 /// Mutex name for single instance detection
 const SINGLE_INSTANCE_MUTEX: &str = "GitTop-SingleInstance-Mutex-7a8b9c0d";
 
+/// Global mock notification count (set via CLI)
+pub static MOCK_NOTIFICATION_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Parse CLI arguments and return any leftover args
+fn parse_cli_args() {
+    let args: Vec<String> = std::env::args().collect();
+    let mut i = 1;
+    while i < args.len() {
+        if args[i] == "--mock-notifications" || args[i] == "-m" {
+            if i + 1 < args.len() {
+                if let Ok(count) = args[i + 1].parse::<usize>() {
+                    MOCK_NOTIFICATION_COUNT.store(count, Ordering::Relaxed);
+                    eprintln!("[SPECS] Mock notifications enabled: {}", count);
+                }
+                i += 1;
+            }
+        }
+        i += 1;
+    }
+}
+
 fn main() -> iced::Result {
+    // Parse CLI arguments (e.g., --mock-notifications 1000)
+    parse_cli_args();
+
     // Check for existing instance
     let instance = SingleInstance::new(SINGLE_INSTANCE_MUTEX).unwrap();
 
@@ -40,14 +65,14 @@ fn main() -> iced::Result {
 
     // Load settings to restore window state
     let settings = AppSettings::load();
-    
+
     // Validate window size (Windows reports 0x0 when minimized)
     let window_size = if settings.window_width >= 100.0 && settings.window_height >= 100.0 {
         Size::new(settings.window_width, settings.window_height)
     } else {
         Size::new(800.0, 640.0) // Default size
     };
-    
+
     // Validate window position (Windows reports -32000 when minimized)
     let window_position = match (settings.window_x, settings.window_y) {
         (Some(x), Some(y)) if x > -10000 && y > -10000 => {

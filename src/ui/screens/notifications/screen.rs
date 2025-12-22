@@ -120,12 +120,6 @@ impl NotificationsScreen {
         }
     }
 
-    /// Reload rules from disk (called when settings change).
-    pub fn reload_rules(&mut self) {
-        self.rules = NotificationRuleSet::load();
-        self.rebuild_groups();
-    }
-
     /// Get the cross-account priority notifications (for passing to new screen on account switch).
     pub fn get_cross_account_priority(&self) -> Vec<ProcessedNotification> {
         self.cross_account_priority.clone()
@@ -161,8 +155,6 @@ impl NotificationsScreen {
     }
 
     fn rebuild_groups(&mut self) {
-        use crate::ui::screens::settings::rule_engine::RuleAction;
-
         // Recompute cached counts from all notifications
         self.type_counts = count_by_type(&self.all_notifications);
         self.repo_counts = count_by_repo(&self.all_notifications);
@@ -196,7 +188,10 @@ impl NotificationsScreen {
             // Add other account priority notifications (they're already marked as Priority action)
             for p in other_account_priority {
                 // Avoid duplicates by ID
-                if !combined.iter().any(|existing| existing.notification.id == p.notification.id) {
+                if !combined
+                    .iter()
+                    .any(|existing| existing.notification.id == p.notification.id)
+                {
                     combined.push(p);
                 }
             }
@@ -292,7 +287,10 @@ impl NotificationsScreen {
         // If there are priority notifications, show them first/prominently
         if !priority_notifications.is_empty() {
             for notif in &priority_notifications {
-                let title = format!("Priority: {} - {}", notif.repo_full_name, notif.subject_type);
+                let title = format!(
+                    "Priority: {} - {}",
+                    notif.repo_full_name, notif.subject_type
+                );
                 let url = notif.url.as_ref().map(|u| api_url_to_web_url(u));
                 let body = format!("{}\n{}", notif.title, notif.reason.label());
                 eprintln!("[DEBUG] Sending priority notification: {:?}", title);
@@ -358,7 +356,22 @@ impl NotificationsScreen {
             NotificationMessage::RefreshComplete(result) => {
                 self.is_loading = false;
                 match result {
-                    Ok(notifications) => {
+                    Ok(mut notifications) => {
+                        // Inject mock notifications if --mock-notifications N was passed
+                        let mock_count = crate::MOCK_NOTIFICATION_COUNT
+                            .load(std::sync::atomic::Ordering::Relaxed);
+                        if mock_count > 0 {
+                            let mock = crate::specs::generate_mock_notifications(
+                                mock_count,
+                                &self.user.login,
+                            );
+                            eprintln!(
+                                "[SPECS] Injecting {} mock notifications for scroll testing",
+                                mock_count
+                            );
+                            notifications.extend(mock);
+                        }
+
                         eprintln!(
                             "[DEBUG] RefreshComplete: got {} notifications",
                             notifications.len()

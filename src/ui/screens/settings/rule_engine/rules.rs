@@ -3,7 +3,6 @@
 //! Provides account-based and type-based notification filtering
 //! with priority organization support.
 
-use chrono::Datelike;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -71,10 +70,6 @@ pub const PRIORITY_LEVELS: &[(&str, i32)] = &[
     ("Min (-100)", PRIORITY_MIN),
 ];
 
-fn default_priority() -> i32 {
-    PRIORITY_DEFAULT
-}
-
 // ============================================================================
 // OVERVIEW HELPERS
 // ============================================================================
@@ -83,9 +78,7 @@ fn default_priority() -> i32 {
 #[derive(Debug, Clone)]
 pub struct HighImpactRule {
     pub name: String,
-    pub rule_type: String,
     pub action: RuleAction,
-    pub priority: i32,
 }
 
 // ============================================================================
@@ -387,9 +380,7 @@ impl NotificationRuleSet {
                 };
                 rules.push(HighImpactRule {
                     name: rule.account.clone(),
-                    rule_type: "Account Schedule".to_string(),
                     action,
-                    priority: 0,
                 });
             }
         }
@@ -403,9 +394,7 @@ impl NotificationRuleSet {
             {
                 rules.push(HighImpactRule {
                     name: rule.org.clone(),
-                    rule_type: "Org".to_string(),
                     action: rule.action,
-                    priority: rule.priority,
                 });
             }
         }
@@ -424,9 +413,7 @@ impl NotificationRuleSet {
                 };
                 rules.push(HighImpactRule {
                     name,
-                    rule_type: "Type".to_string(),
                     action: rule.action,
-                    priority: rule.priority,
                 });
             }
         }
@@ -474,7 +461,7 @@ impl RuleEngine {
         notification_type: &str,
         repo_owner: Option<&str>,
         account: Option<&str>,
-        now: &chrono::DateTime<chrono::Local>,
+        _now: &chrono::DateTime<chrono::Local>,
     ) -> (RuleAction, Option<RuleDecision>) {
         if !self.rules.enabled {
             return (RuleAction::Show, None);

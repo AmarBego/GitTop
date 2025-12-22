@@ -4,4 +4,5 @@
 
 mod disk;
 
+#[allow(unused_imports)]
 pub use disk::{CacheError, DiskCache};

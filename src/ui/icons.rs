@@ -246,16 +246,6 @@ pub fn icon_external_link<M: 'static>(
     themed_icon(theme, &icondata_lu::LuExternalLink, "↗", size, color)
 }
 
-/// Clock icon.
-pub fn icon_clock<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
-    themed_icon(theme, &icondata_lu::LuClock, "🕐", size, color)
-}
-
-/// Calendar icon.
-pub fn icon_calendar<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
-    themed_icon(theme, &icondata_lu::LuCalendar, "📅", size, color)
-}
-
 /// Building icon.
 pub fn icon_building<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
     themed_icon(theme, &icondata_lu::LuBuilding, "🏢", size, color)
@@ -298,13 +288,4 @@ pub fn icon_zap<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Elemen
 /// Eye off/hidden icon.
 pub fn icon_eye_off<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
     themed_icon(theme, &icondata_lu::LuEyeOff, "👁‍🗨", size, color)
-}
-
-/// Briefcase icon.
-pub fn icon_briefcase<M: 'static>(
-    size: f32,
-    color: Color,
-    theme: IconTheme,
-) -> Element<'static, M> {
-    themed_icon(theme, &icondata_lu::LuBriefcase, "💼", size, color)
 }

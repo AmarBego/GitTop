@@ -3,11 +3,11 @@
 use iced::widget::{button, column, container, row, text, Space};
 use iced::{Alignment, Color, Element, Fill};
 
+use crate::github::types::SubjectType;
 use crate::settings::IconTheme;
 use crate::ui::screens::notifications::helper::ProcessedNotification;
 use crate::ui::screens::notifications::NotificationMessage;
 use crate::ui::screens::settings::rule_engine::RuleAction;
-use crate::github::types::SubjectType;
 use crate::ui::{icons, theme};
 
 /// Get color for subject type
@@ -114,7 +114,8 @@ pub fn notification_item(
 
     // Silent indicator - show muted bell for silent notifications
     // Only relevant when rules are active (not in "All" mode where is_priority_group context indicates Unread mode)
-    let silent_indicator: Option<Element<'_, NotificationMessage>> = if action == RuleAction::Silent {
+    let silent_indicator: Option<Element<'_, NotificationMessage>> = if action == RuleAction::Silent
+    {
         Some(
             container(text("🔕").size(account_size))
                 .padding([2, 4])
@@ -126,11 +127,7 @@ pub fn notification_item(
 
     // Priority indicator for priority group items (only show the ⚡ in the priority group)
     let priority_indicator: Option<Element<'_, NotificationMessage>> = if show_priority_style {
-        Some(
-            container(text("⚡").size(meta_size))
-                .padding([0, 4])
-                .into(),
-        )
+        Some(container(text("⚡").size(meta_size)).padding([0, 4]).into())
     } else {
         None
     };
@@ -226,7 +223,9 @@ pub fn notification_item(
     } else {
         // STANDARD LAYOUT
         row![
-            column![title, meta_row].spacing(content_spacing).width(Fill),
+            column![title, meta_row]
+                .spacing(content_spacing)
+                .width(Fill),
             container(time_row).padding([4, 8]),
         ]
         .spacing(row_spacing)
@@ -258,7 +257,12 @@ pub fn notification_item(
 
     // Card styling - priority notifications have special background (only if in priority group)
     let card_bg = if show_priority_style {
-        Color::from_rgba(p.accent_warning.r, p.accent_warning.g, p.accent_warning.b, 0.08)
+        Color::from_rgba(
+            p.accent_warning.r,
+            p.accent_warning.g,
+            p.accent_warning.b,
+            0.08,
+        )
     } else if is_unread {
         Color::from_rgba(type_color.r, type_color.g, type_color.b, 0.05)
     } else {
@@ -266,7 +270,12 @@ pub fn notification_item(
     };
 
     let border_color = if show_priority_style {
-        Color::from_rgba(p.accent_warning.r, p.accent_warning.g, p.accent_warning.b, 0.2)
+        Color::from_rgba(
+            p.accent_warning.r,
+            p.accent_warning.g,
+            p.accent_warning.b,
+            0.2,
+        )
     } else if is_unread {
         Color::from_rgba(type_color.r, type_color.g, type_color.b, 0.12)
     } else {

@@ -1,0 +1,71 @@
+# bacon.toml - GitTop development configuration
+# https://dystroy.org/bacon/
+
+# Default job when running `bacon` without arguments
+default_job = "check"
+
+[jobs.check]
+command = ["cargo", "check", "--color", "always"]
+watch = ["src", "Cargo.toml"]
+need_stdout = false
+
+[jobs.clippy]
+command = ["cargo", "clippy", "--color", "always", "--", "-W", "clippy::all"]
+watch = ["src", "Cargo.toml"]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "test", "--color", "always"]
+watch = ["src", "Cargo.toml"]
+need_stdout = true
+
+[jobs.run]
+command = ["cargo", "run", "--color", "always"]
+watch = ["src", "Cargo.toml"]
+need_stdout = true
+background = true
+
+[jobs.release]
+command = ["cargo", "run", "--release", "--color", "always"]
+watch = ["src", "Cargo.toml"]
+need_stdout = true
+background = true
+
+# Run with mock notifications for scroll testing
+# Usage: bacon mock
+[jobs.mock]
+command = [
+    "cargo",
+    "run",
+    "--color",
+    "always",
+    "--",
+    "--mock-notifications",
+    "1000",
+]
+watch = ["src", "Cargo.toml"]
+need_stdout = true
+background = true
+
+# Run with more mock notifications
+# Usage: bacon mock5k
+[jobs.mock5k]
+command = [
+    "cargo",
+    "run",
+    "--color",
+    "always",
+    "--",
+    "--mock-notifications",
+    "5000",
+]
+watch = ["src", "Cargo.toml"]
+need_stdout = true
+background = true
+
+[keybindings]
+c = "job:check"
+l = "job:clippy"
+t = "job:test"
+r = "job:run"
+m = "job:mock"

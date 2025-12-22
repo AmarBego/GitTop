@@ -21,15 +21,6 @@ pub enum FoundRule {
 }
 
 impl FoundRule {
-    /// Get the rule's ID.
-    pub fn id(&self) -> &str {
-        match self {
-            FoundRule::Account(r) => &r.id,
-            FoundRule::Org(r) => &r.id,
-            FoundRule::Type(r) => &r.id,
-        }
-    }
-
     /// Get whether the rule is enabled.
     pub fn enabled(&self) -> bool {
         match self {
