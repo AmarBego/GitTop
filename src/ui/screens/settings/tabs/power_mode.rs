@@ -16,7 +16,7 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 
     let mut content = column![
         tab_title("Power Mode"),
-        text("Unlock enterprise-grade notification management.")
+        text("Unlock powerful notification management.")
             .size(12)
             .color(p.text_secondary),
         Space::new().height(20),
@@ -88,7 +88,7 @@ fn view_hero(settings: &AppSettings) -> Element<'_, SettingsMessage> {
                             }),
                         Space::new().width(8),
                         text(if enabled {
-                            "Enterprise layout enabled"
+                            "Advanced layout enabled"
                         } else {
                             "Standard layout"
                         })

@@ -270,6 +270,11 @@ impl App {
 
                 // Preserve cross-account priority notifications before switching
                 let cross_account_priority = screen.get_cross_account_priority();
+                eprintln!(
+                    "[DEBUG] SwitchAccount: captured {} priority notifications before switching to @{}",
+                    cross_account_priority.len(),
+                    username
+                );
 
                 // Set new active account
                 ctx.sessions.set_primary(&username);
@@ -295,10 +300,20 @@ impl App {
             }
 
             NotificationMessage::TogglePowerMode => {
+                let was_disabled = !ctx.settings.power_mode;
                 ctx.settings.power_mode = !ctx.settings.power_mode;
                 save_settings(&ctx.settings);
                 // reset view state
                 screen.collapse_all_groups();
+
+                // When enabling power mode, resize window for optimal multi-pane layout
+                if was_disabled {
+                    if let Some(id) = window_state::get_window_id() {
+                        let resize_task: Task<Message> =
+                            window::resize::<Message>(id, iced::Size::new(1410.0, 700.0)).discard();
+                        return resize_task;
+                    }
+                }
                 Task::none()
             }
 
@@ -344,6 +359,19 @@ impl App {
 
             SettingsMessage::OpenRuleEngine => {
                 return self.go_to_rule_engine(RuleEngineOrigin::Settings);
+            }
+
+            SettingsMessage::TogglePowerMode(enabled) => {
+                // When enabling power mode, resize window for optimal multi-pane layout
+                if *enabled {
+                    if let Some(id) = window_state::get_window_id() {
+                        let resize_task: Task<Message> =
+                            window::resize::<Message>(id, iced::Size::new(1410.0, 700.0)).discard();
+                        // Also update the settings screen and save
+                        let settings_task = screen.update(settings_msg).map(Message::Settings);
+                        return Task::batch([resize_task, settings_task]);
+                    }
+                }
             }
 
             SettingsMessage::RemoveAccount(username) => {
@@ -774,6 +802,7 @@ impl App {
                 screen.is_loading,
                 unread_count,
                 screen.filters.show_all,
+                screen.bulk_mode,
                 settings.icon_theme
             ),
             main_area,

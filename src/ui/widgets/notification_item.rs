@@ -233,11 +233,16 @@ fn silent_indicator(size: f32) -> Element<'static, NotificationMessage> {
 ///
 /// Uses `NotificationVisualState` as the single source of truth for all
 /// visual decisions, ensuring consistency between icons, colors, and styling.
+/// Creates a notification item widget.
+///
+/// Uses `NotificationVisualState` as the single source of truth for all
+/// visual decisions, ensuring consistency between icons, colors, and styling.
 pub fn notification_item(
     processed: &ProcessedNotification,
     icon_theme: IconTheme,
     dense: bool,
     is_priority_group: bool,
+    interactive: bool,
 ) -> Element<'_, NotificationMessage> {
     let notif = &processed.notification;
     let p = theme::palette();
@@ -272,23 +277,32 @@ pub fn notification_item(
         build_standard_layout(notif, subject_icon, &visual, &metrics, &p)
     };
 
-    // Click behavior depends on mode:
-    // - Dense (power mode): Select for details panel view
-    // - Standard: Open in browser
-    let click_message = if dense {
-        NotificationMessage::SelectNotification(notif.id.clone())
+    // Make content fill the container
+    let content_element: Element<'_, NotificationMessage> = if interactive {
+        // Click behavior depends on mode:
+        // - Dense (power mode): Select for details panel view
+        // - Standard: Open in browser
+        let click_message = if dense {
+            NotificationMessage::SelectNotification(notif.id.clone())
+        } else {
+            NotificationMessage::Open(notif.id.clone())
+        };
+
+        // Wrap in button for click handling
+        button(content)
+            .style(theme::notification_button)
+            .on_press(click_message)
+            .width(Fill)
+            .into()
     } else {
-        NotificationMessage::Open(notif.id.clone())
+        // Just the content. We remove the container wrapper to avoid layout issues
+        // when nested in other structures (like bulk selection button).
+        // The content itself (Row) handles sizing via its children.
+        content.into()
     };
 
-    // Wrap in button for click handling
-    let item_button = button(content)
-        .style(theme::notification_button)
-        .on_press(click_message)
-        .width(Fill);
-
     // Build card with accent bar
-    build_card(item_button, &visual, dense)
+    build_card(content_element, &visual, dense)
 }
 
 // ============================================================================
@@ -338,8 +352,8 @@ fn build_standard_layout<'a>(
     ]
     .align_y(Alignment::Center);
 
-    // Add account badge if present
-    if !notif.account.is_empty() {
+    // Add account badge only for priority notifications (they can come from any account)
+    if visual.is_priority && !notif.account.is_empty() {
         meta_row = meta_row.push(Space::new().width(8));
         meta_row = meta_row.push(account_badge(&notif.account, metrics.account_size));
     }
@@ -362,6 +376,7 @@ fn build_standard_layout<'a>(
     .spacing(metrics.row_spacing)
     .align_y(Alignment::Center)
     .padding([metrics.padding_y, metrics.padding_x])
+    .width(Fill)
 }
 
 /// Builds the dense layout.
@@ -392,8 +407,8 @@ fn build_dense_layout<'a>(
     ]
     .align_y(Alignment::Center);
 
-    // Add account badge inline for dense mode
-    if !notif.account.is_empty() {
+    // Add account badge only for priority notifications (they can come from any account)
+    if visual.is_priority && !notif.account.is_empty() {
         title_row = title_row.push(Space::new().width(8));
         title_row = title_row.push(account_badge(&notif.account, metrics.account_size));
     }
@@ -422,6 +437,7 @@ fn build_dense_layout<'a>(
     ]
     .align_y(Alignment::Center)
     .padding([metrics.padding_y, metrics.padding_x])
+    .width(Fill)
 }
 
 /// Builds the time row with optional priority indicator.
@@ -441,7 +457,7 @@ fn build_time_row<'a>(
 
 /// Builds the card container with accent bar and styling.
 fn build_card<'a>(
-    item_button: iced::widget::Button<'a, NotificationMessage>,
+    content_element: Element<'a, NotificationMessage>,
     visual: &NotificationVisualState,
     dense: bool,
 ) -> Element<'a, NotificationMessage> {
@@ -450,17 +466,19 @@ fn build_card<'a>(
     let border_color = visual.border_color;
     let show_border = visual.show_border;
 
-    let accent_bar = container(Space::new().width(3).height(Fill))
-        .height(Fill)
+    // Use a fixed-size accent bar instead of Fill to avoid layout collapse
+    // when nested in rows without explicit height
+    let accent_bar = container(Space::new().width(3))
         .style(move |_| container::Style {
             background: Some(iced::Background::Color(bar_color)),
             ..Default::default()
         });
 
     container(
-        row![accent_bar, item_button]
+        row![accent_bar, content_element]
             .spacing(0)
-            .align_y(Alignment::Center),
+            .align_y(Alignment::Center)
+            .width(Fill),
     )
     .style(move |_| container::Style {
         background: Some(iced::Background::Color(card_bg)),

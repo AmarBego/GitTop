@@ -15,38 +15,10 @@ impl NotificationsScreen {
     pub fn view_bulk_action_bar(&self, icon_theme: IconTheme) -> Element<'_, NotificationMessage> {
         let p = theme::palette();
         let selection_count = self.selected_ids.len();
-        let is_bulk_mode = self.bulk_mode;
 
-        if !is_bulk_mode {
-            // Not in bulk mode: show simple "Select" button
-            let select_btn = button(
-                row![
-                    icons::icon_check(12.0, p.text_secondary, icon_theme),
-                    Space::new().width(6),
-                    text("Select").size(12).color(p.text_secondary),
-                ]
-                .align_y(Alignment::Center),
-            )
-            .style(theme::ghost_button)
-            .padding([6, 12])
-            .on_press(NotificationMessage::ToggleBulkMode);
-
-            return container(
-                row![Space::new().width(Fill), select_btn,]
-                    .align_y(Alignment::Center)
-                    .padding([8, 16]),
-            )
-            .width(Fill)
-            .style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_card)),
-                border: iced::Border {
-                    color: p.border_subtle,
-                    width: 0.0,
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            })
-            .into();
+        // Only show action bar when in bulk mode (triggered from top bar Select button)
+        if !self.bulk_mode {
+            return Space::new().height(0).into();
         }
 
         // In bulk mode: show action bar
@@ -103,7 +75,7 @@ impl NotificationsScreen {
             row![
                 icons::icon_inbox(12.0, p.accent_warning, icon_theme),
                 Space::new().width(6),
-                text("Archive").size(12).color(p.text_primary),
+                text("Mark as Done").size(12).color(p.text_primary),
             ]
             .align_y(Alignment::Center),
         )

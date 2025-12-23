@@ -1,8 +1,8 @@
 [package]
-name = "gittop"
+name = "GitTop"
 version = "0.1.0"
 edition = "2021"
-description = "Why spin up a browser just to check your GitHub notifications? 5MB memory footprint and 1MB in tray"
+description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["Amar"]
 license = "AGPL-3.0-only"
 

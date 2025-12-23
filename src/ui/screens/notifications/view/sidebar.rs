@@ -33,6 +33,7 @@ pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMess
         .push(view_repos_section(
             state.repo_counts,
             state.selected_repo,
+            state.total_repo_count,
             state.icon_theme,
         ))
         .spacing(0)
@@ -137,6 +138,7 @@ fn view_types_section(
 fn view_repos_section(
     repo_counts: &[(String, usize)],
     selected_repo: Option<&str>,
+    total_repo_count: usize,
     icon_theme: IconTheme,
 ) -> Element<'static, NotificationMessage> {
     let p = theme::palette();
@@ -146,6 +148,14 @@ fn view_repos_section(
             .size(theme::sidebar_scaled(11.0))
             .color(p.text_secondary),
         Space::new().height(8),
+        // "All" option
+        sidebar_item(
+            icons::icon_folder(14.0, p.text_primary, icon_theme),
+            "All".to_owned(),
+            total_repo_count,
+            selected_repo.is_none(),
+            NotificationMessage::SelectRepo(None),
+        ),
     ]
     .spacing(2);
 
@@ -168,7 +178,7 @@ fn view_repos_section(
         ));
     }
 
-    if repo_counts.is_empty() {
+    if repo_counts.is_empty() && total_repo_count == 0 {
         col = col.push(text("No repositories").size(11).color(p.text_muted));
     }
 

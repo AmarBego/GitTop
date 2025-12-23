@@ -41,6 +41,9 @@ impl NotificationsScreen {
     }
 
     /// Renders the notification list with virtual scrolling.
+    ///
+    /// Supports both normal mode and bulk selection mode with proper
+    /// virtual scrolling for performance.
     pub fn view_content(
         &self,
         icon_theme: IconTheme,
@@ -54,76 +57,81 @@ impl NotificationsScreen {
             return view_error(error, icon_theme);
         }
 
-        // Check processed notifications (after rule filtering) for empty state
-        if self.processed_notifications.is_empty() {
+        // Check if there are any notifications to display
+        let has_notifications = self.groups.iter().any(|g| !g.notifications.is_empty());
+        if !has_notifications {
             return view_empty(self.filters.show_all, icon_theme);
         }
 
-        // === VIRTUAL SCROLLING ===
-        // Constants for item height calculation
-        let item_height: f32 = if power_mode { 48.0 } else { 64.0 };
-        let header_height: f32 = 40.0;
-        let group_spacing: f32 = 8.0;
-        let buffer_items: usize = 5; // Extra items above/below viewport
+        let in_bulk_mode = self.bulk_mode && power_mode;
+        let pp = theme::palette();
 
-        // Calculate visible range based on scroll position
-        let first_visible_px = self.scroll_offset;
-        let last_visible_px = self.scroll_offset + self.viewport_height;
+        // === HEIGHT ESTIMATES FOR VIRTUAL SCROLLING ===
+        let item_height: f32 = if power_mode { 56.0 } else { 72.0 };
+        let header_height: f32 = 32.0;
+        let column_spacing: f32 = 8.0;
+        let content_padding: f32 = 8.0;
+        let buffer_items: usize = 10;
 
-        // Build content with groups, virtualizing items within each group
-        let mut content = column![].spacing(8).padding([8, 8]);
-        let mut cumulative_y: f32 = 8.0; // Start with top padding
+        let first_visible_px = self.scroll_offset.max(0.0);
+        let last_visible_px = self.scroll_offset + self.viewport_height + 100.0;
+
+        let mut content = column![]
+            .spacing(column_spacing)
+            .padding([content_padding, content_padding]);
+        let mut current_y: f32 = content_padding;
 
         for (group_idx, group) in self.groups.iter().enumerate() {
             if group.notifications.is_empty() {
                 continue;
             }
 
-            // Always render group header (they're small and needed for interaction)
-            content = content.push(view_group_header(group, group_idx, icon_theme));
-            cumulative_y += header_height;
+            let header_end_y = current_y + header_height;
+            let header =
+                container(view_group_header(group, group_idx, icon_theme)).height(header_height);
+            content = content.push(header);
+            current_y = header_end_y + column_spacing;
 
             if group.is_expanded {
-                let group_items_start_y = cumulative_y;
-                let total_group_height = group.notifications.len() as f32 * item_height;
-                let group_items_end_y = group_items_start_y + total_group_height;
+                let items_start_y = current_y;
+                let items_count = group.notifications.len();
+                let total_items_height =
+                    items_count as f32 * (item_height + column_spacing) - column_spacing;
+                let items_end_y = items_start_y + total_items_height;
 
-                // Check if this group overlaps with visible viewport
-                if group_items_end_y >= first_visible_px && group_items_start_y <= last_visible_px {
-                    // Calculate which items are visible within this group
-                    let first_visible_in_group = if first_visible_px > group_items_start_y {
-                        ((first_visible_px - group_items_start_y) / item_height) as usize
+                if items_end_y >= first_visible_px && items_start_y <= last_visible_px {
+                    let first_visible_idx = if first_visible_px > items_start_y {
+                        ((first_visible_px - items_start_y) / (item_height + column_spacing))
+                            as usize
                     } else {
                         0
                     };
 
-                    let last_visible_in_group = if last_visible_px < group_items_end_y {
-                        ((last_visible_px - group_items_start_y) / item_height).ceil() as usize
+                    let last_visible_idx = if last_visible_px < items_end_y {
+                        ((last_visible_px - items_start_y) / (item_height + column_spacing)).ceil()
+                            as usize
+                            + 1
                     } else {
-                        group.notifications.len()
+                        items_count
                     };
 
-                    // Apply buffer
-                    let start_idx = first_visible_in_group.saturating_sub(buffer_items);
-                    let end_idx =
-                        (last_visible_in_group + buffer_items).min(group.notifications.len());
+                    let render_start = first_visible_idx.saturating_sub(buffer_items);
+                    let render_end = (last_visible_idx + buffer_items).min(items_count);
 
-                    // Add top spacer for items above visible area
-                    if start_idx > 0 {
-                        let top_space = start_idx as f32 * item_height;
-                        content = content.push(Space::new().height(top_space));
+                    if render_start > 0 {
+                        let top_spacer_height =
+                            render_start as f32 * (item_height + column_spacing);
+                        content = content.push(Space::new().height(top_spacer_height).width(Fill));
                     }
 
-                    // Render only visible items
                     let is_priority = group.is_priority;
-                    for p in &group.notifications[start_idx..end_idx] {
-                        let item = notification_item(p, icon_theme, power_mode, is_priority);
-
-                        // In bulk mode, wrap with selection indicator
-                        if self.bulk_mode && power_mode {
+                    for p in &group.notifications[render_start..render_end] {
+                        let item_element: Element<'_, NotificationMessage> = if in_bulk_mode {
+                            // Bulk mode: checkbox + notification item
+                            let item =
+                                notification_item(p, icon_theme, power_mode, is_priority, false);
                             let id = p.notification.id.clone();
                             let is_selected = self.selected_ids.contains(&id);
-                            let pp = theme::palette();
 
                             let checkbox_icon: Element<'_, NotificationMessage> = if is_selected {
                                 container(icons::icon_check(12.0, iced::Color::WHITE, icon_theme))
@@ -151,40 +159,163 @@ impl NotificationsScreen {
                                     .into()
                             };
 
-                            let wrapped = button(
-                                row![checkbox_icon, Space::new().width(8), item,]
-                                    .align_y(Alignment::Center),
+                            button(
+                                row![checkbox_icon, Space::new().width(8), item]
+                                    .align_y(Alignment::Center)
+                                    .width(Fill),
                             )
-                            .style(move |_theme, _status| button::Style {
-                                background: None,
-                                ..Default::default()
+                            .style(move |_theme, status| {
+                                let bg = match status {
+                                    button::Status::Hovered => Some(iced::Background::Color(
+                                        iced::Color::from_rgba(1.0, 1.0, 1.0, 0.03),
+                                    )),
+                                    button::Status::Pressed => Some(iced::Background::Color(
+                                        iced::Color::from_rgba(1.0, 1.0, 1.0, 0.05),
+                                    )),
+                                    _ => None,
+                                };
+                                button::Style {
+                                    background: bg,
+                                    text_color: pp.text_primary,
+                                    ..Default::default()
+                                }
                             })
                             .padding(0)
-                            .on_press(NotificationMessage::ToggleSelect(id));
-
-                            content = content.push(wrapped);
+                            .on_press(NotificationMessage::ToggleSelect(id))
+                            .width(Fill)
+                            .into()
                         } else {
-                            content = content.push(item);
-                        }
+                            // Normal mode: just the notification item
+                            notification_item(p, icon_theme, power_mode, is_priority, true)
+                        };
+
+                        content = content.push(item_element);
                     }
 
-                    // Add bottom spacer for items below visible area
-                    if end_idx < group.notifications.len() {
-                        let bottom_space =
-                            (group.notifications.len() - end_idx) as f32 * item_height;
-                        content = content.push(Space::new().height(bottom_space));
+                    if render_end < items_count {
+                        let remaining = items_count - render_end;
+                        let bottom_spacer_height =
+                            remaining as f32 * (item_height + column_spacing);
+                        content =
+                            content.push(Space::new().height(bottom_spacer_height).width(Fill));
                     }
                 } else {
-                    // Group is entirely off-screen, just add spacer for total height
-                    content = content.push(Space::new().height(total_group_height));
+                    content = content.push(Space::new().height(total_items_height).width(Fill));
                 }
 
-                cumulative_y += total_group_height;
+                current_y = items_end_y + column_spacing;
+            }
+        }
+
+        content = content.push(Space::new().height(content_padding));
+
+        container(
+            scrollable(content)
+                .on_scroll(NotificationMessage::OnScroll)
+                .height(Fill)
+                .width(Fill)
+                .style(theme::scrollbar),
+        )
+        .style(theme::app_container)
+        .height(Fill)
+        .width(Fill)
+        .into()
+    }
+
+    /// Simple content rendering without virtual scrolling.
+    /// Used as fallback if virtual scrolling causes issues.
+    #[allow(dead_code)]
+    fn view_content_simple(
+        &self,
+        icon_theme: IconTheme,
+        power_mode: bool,
+    ) -> Element<'_, NotificationMessage> {
+        let column_spacing: f32 = 8.0;
+        let content_padding: f32 = 8.0;
+        let pp = theme::palette();
+        let in_bulk_mode = self.bulk_mode && power_mode;
+
+        let mut content = column![]
+            .spacing(column_spacing)
+            .padding([content_padding, content_padding]);
+
+        for (group_idx, group) in self.groups.iter().enumerate() {
+            if group.notifications.is_empty() {
+                continue;
             }
 
-            content = content.push(Space::new().height(group_spacing));
-            cumulative_y += group_spacing;
+            content = content.push(view_group_header(group, group_idx, icon_theme));
+
+            if group.is_expanded {
+                let is_priority = group.is_priority;
+
+                for p in &group.notifications {
+                    let item_element: Element<'_, NotificationMessage> = if in_bulk_mode {
+                        let item = notification_item(p, icon_theme, power_mode, is_priority, false);
+                        let id = p.notification.id.clone();
+                        let is_selected = self.selected_ids.contains(&id);
+
+                        let checkbox_icon: Element<'_, NotificationMessage> = if is_selected {
+                            container(icons::icon_check(12.0, iced::Color::WHITE, icon_theme))
+                                .padding(2)
+                                .style(move |_| container::Style {
+                                    background: Some(iced::Background::Color(pp.accent)),
+                                    border: iced::Border {
+                                        radius: 4.0.into(),
+                                        ..Default::default()
+                                    },
+                                    ..Default::default()
+                                })
+                                .into()
+                        } else {
+                            container(Space::new().width(16).height(16))
+                                .style(move |_| container::Style {
+                                    background: Some(iced::Background::Color(pp.bg_control)),
+                                    border: iced::Border {
+                                        radius: 4.0.into(),
+                                        width: 1.0,
+                                        color: pp.border,
+                                    },
+                                    ..Default::default()
+                                })
+                                .into()
+                        };
+
+                        button(
+                            row![checkbox_icon, Space::new().width(8), item]
+                                .align_y(Alignment::Center)
+                                .width(Fill),
+                        )
+                        .style(move |_theme, status| {
+                            let bg = match status {
+                                button::Status::Hovered => Some(iced::Background::Color(
+                                    iced::Color::from_rgba(1.0, 1.0, 1.0, 0.03),
+                                )),
+                                button::Status::Pressed => Some(iced::Background::Color(
+                                    iced::Color::from_rgba(1.0, 1.0, 1.0, 0.05),
+                                )),
+                                _ => None,
+                            };
+                            button::Style {
+                                background: bg,
+                                text_color: pp.text_primary,
+                                ..Default::default()
+                            }
+                        })
+                        .padding(0)
+                        .on_press(NotificationMessage::ToggleSelect(id))
+                        .width(Fill)
+                        .into()
+                    } else {
+                        notification_item(p, icon_theme, power_mode, is_priority, true)
+                    };
+
+                    content = content.push(item_element);
+                }
+            }
         }
+
+        content = content.push(Space::new().height(content_padding));
 
         container(
             scrollable(content)

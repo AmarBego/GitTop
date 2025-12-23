@@ -20,6 +20,7 @@ pub fn view_top_bar<'a>(
     is_loading: bool,
     unread_count: usize,
     show_all_filters: bool,
+    bulk_mode: bool,
     icon_theme: IconTheme,
 ) -> Element<'a, NotificationMessage> {
     let p = theme::palette();
@@ -127,13 +128,72 @@ pub fn view_top_bar<'a>(
         Space::new().width(0).into()
     };
 
+    // 4. Select Button (for bulk mode)
+    let select_btn = button(
+        row![
+            icons::icon_check(
+                14.0,
+                if bulk_mode {
+                    p.accent
+                } else {
+                    p.text_secondary
+                },
+                icon_theme
+            ),
+            Space::new().width(6),
+            text("Select").size(12).color(if bulk_mode {
+                p.accent
+            } else {
+                p.text_secondary
+            }),
+        ]
+        .align_y(Alignment::Center),
+    )
+    .style(move |_theme, status| {
+        if bulk_mode {
+            // Active/selected state - accent colored
+            button::Style {
+                background: Some(iced::Background::Color(match status {
+                    button::Status::Hovered => p.accent.scale_alpha(0.2),
+                    button::Status::Pressed => p.accent.scale_alpha(0.3),
+                    _ => p.accent.scale_alpha(0.1),
+                })),
+                text_color: p.accent,
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        } else {
+            // Normal ghost button style
+            button::Style {
+                background: Some(iced::Background::Color(match status {
+                    button::Status::Hovered => p.bg_hover,
+                    button::Status::Pressed => p.bg_active,
+                    _ => iced::Color::TRANSPARENT,
+                })),
+                text_color: p.text_primary,
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }
+        }
+    })
+    .padding([4, 8])
+    .on_press(NotificationMessage::ToggleBulkMode);
+
     // Middle container
     let middle_controls = row![
         filter_segment,
         Space::new().width(16),
         sync_status,
         Space::new().width(16),
-        mark_read
+        mark_read,
+        Space::new().width(8),
+        select_btn
     ]
     .align_y(Alignment::Center);
 

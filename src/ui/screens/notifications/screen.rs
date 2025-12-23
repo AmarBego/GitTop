@@ -154,6 +154,16 @@ impl NotificationsScreen {
 
     /// Set cross-account priority notifications (from previous screen on account switch).
     pub fn set_cross_account_priority(&mut self, priority: Vec<ProcessedNotification>) {
+        eprintln!(
+            "[DEBUG] set_cross_account_priority: received {} priority notifications",
+            priority.len()
+        );
+        for p in &priority {
+            eprintln!(
+                "  - {} from @{} (unread={})",
+                p.notification.title, p.notification.account, p.notification.unread
+            );
+        }
         self.cross_account_priority = priority;
         self.rebuild_groups();
     }
@@ -169,6 +179,12 @@ impl NotificationsScreen {
             .cloned()
             .collect();
 
+        eprintln!(
+            "[DEBUG] update_cross_account_priority: found {} priority from current account @{}",
+            current_priority.len(),
+            self.user.login
+        );
+
         // Merge with existing cross-account priority (remove duplicates by ID)
         // and remove old entries from the same account (they'll be replaced)
         let current_account = &self.user.login;
@@ -177,6 +193,11 @@ impl NotificationsScreen {
 
         // Add current account's unread priority notifications
         self.cross_account_priority.extend(current_priority);
+
+        eprintln!(
+            "[DEBUG] cross_account_priority now has {} total notifications",
+            self.cross_account_priority.len()
+        );
     }
 
     /// Process all notifications through the rule engine (single pass).
@@ -192,9 +213,54 @@ impl NotificationsScreen {
     }
 
     fn rebuild_groups(&mut self) {
-        // Recompute cached counts from all notifications
-        self.type_counts = count_by_type(&self.all_notifications);
-        self.repo_counts = count_by_repo(&self.all_notifications);
+        // Compute dynamic counts based on current filter selections:
+        // - type_counts: filtered by selected_repo (if any) so we show types available in that repo
+        // - repo_counts: filtered by selected_type (if any) so we show repos containing that type
+
+        let notifications_for_types: Vec<_> = if let Some(ref repo) = self.filters.selected_repo {
+            self.all_notifications
+                .iter()
+                .filter(|n| &n.repo_full_name == repo)
+                .cloned()
+                .collect()
+        } else {
+            self.all_notifications.clone()
+        };
+
+        let notifications_for_repos: Vec<_> =
+            if let Some(ref selected_type) = self.filters.selected_type {
+                self.all_notifications
+                    .iter()
+                    .filter(|n| &n.subject_type == selected_type)
+                    .cloned()
+                    .collect()
+            } else {
+                self.all_notifications.clone()
+            };
+
+        self.type_counts = count_by_type(&notifications_for_types);
+        self.repo_counts = count_by_repo(&notifications_for_repos);
+
+        // Validate current selections - clear if they become invalid after cross-filtering
+        // This prevents selecting a type that has no notifications in the selected repo (or vice versa)
+        if let Some(ref selected_type) = self.filters.selected_type {
+            let type_valid = self
+                .type_counts
+                .iter()
+                .any(|(t, c)| t == selected_type && *c > 0);
+            if !type_valid {
+                self.filters.selected_type = None;
+            }
+        }
+        if let Some(ref selected_repo) = self.filters.selected_repo {
+            let repo_valid = self
+                .repo_counts
+                .iter()
+                .any(|(r, c)| r == selected_repo && *c > 0);
+            if !repo_valid {
+                self.filters.selected_repo = None;
+            }
+        }
 
         // Process notifications through rule engine (single pass)
         self.process_notifications();
@@ -206,6 +272,7 @@ impl NotificationsScreen {
         // Only show cross-account priority in "Unread" mode, not "All"
         let all_processed = if self.filters.show_all {
             // In "All" mode, just show current account's notifications without cross-account priority
+            eprintln!("[DEBUG] rebuild_groups: show_all mode, skipping cross-account priority");
             self.processed_notifications.clone()
         } else {
             // In "Unread" mode, merge cross-account priority notifications from other accounts
@@ -216,6 +283,18 @@ impl NotificationsScreen {
                 .filter(|p| p.notification.account != *current_account && p.notification.unread)
                 .cloned()
                 .collect();
+
+            eprintln!(
+                "[DEBUG] rebuild_groups: merging {} priority from other accounts (current=@{})",
+                other_account_priority.len(),
+                current_account
+            );
+            for p in &other_account_priority {
+                eprintln!(
+                    "  - Adding: {} from @{}",
+                    p.notification.title, p.notification.account
+                );
+            }
 
             // Combine current account's processed notifications with other accounts' priority
             let mut combined = self.processed_notifications.clone();
@@ -233,9 +312,33 @@ impl NotificationsScreen {
             combined
         };
 
+        // Preserve expansion state from existing groups before rebuilding
+        let previous_expansion: std::collections::HashMap<String, bool> = self
+            .groups
+            .iter()
+            .map(|g| (g.title.clone(), g.is_expanded))
+            .collect();
+
         // Group by time. Priority group only shown in "Unread" mode (not "All").
         let show_priority_group = !self.filters.show_all;
         self.groups = group_processed_notifications(&all_processed, show_priority_group);
+
+        // Restore expansion state for groups that existed before
+        for group in &mut self.groups {
+            if let Some(&was_expanded) = previous_expansion.get(&group.title) {
+                group.is_expanded = was_expanded;
+            }
+        }
+
+        // Log resulting priority group
+        if let Some(priority_group) = self.groups.iter().find(|g| g.is_priority) {
+            eprintln!(
+                "[DEBUG] rebuild_groups: Priority group has {} items",
+                priority_group.notifications.len()
+            );
+        } else {
+            eprintln!("[DEBUG] rebuild_groups: No priority group");
+        }
     }
 
     /// Send desktop notifications for new or updated unread notifications.
@@ -312,6 +415,9 @@ impl NotificationsScreen {
             eprintln!("[DEBUG] Sending summary notification: {:?}", title);
             crate::platform::notify(&title, &body, None);
         }
+
+        // Trim memory after sending desktop notifications to prevent accumulation
+        crate::platform::trim_memory();
     }
 
     pub fn update(&mut self, message: NotificationMessage) -> Task<NotificationMessage> {
@@ -463,13 +569,15 @@ impl NotificationsScreen {
             }
             NotificationMessage::SelectType(subject_type) => {
                 self.filters.selected_type = subject_type;
-                self.filters.selected_repo = None; // Clear repo filter
+                // Don't clear repo filter - allow independent selection
+                self.scroll_offset = 0.0; // Reset scroll to top when filter changes
                 self.rebuild_groups();
                 Task::none()
             }
             NotificationMessage::SelectRepo(repo) => {
                 self.filters.selected_repo = repo;
-                self.filters.selected_type = None; // Clear type filter
+                // Don't clear type filter - allow independent selection
+                self.scroll_offset = 0.0; // Reset scroll to top when filter changes
                 self.rebuild_groups();
                 Task::none()
             }
@@ -586,7 +694,9 @@ impl NotificationsScreen {
             NotificationMessage::ToggleBulkMode => {
                 self.bulk_mode = !self.bulk_mode;
                 if !self.bulk_mode {
+                    // Clear and shrink to free memory
                     self.selected_ids.clear();
+                    self.selected_ids.shrink_to_fit();
                 }
                 Task::none()
             }
@@ -631,7 +741,7 @@ impl NotificationsScreen {
                         }
                         Ok::<(), GitHubError>(())
                     },
-                    |_| NotificationMessage::Refresh,
+                    |_| NotificationMessage::BulkActionComplete,
                 )
             }
             NotificationMessage::BulkMarkAsDone => {
@@ -653,8 +763,12 @@ impl NotificationsScreen {
                         }
                         Ok::<(), GitHubError>(())
                     },
-                    |_| NotificationMessage::Refresh,
+                    |_| NotificationMessage::BulkActionComplete,
                 )
+            }
+            NotificationMessage::BulkActionComplete => {
+                // No-op: optimistic update already handled UI, no need to refresh
+                Task::none()
             }
         }
     }
@@ -666,6 +780,27 @@ impl NotificationsScreen {
         sidebar_width: f32,
         power_mode: bool,
     ) -> Element<'a, NotificationMessage> {
+        // Compute dynamic totals for the "All" items in sidebar:
+        // - total_count (for Types "All"): count filtered by selected_repo
+        // - total_repo_count (for Repos "All"): count filtered by selected_type
+        let total_count = if let Some(ref repo) = self.filters.selected_repo {
+            self.all_notifications
+                .iter()
+                .filter(|n| &n.repo_full_name == repo)
+                .count()
+        } else {
+            self.all_notifications.len()
+        };
+
+        let total_repo_count = if let Some(ref selected_type) = self.filters.selected_type {
+            self.all_notifications
+                .iter()
+                .filter(|n| &n.subject_type == selected_type)
+                .count()
+        } else {
+            self.all_notifications.len()
+        };
+
         row![
             // Sidebar
             view_sidebar(SidebarState {
@@ -675,7 +810,8 @@ impl NotificationsScreen {
                 repo_counts: &self.repo_counts,
                 selected_type: self.filters.selected_type,
                 selected_repo: self.filters.selected_repo.as_deref(),
-                total_count: self.all_notifications.len(),
+                total_count,
+                total_repo_count,
                 icon_theme,
                 width: sidebar_width,
                 power_mode,

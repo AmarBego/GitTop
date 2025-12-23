@@ -107,7 +107,7 @@ impl NotificationEngine {
 
         // Check if notification is new/updated
         let is_new = match seen_timestamps.get(&notif.id) {
-            None => true,                                    // Never seen this ID
+            None => true,                                     // Never seen this ID
             Some(last_seen) => notif.updated_at > *last_seen, // Updated since last seen
         };
 
@@ -210,7 +210,7 @@ mod tests {
         ];
 
         let processed = engine.process_all(&notifications);
-        
+
         // Without any rules enabled, all should show
         assert_eq!(processed.len(), 2);
         assert!(processed.iter().all(|p| p.action == RuleAction::Show));
@@ -226,7 +226,10 @@ mod tests {
         let processed = engine.process_all(&[notif]);
 
         // New unread notification should trigger desktop
-        assert!(NotificationEngine::should_notify_desktop(&processed[0], &seen));
+        assert!(NotificationEngine::should_notify_desktop(
+            &processed[0],
+            &seen
+        ));
     }
 
     #[test]
@@ -241,7 +244,10 @@ mod tests {
         let processed = engine.process_all(&[notif]);
 
         // Already seen notification should NOT trigger desktop
-        assert!(!NotificationEngine::should_notify_desktop(&processed[0], &seen));
+        assert!(!NotificationEngine::should_notify_desktop(
+            &processed[0],
+            &seen
+        ));
     }
 
     #[test]
@@ -254,6 +260,9 @@ mod tests {
         let processed = engine.process_all(&[notif]);
 
         // Read notification should NOT trigger desktop
-        assert!(!NotificationEngine::should_notify_desktop(&processed[0], &seen));
+        assert!(!NotificationEngine::should_notify_desktop(
+            &processed[0],
+            &seen
+        ));
     }
 }

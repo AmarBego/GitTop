@@ -3,6 +3,33 @@
 version = 4
 
 [[package]]
+name = "GitTop"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "iced",
+ "iced_aw",
+ "icondata_core",
+ "icondata_lu",
+ "keyring",
+ "mac-notification-sys",
+ "notify-rust",
+ "open",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "single-instance",
+ "sled",
+ "tauri-winrt-notification",
+ "thiserror 2.0.17",
+ "tokio",
+ "tray-icon",
+ "uuid",
+ "windows 0.62.2",
+]
+
+[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1421,33 +1448,6 @@ dependencies = [
  "libc",
  "system-deps",
  "winapi",
-]
-
-[[package]]
-name = "gittop"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs",
- "iced",
- "iced_aw",
- "icondata_core",
- "icondata_lu",
- "keyring",
- "mac-notification-sys",
- "notify-rust",
- "open",
- "reqwest",
- "serde",
- "serde_json",
- "single-instance",
- "sled",
- "tauri-winrt-notification",
- "thiserror 2.0.17",
- "tokio",
- "tray-icon",
- "uuid",
- "windows 0.62.2",
 ]
 
 [[package]]

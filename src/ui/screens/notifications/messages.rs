@@ -54,4 +54,6 @@ pub enum NotificationMessage {
     BulkMarkAsRead,
     /// Bulk mark selected as done (archive)
     BulkMarkAsDone,
+    /// Bulk action completed (no-op, just to complete the Task)
+    BulkActionComplete,
 }
