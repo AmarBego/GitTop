@@ -247,12 +247,16 @@ impl AppSettings {
         self.accounts.retain(|a| a.username != username);
     }
 
-    /// Get the active account username.
-    #[allow(dead_code)] // Reserved for multi-account feature
-    pub fn active_account(&self) -> Option<&str> {
-        self.accounts
-            .iter()
-            .find(|a| a.is_active)
-            .map(|a| a.username.as_str())
+    /// Apply theme and font scale settings globally.
+    /// Call this after loading settings to initialize the UI theme.
+    pub fn apply_theme(&self) {
+        crate::ui::theme::set_theme(self.theme);
+        crate::ui::theme::set_notification_font_scale(self.notification_font_scale);
+        crate::ui::theme::set_sidebar_font_scale(self.sidebar_font_scale);
+    }
+
+    /// Save settings to disk, ignoring any errors.
+    pub fn save_silent(&self) {
+        let _ = self.save();
     }
 }

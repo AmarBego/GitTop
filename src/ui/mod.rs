@@ -3,7 +3,7 @@
 mod app;
 pub mod icons;
 mod screens;
-mod theme;
+pub mod theme;
 mod widgets;
 pub mod window_state;
 

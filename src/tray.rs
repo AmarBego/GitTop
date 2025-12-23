@@ -96,7 +96,6 @@ impl TrayManager {
     pub fn poll_global_events() -> Option<TrayCommand> {
         // Check for menu events
         if let Ok(event) = MenuEvent::receiver().try_recv() {
-            eprintln!("[DEBUG] Tray menu event: {:?}", event);
             // Check against globally stored menu IDs
             if let Some(show_id) = SHOW_MENU_ID.get() {
                 if event.id == *show_id {

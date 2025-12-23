@@ -1,5 +1,4 @@
-// Temporarily disabled for debugging - enables console output in release builds
-// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 //! GitTop - A beautiful native GitHub notification manager
 //! No browser engine required. Pure Rust. Pure performance.
@@ -25,7 +24,7 @@ const SINGLE_INSTANCE_MUTEX: &str = "GitTop-SingleInstance-Mutex-7a8b9c0d";
 /// Global mock notification count (set via CLI)
 pub static MOCK_NOTIFICATION_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-/// Parse CLI arguments and return any leftover args
+/// Parse CLI arguments for mock data testing.
 fn parse_cli_args() {
     let args: Vec<String> = std::env::args().collect();
     let mut i = 1;
@@ -33,7 +32,6 @@ fn parse_cli_args() {
         if (args[i] == "--mock-notifications" || args[i] == "-m") && i + 1 < args.len() {
             if let Ok(count) = args[i + 1].parse::<usize>() {
                 MOCK_NOTIFICATION_COUNT.store(count, Ordering::Relaxed);
-                eprintln!("[SPECS] Mock notifications enabled: {}", count);
             }
             i += 1;
         }
@@ -44,8 +42,8 @@ fn parse_cli_args() {
 fn main() -> iced::Result {
     // Force OpenGL backend for wgpu to minimize memory footprint
     // OpenGL uses ~42MB vs Vulkan's ~164MB or DX12's ~133MB
-    // This MUST be set before any wgpu/iced initialization
-    std::env::set_var("WGPU_BACKEND", "gl");
+    // Safety: This is called at program start before any threads are spawned
+    unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
 
     // Parse CLI arguments (e.g., --mock-notifications 1000)
     parse_cli_args();
