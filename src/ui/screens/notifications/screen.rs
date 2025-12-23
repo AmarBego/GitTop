@@ -59,6 +59,12 @@ pub struct NotificationsScreen {
     scroll_offset: f32,
     /// Virtual scrolling: viewport height in pixels.
     viewport_height: f32,
+    /// Currently selected notification ID (for power mode details panel).
+    selected_notification_id: Option<String>,
+    /// Fetched details for the selected notification.
+    selected_notification_details: Option<crate::github::NotificationSubjectDetail>,
+    /// Whether we're currently loading details for a selected notification.
+    pub is_loading_details: bool,
 }
 
 /// Notifications screen messages.
@@ -92,6 +98,15 @@ pub enum NotificationMessage {
     TogglePowerMode,
     /// Virtual scrolling: scroll position changed
     OnScroll(iced::widget::scrollable::Viewport),
+    /// Select a notification to view in details panel (power mode)
+    SelectNotification(String),
+    /// Notification details fetch completed
+    SelectComplete(
+        String,
+        Result<crate::github::NotificationSubjectDetail, GitHubError>,
+    ),
+    /// Open selected notification's URL in browser (from details panel)
+    OpenInBrowser,
 }
 
 impl NotificationsScreen {
@@ -113,6 +128,9 @@ impl NotificationsScreen {
             cross_account_priority: Vec::new(),
             scroll_offset: 0.0,
             viewport_height: 600.0, // Default, updated on first scroll
+            selected_notification_id: None,
+            selected_notification_details: None,
+            is_loading_details: false,
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -541,6 +559,67 @@ impl NotificationsScreen {
                 self.viewport_height = viewport.bounds().height;
                 Task::none()
             }
+            NotificationMessage::SelectNotification(id) => {
+                // Find the notification
+                if let Some(notif) = self.all_notifications.iter().find(|n| n.id == id) {
+                    self.selected_notification_id = Some(id.clone());
+                    self.selected_notification_details = None;
+                    self.is_loading_details = true;
+
+                    // Fetch the details
+                    let client = self.client.clone();
+                    let subject_type = notif.subject_type;
+                    let subject_url = notif.url.clone();
+                    let latest_comment_url = notif.latest_comment_url.clone();
+                    let reason = notif.reason;
+                    let title = notif.title.clone();
+
+                    Task::perform(
+                        async move {
+                            client
+                                .get_notification_details(
+                                    subject_type,
+                                    subject_url.as_deref(),
+                                    latest_comment_url.as_deref(),
+                                    reason,
+                                    &title,
+                                )
+                                .await
+                        },
+                        move |result| NotificationMessage::SelectComplete(id.clone(), result),
+                    )
+                } else {
+                    Task::none()
+                }
+            }
+            NotificationMessage::SelectComplete(id, result) => {
+                // Only update if this is still the selected notification
+                if self.selected_notification_id.as_ref() == Some(&id) {
+                    self.is_loading_details = false;
+                    match result {
+                        Ok(details) => {
+                            self.selected_notification_details = Some(details);
+                        }
+                        Err(e) => {
+                            eprintln!("[ERROR] Failed to fetch notification details: {}", e);
+                            self.selected_notification_details = None;
+                        }
+                    }
+                }
+                Task::none()
+            }
+            NotificationMessage::OpenInBrowser => {
+                // Open the selected notification's URL in browser
+                if let Some(ref id) = self.selected_notification_id {
+                    if let Some(notif) = self.all_notifications.iter().find(|n| &n.id == id) {
+                        if let Some(ref url) = notif.url {
+                            let web_url = api_url_to_web_url(url);
+                            let _ = open::that(&web_url);
+                        }
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -912,5 +991,17 @@ impl NotificationsScreen {
         .height(Fill)
         .width(Fill)
         .into()
+    }
+
+    /// Get the currently selected notification (for details panel).
+    pub fn selected_notification(&self) -> Option<&NotificationView> {
+        self.selected_notification_id
+            .as_ref()
+            .and_then(|id| self.all_notifications.iter().find(|n| &n.id == id))
+    }
+
+    /// Get the fetched details for the selected notification.
+    pub fn selected_details(&self) -> Option<&crate::github::NotificationSubjectDetail> {
+        self.selected_notification_details.as_ref()
     }
 }

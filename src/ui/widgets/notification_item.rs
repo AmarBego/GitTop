@@ -23,12 +23,12 @@ use crate::ui::{icons, theme};
 // ============================================================================
 
 /// Centralized visual decisions for a notification.
-/// 
+///
 /// This is the SINGLE SOURCE OF TRUTH for all visual properties:
 /// - Subject type colors (consistent across all usages)
 /// - Card styling (background, border, accent bar)
 /// - State indicators (priority, silent, unread)
-/// 
+///
 /// By computing everything in one place, we guarantee:
 /// 1. Consistent colors between icon and accent bar
 /// 2. No scattered color logic throughout the codebase
@@ -54,7 +54,7 @@ pub struct NotificationVisualState {
 
 impl NotificationVisualState {
     /// Compute complete visual state from notification data.
-    /// 
+    ///
     /// This method encapsulates ALL visual logic, ensuring consistency
     /// between the subject icon, accent bar, card styling, and indicators.
     pub fn compute(
@@ -64,7 +64,7 @@ impl NotificationVisualState {
         is_priority_group: bool,
     ) -> Self {
         let p = theme::palette();
-        
+
         // Subject color is the foundation - used for icons, bars, and tints
         let subject_color = Self::color_for_subject_type(subject_type);
 
@@ -124,26 +124,26 @@ impl NotificationVisualState {
     }
 
     /// Get the canonical color for a subject type.
-    /// 
+    ///
     /// This is the single definition of subject type colors, ensuring
     /// consistency between icons, accent bars, and any other usage.
     #[inline]
     pub fn color_for_subject_type(subject_type: SubjectType) -> Color {
         let p = theme::palette();
         match subject_type {
-            SubjectType::Issue => p.accent_success,          // Green
-            SubjectType::PullRequest => p.accent,            // Blue
-            SubjectType::Release => p.accent_purple,         // Purple
-            SubjectType::Discussion => p.accent,             // Blue
-            SubjectType::CheckSuite => p.accent_warning,     // Yellow/Orange
+            SubjectType::Issue => p.accent_success,      // Green
+            SubjectType::PullRequest => p.accent,        // Blue
+            SubjectType::Release => p.accent_purple,     // Purple
+            SubjectType::Discussion => p.accent,         // Blue
+            SubjectType::CheckSuite => p.accent_warning, // Yellow/Orange
             SubjectType::RepositoryVulnerabilityAlert => p.accent_danger, // Red
-            SubjectType::Commit => p.text_secondary,         // Muted
-            SubjectType::Unknown => p.text_secondary,        // Muted
+            SubjectType::Commit => p.text_secondary,     // Muted
+            SubjectType::Unknown => p.text_secondary,    // Muted
         }
     }
 
     /// Get the icon for a subject type with the correct color.
-    /// 
+    ///
     /// Uses `color_for_subject_type` internally to guarantee consistency.
     /// This is a static method for cases where you don't have a visual state instance.
     #[allow(dead_code)] // Public API for external use
@@ -156,7 +156,7 @@ impl NotificationVisualState {
     }
 
     /// Get the icon for a subject type using the pre-computed subject_color.
-    /// 
+    ///
     /// This uses the already-computed `subject_color` from the visual state,
     /// avoiding redundant color lookups and ensuring consistency.
     pub fn icon_for_subject_type_with_color(
@@ -174,7 +174,7 @@ impl NotificationVisualState {
         icon_theme: IconTheme,
     ) -> Element<'static, NotificationMessage> {
         let icon_size = theme::notification_scaled(14.0);
-        
+
         match subject_type {
             SubjectType::Issue => icons::icon_issue(icon_size, color, icon_theme),
             SubjectType::PullRequest => icons::icon_pull_request(icon_size, color, icon_theme),
@@ -272,10 +272,19 @@ pub fn notification_item(
         build_standard_layout(notif, subject_icon, &visual, &metrics, &p)
     };
 
+    // Click behavior depends on mode:
+    // - Dense (power mode): Select for details panel view
+    // - Standard: Open in browser
+    let click_message = if dense {
+        NotificationMessage::SelectNotification(notif.id.clone())
+    } else {
+        NotificationMessage::Open(notif.id.clone())
+    };
+
     // Wrap in button for click handling
     let item_button = button(content)
         .style(theme::notification_button)
-        .on_press(NotificationMessage::Open(notif.id.clone()))
+        .on_press(click_message)
         .width(Fill);
 
     // Build card with accent bar
@@ -306,7 +315,11 @@ fn build_standard_layout<'a>(
     p: &theme::ThemePalette,
 ) -> iced::widget::Row<'a, NotificationMessage> {
     // Use visual state's is_unread for title styling
-    let title_color = if visual.is_unread { p.text_primary } else { p.text_secondary };
+    let title_color = if visual.is_unread {
+        p.text_primary
+    } else {
+        p.text_secondary
+    };
     let title = text(&notif.title)
         .size(metrics.title_size)
         .color(title_color);
@@ -363,7 +376,11 @@ fn build_dense_layout<'a>(
     let subject_icon = visual.icon_for_subject_type_with_color(notif.subject_type, icon_theme);
 
     // Use visual state's is_unread for title styling
-    let title_color = if visual.is_unread { p.text_primary } else { p.text_secondary };
+    let title_color = if visual.is_unread {
+        p.text_primary
+    } else {
+        p.text_secondary
+    };
 
     // Title row with icon
     let mut title_row = row![

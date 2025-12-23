@@ -275,6 +275,193 @@ impl GitHubClient {
         }
     }
 
+    /// Fetches Issue details from an API URL.
+    ///
+    /// The URL comes from `notification.subject.url` and is in the format:
+    /// `https://api.github.com/repos/{owner}/{repo}/issues/{number}`
+    pub async fn get_issue(
+        &self,
+        url: &str,
+    ) -> Result<super::subject_details::IssueDetails, GitHubError> {
+        let response = self.client.get(url).send().await?;
+        let status = response.status();
+
+        if status.is_success() {
+            Ok(response.json().await?)
+        } else if status.as_u16() == 401 {
+            Err(GitHubError::Unauthorized)
+        } else if status.as_u16() == 403 {
+            Err(GitHubError::RateLimited)
+        } else if status.as_u16() == 404 {
+            Err(GitHubError::Api {
+                status: 404,
+                message: "Issue not found".to_string(),
+            })
+        } else {
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(GitHubError::Api {
+                status: status.as_u16(),
+                message,
+            })
+        }
+    }
+
+    /// Fetches Pull Request details from an API URL.
+    ///
+    /// The URL comes from `notification.subject.url` and is in the format:
+    /// `https://api.github.com/repos/{owner}/{repo}/pulls/{number}`
+    pub async fn get_pull_request(
+        &self,
+        url: &str,
+    ) -> Result<super::subject_details::PullRequestDetails, GitHubError> {
+        let response = self.client.get(url).send().await?;
+        let status = response.status();
+
+        if status.is_success() {
+            Ok(response.json().await?)
+        } else if status.as_u16() == 401 {
+            Err(GitHubError::Unauthorized)
+        } else if status.as_u16() == 403 {
+            Err(GitHubError::RateLimited)
+        } else if status.as_u16() == 404 {
+            Err(GitHubError::Api {
+                status: 404,
+                message: "Pull request not found".to_string(),
+            })
+        } else {
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(GitHubError::Api {
+                status: status.as_u16(),
+                message,
+            })
+        }
+    }
+
+    /// Fetches Comment details from an API URL.
+    ///
+    /// The URL comes from `notification.subject.latest_comment_url`.
+    pub async fn get_comment(
+        &self,
+        url: &str,
+    ) -> Result<super::subject_details::CommentDetails, GitHubError> {
+        let response = self.client.get(url).send().await?;
+        let status = response.status();
+
+        if status.is_success() {
+            Ok(response.json().await?)
+        } else if status.as_u16() == 401 {
+            Err(GitHubError::Unauthorized)
+        } else if status.as_u16() == 403 {
+            Err(GitHubError::RateLimited)
+        } else if status.as_u16() == 404 {
+            Err(GitHubError::Api {
+                status: 404,
+                message: "Comment not found".to_string(),
+            })
+        } else {
+            let message = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(GitHubError::Api {
+                status: status.as_u16(),
+                message,
+            })
+        }
+    }
+
+    /// Fetches notification subject details based on type.
+    ///
+    /// This is the high-level method that determines what to fetch based on:
+    /// - subject_type: Issue, PullRequest, etc.
+    /// - reason: If "mention", fetch the comment instead of the issue
+    /// - subject_url: API URL for the Issue/PR
+    /// - latest_comment_url: API URL for the latest comment (for mentions)
+    pub async fn get_notification_details(
+        &self,
+        subject_type: super::types::SubjectType,
+        subject_url: Option<&str>,
+        latest_comment_url: Option<&str>,
+        reason: super::types::NotificationReason,
+        title: &str,
+    ) -> Result<super::subject_details::NotificationSubjectDetail, GitHubError> {
+        use super::subject_details::NotificationSubjectDetail;
+        use super::types::{NotificationReason, SubjectType};
+
+        // For "mention" reason, prioritize showing the comment that mentioned the user
+        if reason == NotificationReason::Mention {
+            if let Some(comment_url) = latest_comment_url {
+                let comment = self.get_comment(comment_url).await?;
+                return Ok(NotificationSubjectDetail::Comment {
+                    comment,
+                    context_title: title.to_string(),
+                });
+            }
+        }
+
+        match subject_type {
+            SubjectType::Issue => {
+                if let Some(url) = subject_url {
+                    let issue = self.get_issue(url).await?;
+                    Ok(NotificationSubjectDetail::Issue(issue))
+                } else {
+                    Ok(NotificationSubjectDetail::Unsupported {
+                        subject_type: "Issue".to_string(),
+                        html_url: None,
+                    })
+                }
+            }
+            SubjectType::PullRequest => {
+                if let Some(url) = subject_url {
+                    let pr = self.get_pull_request(url).await?;
+                    Ok(NotificationSubjectDetail::PullRequest(pr))
+                } else {
+                    Ok(NotificationSubjectDetail::Unsupported {
+                        subject_type: "PullRequest".to_string(),
+                        html_url: None,
+                    })
+                }
+            }
+            SubjectType::RepositoryVulnerabilityAlert => {
+                // Security alerts don't expose full content via REST API
+                Ok(NotificationSubjectDetail::SecurityAlert {
+                    title: title.to_string(),
+                    severity: None,
+                    html_url: subject_url
+                        .map(|u| u.replace("api.github.com/repos", "github.com"))
+                        .unwrap_or_default(),
+                })
+            }
+            SubjectType::Discussion => {
+                // Discussions have limited REST API support
+                // GraphQL would be needed for full details
+                Ok(NotificationSubjectDetail::Discussion(
+                    super::subject_details::DiscussionDetails {
+                        title: title.to_string(),
+                        body: None,
+                        html_url: subject_url
+                            .map(|u| u.replace("api.github.com/repos", "github.com"))
+                            .unwrap_or_default(),
+                    },
+                ))
+            }
+            _ => {
+                // Release, CheckSuite, Commit, Unknown - unsupported for now
+                Ok(NotificationSubjectDetail::Unsupported {
+                    subject_type: format!("{:?}", subject_type),
+                    html_url: subject_url
+                        .map(|u| u.replace("api.github.com/repos", "github.com").to_string()),
+                })
+            }
+        }
+    }
+
     /// Returns the token for storage purposes.
     #[allow(unused)]
     pub fn token(&self) -> &str {

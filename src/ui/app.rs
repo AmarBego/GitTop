@@ -465,7 +465,10 @@ impl App {
 
         match cmd {
             TrayCommand::ShowWindow => {
-                eprintln!("[DEBUG] Processing ShowWindow command, is_hidden={}", window_state::is_hidden());
+                eprintln!(
+                    "[DEBUG] Processing ShowWindow command, is_hidden={}",
+                    window_state::is_hidden()
+                );
                 let was_hidden = window_state::restore_from_hidden();
 
                 let window_task = if let Some(id) = window_state::get_window_id() {
@@ -733,7 +736,12 @@ impl App {
         let main_area: iced::Element<NotificationMessage> = if settings.show_details_panel {
             row![
                 content,
-                details_panel::view_details_panel(None, settings.icon_theme)
+                details_panel::view_details_panel(
+                    screen.selected_notification(),
+                    screen.selected_details(),
+                    screen.is_loading_details,
+                    settings.icon_theme
+                )
             ]
             .height(iced::Fill)
             .into()

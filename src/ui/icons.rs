@@ -289,3 +289,8 @@ pub fn icon_zap<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Elemen
 pub fn icon_eye_off<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
     themed_icon(theme, icondata_lu::LuEyeOff, "👁‍🗨", size, color)
 }
+
+/// At sign/mention icon.
+pub fn icon_at<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
+    themed_icon(theme, icondata_lu::LuAtSign, "@", size, color)
+}

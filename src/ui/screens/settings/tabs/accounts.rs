@@ -126,13 +126,6 @@ fn view_account_item(
 ) -> Element<'static, SettingsMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
-    let status_color = if account.is_active {
-        p.accent_success
-    } else {
-        p.text_muted
-    };
-
-    let status_text = if account.is_active { "Active" } else { "" };
     let username = account.username.clone();
     let username_for_button = account.username.clone();
 
@@ -142,7 +135,6 @@ fn view_account_item(
             Space::new().width(8),
             text(username).size(13).color(p.text_primary),
             Space::new().width(8),
-            text(status_text).size(10).color(status_color),
             Space::new().width(Fill),
             button(icons::icon_trash(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
