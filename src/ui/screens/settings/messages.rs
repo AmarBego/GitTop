@@ -6,10 +6,8 @@ use crate::settings::AppTheme;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsTab {
     #[default]
-    Appearance,
-    Behavior,
-    CommandCenter,
-    Notifications,
+    PowerMode,
+    General,
     Accounts,
 }
 

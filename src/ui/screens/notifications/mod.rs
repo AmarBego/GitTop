@@ -1,14 +1,13 @@
 //! Notifications screen module.
 
 mod engine;
-mod group;
 pub mod helper;
+pub mod messages;
 mod screen;
-pub mod sidebar;
-pub mod sidebar_state;
-mod states;
+mod view;
 
 // Public API exports for external consumers
 #[allow(unused_imports)]
 pub use engine::{DesktopNotificationBatch, NotificationEngine};
-pub use screen::{NotificationMessage, NotificationsScreen};
+pub use messages::NotificationMessage;
+pub use screen::NotificationsScreen;

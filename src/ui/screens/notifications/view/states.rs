@@ -3,8 +3,8 @@
 use iced::widget::{button, column, container, text, Space};
 use iced::{Alignment, Element, Fill};
 
-use super::screen::NotificationMessage;
 use crate::settings::IconTheme;
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
 /// Render the loading state.

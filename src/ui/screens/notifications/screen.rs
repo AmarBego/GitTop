@@ -9,25 +9,23 @@
 //! - `rebuild_groups()` operates on already-processed notifications
 //! - `send_desktop_notifications()` uses the same processed data
 
-use iced::widget::{button, column, container, row, scrollable, text, Space};
-use iced::{Alignment, Color, Element, Fill, Task};
+use iced::widget::row;
+use iced::{Element, Fill, Task};
 
 use crate::github::{GitHubClient, GitHubError, NotificationView, SubjectType, UserInfo};
 use crate::settings::IconTheme;
 use crate::ui::screens::settings::rule_engine::{NotificationRuleSet, RuleAction};
-use crate::ui::{icons, theme, window_state};
+use crate::ui::window_state;
 
 use super::engine::{DesktopNotificationBatch, NotificationEngine};
-use super::group::view_group_header;
 use super::helper::{
     api_url_to_web_url, apply_filters, count_by_repo, count_by_type, group_processed_notifications,
     FilterSettings, NotificationGroup, ProcessedNotification,
 };
-use super::sidebar::view_sidebar;
-use super::states::{view_empty, view_error, view_loading};
-use crate::ui::widgets::notification_item;
+use super::messages::NotificationMessage;
+use super::view::{view_sidebar, SidebarState};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Notifications screen state.
 #[derive(Debug, Clone)]
@@ -56,57 +54,19 @@ pub struct NotificationsScreen {
     /// These are always shown at the top, regardless of current account.
     cross_account_priority: Vec<ProcessedNotification>,
     /// Virtual scrolling: current scroll offset in pixels.
-    scroll_offset: f32,
+    pub(crate) scroll_offset: f32,
     /// Virtual scrolling: viewport height in pixels.
-    viewport_height: f32,
+    pub(crate) viewport_height: f32,
     /// Currently selected notification ID (for power mode details panel).
     selected_notification_id: Option<String>,
     /// Fetched details for the selected notification.
     selected_notification_details: Option<crate::github::NotificationSubjectDetail>,
     /// Whether we're currently loading details for a selected notification.
     pub is_loading_details: bool,
-}
-
-/// Notifications screen messages.
-#[derive(Debug, Clone)]
-#[allow(dead_code)] // MarkAsRead/MarkAsDone/MuteThread have handlers, pending UI buttons
-pub enum NotificationMessage {
-    Refresh,
-    RefreshComplete(Result<Vec<NotificationView>, GitHubError>),
-    Open(String),
-    MarkAsRead(String),
-    MarkAsReadComplete(String, Result<(), GitHubError>),
-    MarkAllAsRead,
-    MarkAllAsReadComplete(Result<(), GitHubError>),
-    ToggleShowAll,
-    Logout,
-    ToggleGroup(usize),
-    // Filter actions
-    SelectType(Option<SubjectType>),
-    SelectRepo(Option<String>),
-    // Thread actions
-    MarkAsDone(String),
-    MarkAsDoneComplete(String, Result<(), GitHubError>),
-    MuteThread(String),
-    MuteThreadComplete(String, Result<(), GitHubError>),
-    // Navigation
-    OpenSettings,
-    OpenRuleEngine,
-    // Account switching (handled by app.rs)
-    // Account switching (handled by app.rs)
-    SwitchAccount(String),
-    TogglePowerMode,
-    /// Virtual scrolling: scroll position changed
-    OnScroll(iced::widget::scrollable::Viewport),
-    /// Select a notification to view in details panel (power mode)
-    SelectNotification(String),
-    /// Notification details fetch completed
-    SelectComplete(
-        String,
-        Result<crate::github::NotificationSubjectDetail, GitHubError>,
-    ),
-    /// Open selected notification's URL in browser (from details panel)
-    OpenInBrowser,
+    /// Set of selected notification IDs for bulk actions (Power Mode only).
+    pub selected_ids: HashSet<String>,
+    /// Whether bulk selection mode is active.
+    pub bulk_mode: bool,
 }
 
 impl NotificationsScreen {
@@ -131,6 +91,8 @@ impl NotificationsScreen {
             selected_notification_id: None,
             selected_notification_details: None,
             is_loading_details: false,
+            selected_ids: HashSet::new(),
+            bulk_mode: false,
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -620,6 +582,80 @@ impl NotificationsScreen {
                 }
                 Task::none()
             }
+            // Bulk action handlers
+            NotificationMessage::ToggleBulkMode => {
+                self.bulk_mode = !self.bulk_mode;
+                if !self.bulk_mode {
+                    self.selected_ids.clear();
+                }
+                Task::none()
+            }
+            NotificationMessage::ToggleSelect(id) => {
+                if self.selected_ids.contains(&id) {
+                    self.selected_ids.remove(&id);
+                } else {
+                    self.selected_ids.insert(id);
+                }
+                Task::none()
+            }
+            NotificationMessage::SelectAll => {
+                // Select all filtered notifications
+                for notif in &self.filtered_notifications {
+                    self.selected_ids.insert(notif.id.clone());
+                }
+                Task::none()
+            }
+            NotificationMessage::ClearSelection => {
+                self.selected_ids.clear();
+                Task::none()
+            }
+            NotificationMessage::BulkMarkAsRead => {
+                // Optimistic update: immediately mark selected as read in UI
+                for id in &self.selected_ids {
+                    if let Some(notif) = self.all_notifications.iter_mut().find(|n| &n.id == id) {
+                        notif.unread = false;
+                    }
+                }
+                self.rebuild_groups();
+
+                // Fire API calls in background for each selected
+                let client = self.client.clone();
+                let ids: Vec<String> = self.selected_ids.iter().cloned().collect();
+                self.selected_ids.clear();
+                self.bulk_mode = false;
+
+                Task::perform(
+                    async move {
+                        for id in ids {
+                            let _ = client.mark_as_read(&id).await;
+                        }
+                        Ok::<(), GitHubError>(())
+                    },
+                    |_| NotificationMessage::Refresh,
+                )
+            }
+            NotificationMessage::BulkMarkAsDone => {
+                // Optimistic update: immediately remove selected from UI
+                let ids_to_remove: Vec<String> = self.selected_ids.iter().cloned().collect();
+                self.all_notifications
+                    .retain(|n| !self.selected_ids.contains(&n.id));
+                self.rebuild_groups();
+
+                // Fire API calls in background
+                let client = self.client.clone();
+                self.selected_ids.clear();
+                self.bulk_mode = false;
+
+                Task::perform(
+                    async move {
+                        for id in ids_to_remove {
+                            let _ = client.mark_thread_as_done(&id).await;
+                        }
+                        Ok::<(), GitHubError>(())
+                    },
+                    |_| NotificationMessage::Refresh,
+                )
+            }
         }
     }
 
@@ -632,7 +668,7 @@ impl NotificationsScreen {
     ) -> Element<'a, NotificationMessage> {
         row![
             // Sidebar
-            view_sidebar(super::sidebar_state::SidebarState {
+            view_sidebar(SidebarState {
                 user: &self.user,
                 accounts,
                 type_counts: &self.type_counts,
@@ -648,348 +684,6 @@ impl NotificationsScreen {
             self.view_main_content(icon_theme, power_mode)
         ]
         .height(Fill)
-        .into()
-    }
-
-    fn view_main_content(
-        &self,
-        icon_theme: IconTheme,
-        power_mode: bool,
-    ) -> Element<'_, NotificationMessage> {
-        if power_mode {
-            // In power mode, header controls are in top bar
-            column![self.view_content(icon_theme, power_mode)]
-                .width(Fill)
-                .height(Fill)
-                .into()
-        } else {
-            column![
-                self.view_content_header(icon_theme),
-                self.view_content(icon_theme, power_mode)
-            ]
-            .width(Fill)
-            .height(Fill)
-            .into()
-        }
-    }
-
-    fn view_content_header(&self, icon_theme: IconTheme) -> Element<'_, NotificationMessage> {
-        let p = theme::palette();
-        let unread_count = self
-            .filtered_notifications
-            .iter()
-            .filter(|n| n.unread)
-            .count();
-
-        let title = text("Notifications").size(18).color(p.text_primary);
-
-        let sync_status: Element<'_, NotificationMessage> = if self.is_loading {
-            row![
-                icons::icon_refresh(11.0, p.text_muted, icon_theme),
-                Space::new().width(4),
-                text("Syncing...").size(11).color(p.text_muted),
-            ]
-            .align_y(Alignment::Center)
-            .into()
-        } else {
-            row![
-                icons::icon_check(11.0, p.accent_success, icon_theme),
-                Space::new().width(4),
-                text("Synced").size(11).color(p.accent_success),
-            ]
-            .align_y(Alignment::Center)
-            .into()
-        };
-
-        // Segmented control for filter selection (Unread | All)
-        // Clear visual indication of current state, scales for future filters
-        let is_unread_filter = !self.filters.show_all;
-
-        let unread_btn = button(text("Unread").size(12).color(if is_unread_filter {
-            p.text_primary
-        } else {
-            p.text_secondary
-        }))
-        .style(move |_theme, status| {
-            let base_bg = if is_unread_filter {
-                p.bg_active
-            } else {
-                Color::TRANSPARENT
-            };
-            let bg = match status {
-                button::Status::Hovered if !is_unread_filter => p.bg_hover,
-                button::Status::Pressed => p.bg_active,
-                _ => base_bg,
-            };
-            button::Style {
-                background: Some(iced::Background::Color(bg)),
-                text_color: if is_unread_filter {
-                    p.text_primary
-                } else {
-                    p.text_secondary
-                },
-                border: iced::Border {
-                    radius: 0.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }
-        })
-        .padding([6, 12])
-        .on_press(NotificationMessage::ToggleShowAll);
-
-        let all_btn = button(text("All").size(12).color(if !is_unread_filter {
-            p.text_primary
-        } else {
-            p.text_secondary
-        }))
-        .style(move |_theme, status| {
-            let base_bg = if !is_unread_filter {
-                p.bg_active
-            } else {
-                Color::TRANSPARENT
-            };
-            let bg = match status {
-                button::Status::Hovered if is_unread_filter => p.bg_hover,
-                button::Status::Pressed => p.bg_active,
-                _ => base_bg,
-            };
-            button::Style {
-                background: Some(iced::Background::Color(bg)),
-                text_color: if !is_unread_filter {
-                    p.text_primary
-                } else {
-                    p.text_secondary
-                },
-                border: iced::Border {
-                    radius: 0.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }
-        })
-        .padding([6, 12])
-        .on_press(NotificationMessage::ToggleShowAll);
-
-        // Wrap in container with border
-        let filter_segment =
-            container(row![unread_btn, all_btn].spacing(0)).style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_control)),
-                border: iced::Border {
-                    radius: 4.0.into(),
-                    color: p.border_subtle,
-                    width: 1.0,
-                },
-                ..Default::default()
-            });
-
-        // Mark all read button with improved styling
-        let mark_all_btn = if unread_count > 0 {
-            button(
-                row![
-                    icons::icon_check(12.0, p.accent, icon_theme),
-                    Space::new().width(6),
-                    text("Mark all read").size(12).color(p.text_primary),
-                ]
-                .align_y(Alignment::Center),
-            )
-            .style(move |_theme, status| {
-                let bg = match status {
-                    button::Status::Hovered => p.bg_hover,
-                    button::Status::Pressed => p.bg_active,
-                    _ => Color::TRANSPARENT,
-                };
-                button::Style {
-                    background: Some(iced::Background::Color(bg)),
-                    text_color: p.text_primary,
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            })
-            .padding([6, 10])
-            .on_press(NotificationMessage::MarkAllAsRead)
-        } else {
-            button(
-                row![
-                    icons::icon_check(12.0, p.text_muted, icon_theme),
-                    Space::new().width(6),
-                    text("Mark all read").size(12).color(p.text_muted),
-                ]
-                .align_y(Alignment::Center),
-            )
-            .style(move |_theme, _status| button::Style {
-                background: Some(iced::Background::Color(Color::TRANSPARENT)),
-                text_color: p.text_muted,
-                border: iced::Border {
-                    radius: 6.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .padding([6, 10])
-        };
-
-        // Refresh button with subtle styling
-        let refresh_btn = button(icons::icon_refresh(14.0, p.text_secondary, icon_theme))
-            .style(move |_theme, status| {
-                let bg = match status {
-                    button::Status::Hovered => p.bg_hover,
-                    button::Status::Pressed => p.bg_active,
-                    _ => Color::TRANSPARENT,
-                };
-                button::Style {
-                    background: Some(iced::Background::Color(bg)),
-                    text_color: p.text_secondary,
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-            })
-            .padding(8)
-            .on_press(NotificationMessage::Refresh);
-
-        let header_row = row![
-            title,
-            Space::new().width(12),
-            sync_status,
-            Space::new().width(Fill),
-            filter_segment,
-            Space::new().width(12),
-            mark_all_btn,
-            Space::new().width(4),
-            refresh_btn,
-        ]
-        .align_y(Alignment::Center)
-        .padding([14, 16]);
-
-        // Header with subtle bottom border for visual separation
-        container(header_row)
-            .width(Fill)
-            .style(move |_| container::Style {
-                background: Some(iced::Background::Color(p.bg_card)),
-                border: iced::Border {
-                    color: p.border_subtle,
-                    width: 0.0,
-                    radius: 0.0.into(),
-                },
-                ..Default::default()
-            })
-            .into()
-    }
-
-    fn view_content(
-        &self,
-        icon_theme: IconTheme,
-        power_mode: bool,
-    ) -> Element<'_, NotificationMessage> {
-        if self.is_loading && self.all_notifications.is_empty() {
-            return view_loading();
-        }
-
-        if let Some(ref error) = self.error_message {
-            return view_error(error, icon_theme);
-        }
-
-        // Check processed notifications (after rule filtering) for empty state
-        if self.processed_notifications.is_empty() {
-            return view_empty(self.filters.show_all, icon_theme);
-        }
-
-        // === VIRTUAL SCROLLING ===
-        // Constants for item height calculation
-        let item_height: f32 = if power_mode { 48.0 } else { 64.0 };
-        let header_height: f32 = 40.0;
-        let group_spacing: f32 = 8.0;
-        let buffer_items: usize = 5; // Extra items above/below viewport
-
-        // Calculate visible range based on scroll position
-        let first_visible_px = self.scroll_offset;
-        let last_visible_px = self.scroll_offset + self.viewport_height;
-
-        // Build content with groups, virtualizing items within each group
-        let mut content = column![].spacing(8).padding([8, 8]);
-        let mut cumulative_y: f32 = 8.0; // Start with top padding
-
-        for (group_idx, group) in self.groups.iter().enumerate() {
-            if group.notifications.is_empty() {
-                continue;
-            }
-
-            // Always render group header (they're small and needed for interaction)
-            content = content.push(view_group_header(group, group_idx, icon_theme));
-            cumulative_y += header_height;
-
-            if group.is_expanded {
-                let group_items_start_y = cumulative_y;
-                let total_group_height = group.notifications.len() as f32 * item_height;
-                let group_items_end_y = group_items_start_y + total_group_height;
-
-                // Check if this group overlaps with visible viewport
-                if group_items_end_y >= first_visible_px && group_items_start_y <= last_visible_px {
-                    // Calculate which items are visible within this group
-                    let first_visible_in_group = if first_visible_px > group_items_start_y {
-                        ((first_visible_px - group_items_start_y) / item_height) as usize
-                    } else {
-                        0
-                    };
-
-                    let last_visible_in_group = if last_visible_px < group_items_end_y {
-                        ((last_visible_px - group_items_start_y) / item_height).ceil() as usize
-                    } else {
-                        group.notifications.len()
-                    };
-
-                    // Apply buffer
-                    let start_idx = first_visible_in_group.saturating_sub(buffer_items);
-                    let end_idx =
-                        (last_visible_in_group + buffer_items).min(group.notifications.len());
-
-                    // Add top spacer for items above visible area
-                    if start_idx > 0 {
-                        let top_space = start_idx as f32 * item_height;
-                        content = content.push(Space::new().height(top_space));
-                    }
-
-                    // Render only visible items
-                    let is_priority = group.is_priority;
-                    for p in &group.notifications[start_idx..end_idx] {
-                        content =
-                            content.push(notification_item(p, icon_theme, power_mode, is_priority));
-                    }
-
-                    // Add bottom spacer for items below visible area
-                    if end_idx < group.notifications.len() {
-                        let bottom_space =
-                            (group.notifications.len() - end_idx) as f32 * item_height;
-                        content = content.push(Space::new().height(bottom_space));
-                    }
-                } else {
-                    // Group is entirely off-screen, just add spacer for total height
-                    content = content.push(Space::new().height(total_group_height));
-                }
-
-                cumulative_y += total_group_height;
-            }
-
-            content = content.push(Space::new().height(group_spacing));
-            cumulative_y += group_spacing;
-        }
-
-        container(
-            scrollable(content)
-                .on_scroll(NotificationMessage::OnScroll)
-                .height(Fill)
-                .width(Fill)
-                .style(theme::scrollbar),
-        )
-        .style(theme::app_container)
-        .height(Fill)
-        .width(Fill)
         .into()
     }
 

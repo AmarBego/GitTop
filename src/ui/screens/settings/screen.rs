@@ -8,7 +8,7 @@ use crate::settings::{AppSettings, IconTheme};
 use crate::ui::{icons, theme};
 
 use super::messages::{SettingsMessage, SettingsTab};
-use super::tabs::{accounts, appearance, behavior, command_center, notifications};
+use super::tabs::{accounts, general, power_mode};
 
 /// Settings screen state.
 #[derive(Debug, Clone)]
@@ -32,7 +32,6 @@ impl SettingsScreen {
             SettingsMessage::Back => Task::none(),
             SettingsMessage::SelectTab(tab) => {
                 self.selected_tab = tab;
-                // Clear any messages when switching tabs
                 self.accounts_state.error_message = None;
                 self.accounts_state.success_message = None;
                 Task::none()
@@ -60,10 +59,8 @@ impl SettingsScreen {
                 Task::none()
             }
             SettingsMessage::RemoveAccount(username) => {
-                // Remove from settings
                 self.settings.remove_account(&username);
                 let _ = self.settings.save();
-                // Remove from keyring
                 let _ = AccountKeyring::delete_token(&username);
                 Task::none()
             }
@@ -95,10 +92,7 @@ impl SettingsScreen {
                 let _ = self.settings.save();
                 Task::none()
             }
-            SettingsMessage::OpenRuleEngine => {
-                // Handled by parent (app.rs)
-                Task::none()
-            }
+            SettingsMessage::OpenRuleEngine => Task::none(),
             SettingsMessage::TokenInputChanged(token) => {
                 self.accounts_state.token_input = token;
                 self.accounts_state.error_message = None;
@@ -111,7 +105,6 @@ impl SettingsScreen {
                     return Task::none();
                 }
 
-                // Basic validation
                 if !token.starts_with("ghp_") && !token.starts_with("github_pat_") {
                     self.accounts_state.error_message =
                         Some("Token must start with 'ghp_' or 'github_pat_'".to_string());
@@ -121,13 +114,11 @@ impl SettingsScreen {
                 self.accounts_state.is_validating = true;
                 self.accounts_state.error_message = None;
 
-                // Validate token asynchronously
                 Task::perform(
                     async move {
                         match GitHubClient::new(&token) {
                             Ok(client) => match client.get_authenticated_user().await {
                                 Ok(user) => {
-                                    // Save to keyring
                                     if let Err(e) = AccountKeyring::save_token(&user.login, &token)
                                     {
                                         return Err(format!("Failed to save token: {}", e));
@@ -146,7 +137,6 @@ impl SettingsScreen {
                 self.accounts_state.is_validating = false;
                 match result {
                     Ok(username) => {
-                        // Add to settings
                         self.settings.set_active_account(&username);
                         let _ = self.settings.save();
                         self.accounts_state.token_input.clear();
@@ -169,7 +159,7 @@ impl SettingsScreen {
     pub fn view(&self) -> Element<'_, SettingsMessage> {
         let header = self.view_header();
         let sidebar = self.view_sidebar();
-        let content = self.view_tab_content();
+        let content = self.view_content();
 
         let main_area = row![sidebar, content].height(Fill);
 
@@ -220,56 +210,34 @@ impl SettingsScreen {
     fn view_sidebar(&self) -> Element<'_, SettingsMessage> {
         let icon_theme = self.settings.icon_theme;
 
-        let nav_items = column![
-            self.view_nav_item(
-                "Appearance",
-                SettingsTab::Appearance,
-                icons::icon_palette(
-                    16.0,
-                    self.nav_icon_color(SettingsTab::Appearance),
-                    icon_theme
-                )
+        let nav = column![
+            self.nav_item(
+                "Power Mode",
+                SettingsTab::PowerMode,
+                icons::icon_power(16.0, self.icon_color(SettingsTab::PowerMode), icon_theme)
             ),
-            self.view_nav_item(
-                "Behavior",
-                SettingsTab::Behavior,
-                icons::icon_settings(16.0, self.nav_icon_color(SettingsTab::Behavior), icon_theme)
+            self.nav_item(
+                "General",
+                SettingsTab::General,
+                icons::icon_settings(16.0, self.icon_color(SettingsTab::General), icon_theme)
             ),
-            self.view_nav_item(
-                "Command Center",
-                SettingsTab::CommandCenter,
-                icons::icon_power(
-                    16.0,
-                    self.nav_icon_color(SettingsTab::CommandCenter),
-                    icon_theme
-                )
-            ),
-            self.view_nav_item(
-                "Notifications",
-                SettingsTab::Notifications,
-                icons::icon_notification(
-                    16.0,
-                    self.nav_icon_color(SettingsTab::Notifications),
-                    icon_theme
-                )
-            ),
-            self.view_nav_item(
+            self.nav_item(
                 "Accounts",
                 SettingsTab::Accounts,
-                icons::icon_user(16.0, self.nav_icon_color(SettingsTab::Accounts), icon_theme)
+                icons::icon_user(16.0, self.icon_color(SettingsTab::Accounts), icon_theme)
             ),
         ]
         .spacing(4)
         .padding([16, 8]);
 
-        container(nav_items)
+        container(nav)
             .width(Length::Fixed(self.settings.sidebar_width))
             .height(Fill)
             .style(theme::sidebar)
             .into()
     }
 
-    fn nav_icon_color(&self, tab: SettingsTab) -> iced::Color {
+    fn icon_color(&self, tab: SettingsTab) -> iced::Color {
         let p = theme::palette();
         if self.selected_tab == tab {
             p.accent
@@ -278,33 +246,26 @@ impl SettingsScreen {
         }
     }
 
-    fn view_nav_item<'a>(
+    fn nav_item<'a>(
         &self,
         label: &'static str,
         tab: SettingsTab,
         icon: Element<'a, SettingsMessage>,
     ) -> Element<'a, SettingsMessage> {
         let p = theme::palette();
-        let is_selected = self.selected_tab == tab;
-
-        let text_color = if is_selected {
-            p.accent
-        } else {
-            p.text_primary
-        };
+        let selected = self.selected_tab == tab;
+        let color = if selected { p.accent } else { p.text_primary };
 
         let content = row![
             icon,
             Space::new().width(10),
-            text(label)
-                .size(theme::sidebar_scaled(13.0))
-                .color(text_color),
+            text(label).size(theme::sidebar_scaled(13.0)).color(color),
         ]
         .align_y(Alignment::Center)
         .padding([10, 12]);
 
         button(content)
-            .style(move |theme, status| (theme::sidebar_button(is_selected))(theme, status))
+            .style(move |theme, status| (theme::sidebar_button(selected))(theme, status))
             .on_press(SettingsMessage::SelectTab(tab))
             .width(Fill)
             .into()
@@ -314,14 +275,12 @@ impl SettingsScreen {
     // Tab Content
     // ========================================================================
 
-    fn view_tab_content(&self) -> Element<'_, SettingsMessage> {
+    fn view_content(&self) -> Element<'_, SettingsMessage> {
         let p = theme::palette();
 
         let content = match self.selected_tab {
-            SettingsTab::Appearance => appearance::view(&self.settings),
-            SettingsTab::Behavior => behavior::view(&self.settings),
-            SettingsTab::CommandCenter => command_center::view(&self.settings),
-            SettingsTab::Notifications => notifications::view(),
+            SettingsTab::PowerMode => power_mode::view(&self.settings),
+            SettingsTab::General => general::view(&self.settings),
             SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
         };
 

@@ -3,12 +3,11 @@
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Alignment, Element, Fill, Length, Padding};
 
-use super::screen::NotificationMessage;
 use crate::github::{SubjectType, UserInfo};
 use crate::settings::IconTheme;
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
-/// Render the sidebar.
 use super::sidebar_state::SidebarState;
 
 /// Render the sidebar.

@@ -218,20 +218,6 @@ pub fn icon_trash<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Elem
     themed_icon(theme, icondata_lu::LuTrash2, "🗑", size, color)
 }
 
-/// Palette/appearance icon.
-pub fn icon_palette<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
-    themed_icon(theme, icondata_lu::LuPalette, "🎨", size, color)
-}
-
-/// Bell/notification icon.
-pub fn icon_notification<M: 'static>(
-    size: f32,
-    color: Color,
-    theme: IconTheme,
-) -> Element<'static, M> {
-    themed_icon(theme, icondata_lu::LuBell, "🔔", size, color)
-}
-
 /// Filter icon.
 pub fn icon_filter<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
     themed_icon(theme, icondata_lu::LuSlidersHorizontal, "⚙", size, color)

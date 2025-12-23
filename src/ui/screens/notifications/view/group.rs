@@ -3,9 +3,9 @@
 use iced::widget::{button, container, row, text, Space};
 use iced::{Alignment, Color, Element, Fill};
 
-use super::helper::NotificationGroup;
-use super::screen::NotificationMessage;
 use crate::settings::IconTheme;
+use crate::ui::screens::notifications::helper::NotificationGroup;
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
 /// Render a collapsible notification group header.

@@ -1,3 +1,5 @@
+//! Sidebar state structure for view rendering.
+
 use crate::github::{SubjectType, UserInfo};
 use crate::settings::IconTheme;
 
