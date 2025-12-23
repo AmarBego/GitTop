@@ -413,7 +413,6 @@ impl GitHubClient {
                 } else {
                     Ok(NotificationSubjectDetail::Unsupported {
                         subject_type: "Issue".to_string(),
-                        html_url: None,
                     })
                 }
             }
@@ -424,7 +423,6 @@ impl GitHubClient {
                 } else {
                     Ok(NotificationSubjectDetail::Unsupported {
                         subject_type: "PullRequest".to_string(),
-                        html_url: None,
                     })
                 }
             }
@@ -433,9 +431,6 @@ impl GitHubClient {
                 Ok(NotificationSubjectDetail::SecurityAlert {
                     title: title.to_string(),
                     severity: None,
-                    html_url: subject_url
-                        .map(|u| u.replace("api.github.com/repos", "github.com"))
-                        .unwrap_or_default(),
                 })
             }
             SubjectType::Discussion => {
@@ -456,18 +451,12 @@ impl GitHubClient {
                 // Fallback: minimal discussion details
                 Ok(NotificationSubjectDetail::Discussion(
                     super::subject_details::DiscussionDetails {
-                        number: 0,
                         title: title.to_string(),
                         body: None,
-                        html_url: subject_url
-                            .map(|u| u.replace("api.github.com/repos", "github.com"))
-                            .unwrap_or_default(),
                         author: None,
                         category: None,
                         answer_chosen: false,
                         comments_count: 0,
-                        created_at: None,
-                        updated_at: None,
                     },
                 ))
             }
@@ -475,8 +464,6 @@ impl GitHubClient {
                 // Release, CheckSuite, Commit, Unknown - unsupported for now
                 Ok(NotificationSubjectDetail::Unsupported {
                     subject_type: format!("{:?}", subject_type),
-                    html_url: subject_url
-                        .map(|u| u.replace("api.github.com/repos", "github.com").to_string()),
                 })
             }
         }
@@ -553,10 +540,8 @@ impl GitHubClient {
         }
 
         Ok(DiscussionDetails {
-            number: discussion["number"].as_u64().unwrap_or(number),
             title: discussion["title"].as_str().unwrap_or("").to_string(),
             body: discussion["body"].as_str().map(String::from),
-            html_url: discussion["url"].as_str().unwrap_or("").to_string(),
             author: discussion["author"]["login"].as_str().map(String::from),
             category: discussion["category"]["name"]
                 .as_str()
@@ -566,14 +551,6 @@ impl GitHubClient {
                 }),
             answer_chosen: discussion["answerChosenAt"].as_str().is_some(),
             comments_count: discussion["comments"]["totalCount"].as_u64().unwrap_or(0),
-            created_at: discussion["createdAt"]
-                .as_str()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&chrono::Utc)),
-            updated_at: discussion["updatedAt"]
-                .as_str()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&chrono::Utc)),
         })
     }
 

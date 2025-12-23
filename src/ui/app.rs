@@ -58,7 +58,7 @@ impl AppContext {
 /// Current screen state.
 pub enum Screen {
     /// Main notifications screen.
-    Notifications(NotificationsScreen),
+    Notifications(Box<NotificationsScreen>),
     /// Settings screen.
     Settings(SettingsScreen),
     /// Rule Engine screen.
@@ -174,7 +174,10 @@ impl App {
                 let (notif_screen, task) =
                     NotificationsScreen::new(session.client.clone(), session.user.clone());
                 let ctx = AppContext::new(settings, sessions);
-                *self = App::Authenticated(Box::new(Screen::Notifications(notif_screen)), ctx);
+                *self = App::Authenticated(
+                    Box::new(Screen::Notifications(Box::new(notif_screen))),
+                    ctx,
+                );
                 return task.map(Message::Notifications);
             } else {
                 // Load settings to ensure correct theme on Login screen
@@ -217,7 +220,8 @@ impl App {
 
             let (notif_screen, task) = NotificationsScreen::new(client, user);
             let ctx = AppContext::new(settings, sessions);
-            *self = App::Authenticated(Box::new(Screen::Notifications(notif_screen)), ctx);
+            *self =
+                App::Authenticated(Box::new(Screen::Notifications(Box::new(notif_screen))), ctx);
             return task.map(Message::Notifications);
         }
 
@@ -279,7 +283,7 @@ impl App {
                     notif_screen.set_cross_account_priority(cross_account_priority);
 
                     *self = App::Authenticated(
-                        Box::new(Screen::Notifications(notif_screen)),
+                        Box::new(Screen::Notifications(Box::new(notif_screen))),
                         AppContext {
                             settings: ctx.settings.clone(),
                             sessions: ctx.sessions.clone(),
@@ -423,7 +427,7 @@ impl App {
                         let (notif_screen, task) =
                             NotificationsScreen::new(session.client.clone(), session.user.clone());
                         *self = App::Authenticated(
-                            Box::new(Screen::Notifications(notif_screen)),
+                            Box::new(Screen::Notifications(Box::new(notif_screen))),
                             AppContext {
                                 settings: ctx.settings.clone(),
                                 sessions: ctx.sessions.clone(),
@@ -569,7 +573,7 @@ impl App {
             let (notif_screen, task) =
                 NotificationsScreen::new(session.client.clone(), session.user.clone());
             *self = App::Authenticated(
-                Box::new(Screen::Notifications(notif_screen)),
+                Box::new(Screen::Notifications(Box::new(notif_screen))),
                 AppContext {
                     settings,
                     sessions: ctx.sessions.clone(),

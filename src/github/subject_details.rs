@@ -4,14 +4,12 @@
 //! Issue/PR/Comment content from the GitHub API and display it in the
 //! details panel.
 
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 /// GitHub user info (author, assignee, etc.)
 #[derive(Debug, Clone, Deserialize)]
 pub struct User {
     pub login: String,
-    pub avatar_url: String,
 }
 
 /// Issue/PR label
@@ -30,13 +28,8 @@ pub struct IssueDetails {
     pub state: String,
     #[serde(default)]
     pub labels: Vec<Label>,
-    #[serde(default)]
-    pub assignees: Vec<User>,
     #[serde(rename = "comments")]
     pub comments_count: u64,
-    pub html_url: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
     pub user: User,
 }
 
@@ -49,7 +42,6 @@ pub struct PullRequestDetails {
     pub state: String,
     #[serde(default)]
     pub merged: bool,
-    pub mergeable: Option<bool>,
     #[serde(default)]
     pub additions: u64,
     #[serde(default)]
@@ -58,34 +50,25 @@ pub struct PullRequestDetails {
     pub changed_files: u64,
     #[serde(default)]
     pub commits: u64,
-    pub html_url: String,
     pub user: User,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
 }
 
 /// Fetched content for a Comment
 #[derive(Debug, Clone, Deserialize)]
 pub struct CommentDetails {
     pub body: String,
-    pub html_url: String,
-    pub created_at: DateTime<Utc>,
     pub user: User,
 }
 
 /// Discussion details (fetched via GraphQL API)
 #[derive(Debug, Clone)]
 pub struct DiscussionDetails {
-    pub number: u64,
     pub title: String,
     pub body: Option<String>,
-    pub html_url: String,
     pub author: Option<String>,
     pub category: Option<DiscussionCategory>,
     pub answer_chosen: bool,
     pub comments_count: u64,
-    pub created_at: Option<DateTime<Utc>>,
-    pub updated_at: Option<DateTime<Utc>>,
 }
 
 /// Discussion category
@@ -113,25 +96,7 @@ pub enum NotificationSubjectDetail {
     SecurityAlert {
         title: String,
         severity: Option<String>,
-        html_url: String,
     },
     /// Unsupported subject type (show link only)
-    Unsupported {
-        subject_type: String,
-        html_url: Option<String>,
-    },
-}
-
-impl NotificationSubjectDetail {
-    /// Get the HTML URL for opening in browser
-    pub fn html_url(&self) -> Option<&str> {
-        match self {
-            Self::Issue(i) => Some(&i.html_url),
-            Self::PullRequest(pr) => Some(&pr.html_url),
-            Self::Comment { comment, .. } => Some(&comment.html_url),
-            Self::Discussion(d) => Some(&d.html_url),
-            Self::SecurityAlert { html_url, .. } => Some(html_url),
-            Self::Unsupported { html_url, .. } => html_url.as_deref(),
-        }
-    }
+    Unsupported { subject_type: String },
 }

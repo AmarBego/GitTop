@@ -115,15 +115,12 @@ fn view_details<'a>(
         NotificationSubjectDetail::Discussion(discussion) => {
             view_discussion(discussion, notif, icon_theme, p)
         }
-        NotificationSubjectDetail::SecurityAlert {
-            title,
-            severity,
-            html_url: _,
-        } => view_security_alert(title, severity.as_deref(), notif, icon_theme, p),
-        NotificationSubjectDetail::Unsupported {
-            subject_type,
-            html_url: _,
-        } => view_unsupported(subject_type, notif, icon_theme, p),
+        NotificationSubjectDetail::SecurityAlert { title, severity } => {
+            view_security_alert(title, severity.as_deref(), notif, icon_theme, p)
+        }
+        NotificationSubjectDetail::Unsupported { subject_type } => {
+            view_unsupported(subject_type, notif, icon_theme, p)
+        }
     };
 
     scrollable(content)
