@@ -84,7 +84,7 @@ Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe`
 **Linux:**
 ```bash
 # Debian/Ubuntu
-sudo apt install pkg-config libglib2.0-dev libgtk-3-dev
+sudo apt install pkg-config libglib2.0-dev libgtk-3-dev libxdo-dev
 
 # Fedora
 sudo dnf install pkg-config glib2-devel gtk3-devel
