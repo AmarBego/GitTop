@@ -72,6 +72,9 @@ Requirements:
 git clone https://github.com/AmarBego/GitTop.git
 cd GitTop
 cargo build --release
+
+# Linux: Install desktop integration (icons, .desktop file)
+./scripts/install.sh
 ```
 
 Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe` (Windows).

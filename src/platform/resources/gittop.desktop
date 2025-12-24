@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=GitTop
+Comment=GitHub Notifications Manager
+GenericName=GitHub Notifications
+Exec=GitTop
+Icon=gittop
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+Keywords=github;notifications;git;
+StartupWMClass=gittop
