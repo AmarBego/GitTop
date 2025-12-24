@@ -84,13 +84,13 @@ Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe`
 **Linux:**
 ```bash
 # Debian/Ubuntu
-sudo apt install pkg-config libglib2.0-dev
+sudo apt install pkg-config libglib2.0-dev libgtk-3-dev
 
 # Fedora
-sudo dnf install pkg-config glib2-devel
+sudo dnf install pkg-config glib2-devel gtk3-devel
 
 # Arch
-sudo pacman -S pkg-config glib2
+sudo pacman -S pkg-config glib2 gtk3
 
 # If building using clang (mold) instead of gcc additionally install
 sudo apt install clang xdotool
