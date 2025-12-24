@@ -1,10 +1,36 @@
-# GitTop
+<p align="center">
+  <img
+    width="400"
+    src="assets/images/text.png"
+    alt="GitTop"
+  />
+</p>
 
-A lightweight desktop client for GitHub notifications. Why spin up a browser just to check your GitHub notifications?
+<h1></h1>
 
-[![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE.md)
+<img
+  src="assets/images/GitTop-256x256.png"
+  alt="GitTop Logo"
+  width="30%"
+  align="right"
+/>
 
-![GitTop showcase](assets/images/showcase.png)
+**A lightweight desktop client for GitHub notifications. Why spin up a browser just to check your GitHub notifications?**
+
+- **Super lean:** ~5-15MB RAM whilst in use (1-2MB in tray)
+- **Multi-account:** Seamless support for multiple GitHub accounts
+- **Smart Rules:** Powerful engine for priorities and hiding noisy notification types
+- **Cross platform:** Native experience on Windows and Linux
+- **Dual Mode:** Minimalist by default. Enable **Power Mode** for in-app notification viewing, rule engine and more
+- **Stay focused:** Be on top of your notifications
+
+<img
+  src="assets/images/showcase.png"
+  alt="GitTop Logo"
+  width="100%"
+  align="center"
+/>
+<a name="🚀-installation"></a>
 ## Installation
 
 **[Download pre-built binaries from GitHub Releases](https://github.com/AmarBego/GitTop/releases)**
