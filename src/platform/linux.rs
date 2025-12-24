@@ -17,18 +17,27 @@ pub fn enable_dark_mode() {
     // tray-icon/muda should respect the system theme.
 }
 
+/// Initialize the tray subsystem.
+/// On Linux, tray-icon uses GTK which must be initialized before use.
+pub fn init_tray() {
+    // GTK must be initialized before tray-icon can create menus
+    if gtk::init().is_err() {
+        eprintln!("Failed to initialize GTK for tray icon");
+    }
+}
+
 /// Reduce memory footprint.
 /// Uses malloc_trim on glibc systems.
 pub fn trim_memory() {
     // On Linux with glibc, we can call malloc_trim to release memory
     // back to the OS. This is similar to EmptyWorkingSet on Windows.
     #[cfg(target_env = "gnu")]
-    unsafe {
+    {
         // malloc_trim returns 1 if memory was released, 0 otherwise
-        extern "C" {
-            fn malloc_trim(pad: usize) -> i32;
+        unsafe extern "C" {
+            safe fn malloc_trim(pad: usize) -> i32;
         }
-        let _ = malloc_trim(0);
+        malloc_trim(0);
     }
 }
 

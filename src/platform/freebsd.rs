@@ -13,6 +13,15 @@ pub fn enable_dark_mode() {
     // Similar to Linux, GTK theming controls context menu appearance.
 }
 
+/// Initialize the tray subsystem.
+/// On FreeBSD, tray-icon uses GTK which must be initialized before use.
+pub fn init_tray() {
+    // GTK must be initialized before tray-icon can create menus
+    if gtk::init().is_err() {
+        eprintln!("Failed to initialize GTK for tray icon");
+    }
+}
+
 /// Reduce memory footprint.
 pub fn trim_memory() {
     // FreeBSD uses jemalloc by default.

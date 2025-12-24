@@ -66,6 +66,23 @@ pub fn trim_memory() {
     freebsd::trim_memory();
 }
 
+/// Initialize the tray subsystem.
+/// Must be called before creating TrayManager.
+/// On Linux/FreeBSD, this initializes GTK which tray-icon requires.
+pub fn init_tray() {
+    #[cfg(windows)]
+    windows::init_tray();
+
+    #[cfg(target_os = "macos")]
+    macos::init_tray();
+
+    #[cfg(target_os = "linux")]
+    linux::init_tray();
+
+    #[cfg(target_os = "freebsd")]
+    freebsd::init_tray();
+}
+
 /// Send a native desktop notification.
 ///
 /// This is a fire-and-forget operation:

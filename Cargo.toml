@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Iced GUI framework - using software renderer (tiny-skia) for minimal memory footprint
+# Base features shared across all platforms
 iced = { version = "0.14.0-dev", default-features = false, features = [
     "tiny-skia",
     "tokio",
@@ -20,6 +21,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
     "svg",
     "wgpu",
 ] }
+
 
 # Iced additional widgets - context menus
 iced_aw = { version = "0.13", default-features = false, features = [
@@ -85,31 +87,35 @@ windows = { version = "0.62.2", features = [
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
 ] }
-# Windows toast notifications (WinRT) - with on_activated callback support
 tauri-winrt-notification = "0.7"
-# Secure credential storage (Windows)
 keyring = { version = "3", features = ["windows-native"] }
 
 # macOS-specific APIs
 [target.'cfg(target_os = "macos")'.dependencies]
-# Native macOS notifications via Objective-C runtime
 mac-notification-sys = "0.6"
-# Secure credential storage (macOS)
 keyring = { version = "3", features = ["apple-native"] }
 
 # Linux-specific APIs
 [target.'cfg(target_os = "linux")'.dependencies]
-# DBus notifications - zero-cost after send
+iced = { version = "0.14.0-dev", default-features = false, features = [
+    "wayland",
+    "x11",
+] }
 notify-rust = "4"
-# Secure credential storage (Linux)
 keyring = { version = "3", features = ["sync-secret-service"] }
+# GTK for tray-icon initialization
+gtk = "0.18"
 
 # FreeBSD-specific APIs
 [target.'cfg(target_os = "freebsd")'.dependencies]
-# DBus notifications - same as Linux
+iced = { version = "0.14.0-dev", default-features = false, features = [
+    "wayland",
+    "x11",
+] }
 notify-rust = "4"
-# Secure credential storage (FreeBSD)
 keyring = { version = "3", features = ["sync-secret-service"] }
+# GTK for tray-icon initialization
+gtk = "0.18"
 
 # Build dependencies for Windows icon embedding
 [target.'cfg(windows)'.build-dependencies]

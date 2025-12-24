@@ -80,6 +80,12 @@ pub fn enable_dark_mode() {
     }
 }
 
+/// Initialize the tray subsystem.
+/// Windows doesn't require special initialization.
+pub fn init_tray() {
+    // No-op on Windows - tray-icon works without GTK
+}
+
 /// Aggressively trim the process working set to reduce memory footprint.
 /// This moves pages to the page file, making the process appear to use less memory.
 pub fn trim_working_set() {

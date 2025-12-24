@@ -228,6 +228,7 @@ impl App {
                 let settings = AppSettings::load();
                 settings.apply_theme();
                 *self = App::Login(LoginScreen::new());
+                crate::platform::trim_memory();
             }
         }
         Task::none()

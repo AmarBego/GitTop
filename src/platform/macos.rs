@@ -15,6 +15,12 @@ pub fn enable_dark_mode() {
     // No action needed.
 }
 
+/// Initialize the tray subsystem.
+/// macOS doesn't require special initialization.
+pub fn init_tray() {
+    // No-op on macOS - tray-icon works without GTK
+}
+
 /// Reduce memory footprint.
 /// TODO: Could potentially use madvise or similar.
 pub fn trim_memory() {
