@@ -53,23 +53,19 @@ impl TrayManager {
     }
 
     fn create_icon() -> Result<Icon, Box<dyn std::error::Error>> {
-        const SIZE: u32 = 32;
-        const CENTER: i32 = (SIZE / 2) as i32;
-        const RADIUS: i32 = CENTER - 2;
-        const COLOR: [u8; 4] = [100, 149, 237, 255]; // Cornflower blue
+        use image::ImageReader;
+        use std::io::Cursor;
 
-        let mut rgba = vec![0u8; (SIZE * SIZE * 4) as usize];
+        const ICON_BYTES: &[u8] = include_bytes!("../assets/images/GitTop-256x256.png");
 
-        for (i, pixel) in rgba.chunks_exact_mut(4).enumerate() {
-            let x = (i % SIZE as usize) as i32;
-            let y = (i / SIZE as usize) as i32;
+        let img = ImageReader::new(Cursor::new(ICON_BYTES))
+            .with_guessed_format()?
+            .decode()?
+            .resize(32, 32, image::imageops::FilterType::Lanczos3)
+            .into_rgba8();
 
-            if (x - CENTER).abs() + (y - CENTER).abs() <= RADIUS {
-                pixel.copy_from_slice(&COLOR);
-            }
-        }
-
-        Icon::from_rgba(rgba, SIZE, SIZE).map_err(Into::into)
+        let (width, height) = img.dimensions();
+        Icon::from_rgba(img.into_raw(), width, height).map_err(Into::into)
     }
 
     pub fn poll_global_events() -> Option<TrayCommand> {

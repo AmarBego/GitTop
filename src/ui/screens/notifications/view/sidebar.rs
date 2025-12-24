@@ -23,7 +23,7 @@ pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMess
 
 fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
     // Scrollable content (branding, types, repos)
-    let scrollable_content = column![view_branding(state.icon_theme), Space::new().height(16)]
+    let scrollable_content = column![view_branding(), Space::new().height(16)]
         .push(view_types_section(
             state.type_counts,
             state.selected_type,
@@ -98,15 +98,11 @@ fn view_power_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMe
     .into()
 }
 
-fn view_branding<'a>(icon_theme: IconTheme) -> Element<'a, NotificationMessage> {
+fn view_branding<'a>() -> Element<'a, NotificationMessage> {
     let p = theme::palette();
-    row![
-        icons::icon_brand(20.0, p.accent, icon_theme),
-        Space::new().width(8),
-        text("GitTop").size(18).color(p.text_primary),
-    ]
-    .align_y(Alignment::Center)
-    .into()
+    row![text("GitTop").size(18).color(p.text_primary),]
+        .align_y(Alignment::Center)
+        .into()
 }
 
 fn view_types_section(

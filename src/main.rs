@@ -41,6 +41,23 @@ fn parse_cli_args() {
     }
 }
 
+/// Load the window icon for the title bar.
+fn load_window_icon() -> Option<iced::window::Icon> {
+    use std::io::Cursor;
+
+    const ICON_BYTES: &[u8] = include_bytes!("../assets/images/favicon-32x32.png");
+
+    let img = image::ImageReader::new(Cursor::new(ICON_BYTES))
+        .with_guessed_format()
+        .ok()?
+        .decode()
+        .ok()?
+        .to_rgba8();
+
+    let (width, height) = img.dimensions();
+    iced::window::icon::from_rgba(img.into_raw(), width, height).ok()
+}
+
 fn main() -> iced::Result {
     // Force OpenGL backend for wgpu to minimize memory footprint
     // OpenGL uses ~42MB vs Vulkan's ~164MB or DX12's ~133MB
@@ -85,12 +102,22 @@ fn main() -> iced::Result {
         _ => Position::Centered,
     };
 
+    // Load window icon for title bar
+    let window_icon = load_window_icon();
+
+    // Window settings with icon
+    let window_settings = iced::window::Settings {
+        size: window_size,
+        position: window_position,
+        icon: window_icon,
+        ..Default::default()
+    };
+
     application(App::new, App::update, App::view)
         .title(|app: &App| app.title())
         .theme(|app: &App| app.theme())
         .subscription(App::subscription)
-        .window_size(window_size)
-        .position(window_position)
+        .window(window_settings)
         .antialiasing(true)
         .default_font(Font::DEFAULT)
         .exit_on_close_request(false)

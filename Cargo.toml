@@ -67,6 +67,7 @@ sled = "0.34"
 
 # System tray
 tray-icon = "0.21.2"
+image = { version = "0.25", default-features = false, features = ["ico"] }
 
 # Single instance (Windows named mutex)
 single-instance = "0.3"
@@ -109,6 +110,10 @@ keyring = { version = "3", features = ["sync-secret-service"] }
 notify-rust = "4"
 # Secure credential storage (FreeBSD)
 keyring = { version = "3", features = ["sync-secret-service"] }
+
+# Build dependencies for Windows icon embedding
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3"
 
 [profile.release]
 opt-level = 3

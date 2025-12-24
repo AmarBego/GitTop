@@ -53,7 +53,7 @@ impl DiskCache {
     /// Gets the cache directory path.
     fn cache_path() -> Result<PathBuf, CacheError> {
         dirs::cache_dir()
-            .map(|p| p.join("gittop").join("cache.sled"))
+            .map(|p| p.join("GitTop").join("cache.sled"))
             .ok_or(CacheError::NoCacheDir)
     }
 

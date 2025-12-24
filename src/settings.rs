@@ -191,7 +191,7 @@ impl Default for AppSettings {
 impl AppSettings {
     /// Get the settings file path.
     fn settings_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|p| p.join("gittop").join("settings.json"))
+        dirs::config_dir().map(|p| p.join("GitTop").join("settings.json"))
     }
 
     /// Load settings from disk, or return defaults.

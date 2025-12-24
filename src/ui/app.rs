@@ -139,23 +139,40 @@ const TRAY_POLL_INTERVAL_ACTIVE_MS: u64 = 100;
 const REFRESH_INTERVAL_SECS: u64 = 60;
 
 impl App {
-    /// Create the app and start the restore task.
     pub fn new() -> (Self, Task<Message>) {
         (
             App::Loading,
             Task::perform(
                 async {
                     let mut sessions = SessionManager::new();
-                    let settings = AppSettings::load();
+                    let mut settings = AppSettings::load();
+                    let mut failed_accounts = Vec::new();
 
-                    // Restore all accounts
+                    // Restore all accounts, track failures
                     for account in &settings.accounts {
-                        let _ = sessions.restore_account(&account.username).await;
+                        if sessions.restore_account(&account.username).await.is_err() {
+                            failed_accounts.push(account.username.clone());
+                        }
                     }
 
-                    // Set the persisted active account as primary (if it was restored)
-                    if let Some(active) = settings.accounts.iter().find(|a| a.is_active) {
-                        sessions.set_primary(&active.username);
+                    // Remove corrupted/failed accounts from settings
+                    if !failed_accounts.is_empty() {
+                        for username in failed_accounts {
+                            settings.remove_account(&username);
+                        }
+                        settings.save_silent();
+                    }
+
+                    // Set primary: prefer marked active, fallback to first available
+                    let primary = settings
+                        .accounts
+                        .iter()
+                        .find(|a| a.is_active)
+                        .or_else(|| settings.accounts.first())
+                        .map(|a| a.username.clone());
+
+                    if let Some(username) = primary {
+                        sessions.set_primary(&username);
                     }
 
                     sessions
@@ -269,14 +286,36 @@ impl App {
 
         match notif_msg {
             NotificationMessage::Navigation(NavigationMessage::Logout) => {
-                // Collect usernames as owned strings first to avoid borrow issues
-                let usernames: Vec<String> = ctx.sessions.usernames().map(String::from).collect();
-                for username in usernames {
+                // Remove only the current account, not all accounts
+                let current_username = ctx.sessions.primary().map(|s| s.username.clone());
+
+                if let Some(username) = current_username {
                     let _ = ctx.sessions.remove_account(&username);
+                    ctx.settings.remove_account(&username);
+                    ctx.settings.save_silent();
                 }
-                // Also clean up old auth
-                let _ = auth::delete_token();
-                *self = App::Login(LoginScreen::new());
+
+                // If no accounts left, go to login
+                if ctx.sessions.primary().is_none() {
+                    let _ = auth::delete_token();
+                    *self = App::Login(LoginScreen::new());
+                    return Task::none();
+                }
+
+                // Switch to next available account
+                if let Some(session) = ctx.sessions.primary() {
+                    ctx.settings.set_active_account(&session.username);
+                    ctx.settings.save_silent();
+
+                    let (notif_screen, task) =
+                        NotificationsScreen::new(session.client.clone(), session.user.clone());
+                    let settings = ctx.settings.clone();
+                    *self = App::Authenticated(
+                        Box::new(Screen::Notifications(Box::new(notif_screen))),
+                        ctx.with_settings(settings),
+                    );
+                    return task.map(Message::Notifications);
+                }
                 Task::none()
             }
 

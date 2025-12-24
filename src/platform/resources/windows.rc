@@ -1,0 +1,3 @@
+// Windows resource file for embedding the application icon
+// This makes the icon appear in the title bar and taskbar
+1 ICON "../../../assets/images/favicon.ico"

@@ -273,7 +273,7 @@ fn default_rule_set_name() -> String {
 impl NotificationRuleSet {
     /// Get the rules file path.
     fn rules_path() -> Option<PathBuf> {
-        dirs::config_dir().map(|p| p.join("gittop").join("rules.json"))
+        dirs::config_dir().map(|p| p.join("GitTop").join("rules.json"))
     }
 
     /// Load rules from disk, or return defaults.

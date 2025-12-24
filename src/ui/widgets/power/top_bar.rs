@@ -202,12 +202,9 @@ pub fn view_top_bar<'a>(
     container(
         row![
             // Left: Header Label (GitTop Logo in Power Mode)
-            row![
-                icons::icon_brand(18.0, p.accent, icon_theme),
-                text("GitTop").size(16).color(p.text_primary)
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center),
+            row![text("GitTop").size(16).color(p.text_primary)]
+                .spacing(8)
+                .align_y(Alignment::Center),
             Space::new().width(Fill),
             // Middle: Controls
             middle_controls,

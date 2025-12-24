@@ -91,7 +91,6 @@ macro_rules! impl_icons {
 }
 
 impl_icons! {
-    fn icon_brand(icondata_lu::LuDiamond, "◆");
     fn icon_user(icondata_lu::LuUser, "👤");
     fn icon_power(icondata_lu::LuPower, "⏻");
     fn icon_refresh(icondata_lu::LuRefreshCw, "↻");

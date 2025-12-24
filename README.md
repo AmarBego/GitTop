@@ -4,7 +4,7 @@ A lightweight desktop client for GitHub notifications. Why spin up a browser jus
 
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg)](LICENSE.md)
 
-![GitTop showcase](image.png)
+![GitTop showcase](assets/images/showcase.png)
 ## Installation
 
 **[Download pre-built binaries from GitHub Releases](https://github.com/AmarBego/GitTop/releases)**
