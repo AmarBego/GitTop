@@ -18,7 +18,7 @@ pub fn run_app() -> iced::Result {
 }
 
 /// Build window settings for spawning from daemon.
-pub fn build_initial_window_settings() -> (window::Id, iced::Task<crate::ui::Message>) {
+pub fn build_initial_window_settings() -> (window::Id, iced::Task<crate::ui::app::Message>) {
     let settings = AppSettings::load();
 
     let size = iced::Size::new(

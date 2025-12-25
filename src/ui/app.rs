@@ -557,9 +557,8 @@ impl App {
             TrayCommand::ShowWindow => {
                 let was_hidden = window_state::restore_from_hidden();
 
-                // On Linux with daemon mode, we closed the window - reopen it
                 #[cfg(target_os = "linux")]
-                let window_task = if is_currently_hidden {
+                let window_task = if was_hidden {
                     let (id, open_task) = crate::platform::linux::build_initial_window_settings();
                     window_state::set_window_id(id);
                     open_task
