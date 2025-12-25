@@ -56,9 +56,13 @@ This document explains how GitTop's automated release and distribution pipeline 
 
 | Job | Description |
 |-----|-------------|
-| `build-windows` | Builds Windows `.zip`, extracts version from tag |
+| `build-windows` | Builds Windows `.zip`, `.msi`, `.exe` installers |
 | `build-linux` | Builds Linux `.tar.gz` with desktop integration files |
 | `release` | Creates GitHub Release, uploads artifacts, saves metadata for downstream |
+
+**Windows Installers:**
+- **MSI** — Built with WiX via `cargo-wix`
+- **EXE** — Built with Inno Setup
 
 **Key Output:** `release-meta` artifact containing:
 - `tag` — The release tag (e.g., `v0.2.0`)
@@ -118,13 +122,53 @@ The PKGBUILD uses `${pkgver}` variable in the source URL, so version updates are
 | `tools/chocolateyInstall.ps1` | Install script (uses `{{VERSION}}`, `{{CHECKSUM}}`) |
 | `tools/chocolateyUninstall.ps1` | Uninstall script |
 
-### Scoop (`packaging/scoop/`)
+### Scoop (`bucket/`)
 
 | File | Purpose |
 |------|---------|
-| `gittop.json` | Scoop manifest |
+| `gittop.json` | Scoop manifest (auto-updated by `scoop.yml`) |
 
-> **Note:** Scoop publishing is not yet automated. The manifest can be submitted to a Scoop bucket manually or via a dedicated bucket repository.
+> Self-hosted bucket at `https://github.com/AmarBego/GitTop`. Future migration to Scoop Extras planned.
+
+### WiX MSI Installer (`packaging/wix/`)
+
+| File | Purpose |
+|------|---------|
+| `main.wxs` | WiX configuration (uses `{{VERSION}}` placeholder) |
+| `License.rtf` | AGPL-3.0 license dialog |
+
+### Inno Setup EXE Installer (`packaging/innosetup/`)
+
+| File | Purpose |
+|------|---------|
+| `gittop.iss` | Inno Setup script |
+
+---
+
+## MSI Version Mapping
+
+MSI requires numeric `Major.Minor.Build.Revision` format (each 0–65535). SemVer is mapped to ensure correct upgrade ordering across patches and prereleases:
+
+**Formula:** `Build = (patch × 10000) + base_offset + N`
+
+| Stage | Base Offset | Example SemVer | Build Calculation | MSI Version |
+|-------|-------------|----------------|-------------------|-------------|
+| alpha | 1000 | `0.1.0-alpha.5` | 0×10000 + 1000 + 5 | `0.1.1005.0` |
+| beta | 2000 | `0.1.0-beta.3` | 0×10000 + 2000 + 3 | `0.1.2003.0` |
+| rc | 3000 | `0.1.0-rc.1` | 0×10000 + 3000 + 1 | `0.1.3001.0` |
+| stable | 4000 | `0.1.0` | 0×10000 + 4000 + 0 | `0.1.4000.0` |
+| stable | 4000 | `0.1.1` | 1×10000 + 4000 + 0 | `0.1.14000.0` |
+| alpha | 1000 | `0.1.2-alpha.1` | 2×10000 + 1000 + 1 | `0.1.21001.0` |
+
+### Sanity Rules
+
+1. **Only Build is used for upgrade ordering** — Revision is always `0`
+2. **Build numbers must increase monotonically** — Never decrement
+3. **Patch contributes 10000 per increment** — Ensures patch releases upgrade correctly
+4. **Max 6 patches per minor** — Build > 65535 fails the pipeline
+5. **ARPDisplayVersion uses full SemVer** — Users see `0.1.0-alpha.10`, not `0.1.1010.0`
+
+This ensures: **0.1.0 < 0.1.1-alpha.1 < 0.1.1** — always.
 
 ---
 

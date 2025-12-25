@@ -55,18 +55,41 @@ git push origin v0.1.0
 ### 4. What happens automatically
 
 1. **release.yml** triggers on the tag
-2. Builds Windows + Linux binaries
+2. Builds Windows + Linux binaries and installers
 3. Creates GitHub Release with:
-   - `gittop-windows-x86_64.zip`
-   - `gittop-linux-x86_64.tar.gz`
+   - `gittop-windows-x86_64.zip` — Portable archive
+   - `gittop-X.Y.Z.msi` — MSI installer (WiX)
+   - `gittop-X.Y.Z-setup.exe` — EXE installer (Inno Setup)
+   - `gittop-linux-x86_64.tar.gz` — Linux archive
    - `SHA256SUMS.txt`
+4. Downstream workflows update package managers (stable releases only)
 
-### 5. Update package managers (manual for now)
+---
 
-After release, update checksums in:
-- `packaging/scoop/gittop.json`
-- `packaging/chocolatey/tools/chocolateyInstall.ps1`
-- `packaging/aur/PKGBUILD`
+## MSI Version Mapping
+
+Windows Installer (MSI) requires numeric `Major.Minor.Build.Revision` format. SemVer is mapped using:
+
+**Formula:** `Build = (patch × 10000) + base_offset + N`
+
+| Stage | Base | Example SemVer | MSI ProductVersion |
+|-------|------|----------------|---------------------|
+| alpha | 1000 | `0.1.0-alpha.5` | `0.1.1005.0` |
+| stable | 4000 | `0.1.0` | `0.1.4000.0` |
+| stable | 4000 | `0.1.1` | `0.1.14000.0` |
+
+This ensures upgrades work correctly: **0.1.0 → 0.1.1-alpha.1 → 0.1.1**.
+
+> Max 6 patches per minor (build > 65535 fails). Filename uses full SemVer for humans.
+
+### 5. Package manager updates (automated)
+
+For **stable releases only**, downstream workflows automatically update:
+- **Scoop** — Updates `bucket/gittop.json` with new version/checksum
+- **Chocolatey** — Builds and pushes `.nupkg` to Chocolatey.org
+- **AUR** — Updates `PKGBUILD` and pushes to AUR
+
+Prereleases (`-alpha`, `-beta`, `-rc`) skip package manager updates.
 
 ---
 

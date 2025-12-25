@@ -51,20 +51,59 @@ jobs:
         with:
           targets: ${{ env.TARGET_WINDOWS }}
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Build release
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_WINDOWS }}
 
       - name: Build MSI installer (WiX)
+        id: msi
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          $fullVersion = "${{ steps.version.outputs.version }}".Trim()
+          
+          # Parse SemVer → MSI version (Major.Minor.Build.0)
+          # Build = (patch * 10000) + base + n
+          # Reserved ranges per patch: alpha=1000-1999, beta=2000-2999, rc=3000-3999, stable=4000+
+          if ($fullVersion -match '^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$') {
+            $major = [int]$matches[1]
+            $minor = [int]$matches[2]
+            $patch = [int]$matches[3]
+            $stage = $matches[4]
+            $n = if ($matches[5]) { [int]$matches[5] } else { 0 }
+            
+            # Base offsets per stage
+            $base = switch ($stage) {
+              'alpha' { 1000 }
+              'beta'  { 2000 }
+              'rc'    { 3000 }
+              default { 4000 }  # stable
+            }
+            
+            # Include patch in build for upgrade monotonicity across patches
+            $build = ($patch * 10000) + $base + $n
+            
+            # Validate MSI field constraints (0-65535)
+            if ($build -gt 65535) {
+              throw "MSI build number overflow: $build > 65535 (max 6 patches per minor)"
+            }
+            
+            $msiVersion = "$major.$minor.$build.0"
+          } else {
+            throw "Invalid version format: $fullVersion (expected: X.Y.Z or X.Y.Z-stage.N)"
+          }
+          
+          Write-Host "SemVer: $fullVersion -> MSI: $msiVersion"
+          echo "msi_version=$msiVersion" >> $env:GITHUB_OUTPUT
+          
           # Substitute version placeholder in WXS
-          (Get-Content packaging/wix/main.wxs) -replace '\{\{VERSION\}\}', $version | Set-Content packaging/wix/main.wxs
+          (Get-Content packaging/wix/main.wxs) -replace '\{\{VERSION\}\}', $msiVersion | Set-Content packaging/wix/main.wxs
           cargo install cargo-wix --version 0.3.8
-          cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-$version.msi
+          cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-$fullVersion.msi
 
       - name: Build EXE installer (Inno Setup)
         shell: pwsh
@@ -108,8 +147,8 @@ jobs:
         with:
           targets: ${{ env.TARGET_LINUX }}
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Install system dependencies
         run: |
@@ -117,6 +156,9 @@ jobs:
           sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev libxdo-dev
 
       - name: Build release
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_LINUX }}
 
       - name: Package Linux release
