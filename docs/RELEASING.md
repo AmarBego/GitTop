@@ -25,6 +25,17 @@ vMAJOR.MINOR.PATCH[-PRERELEASE]
 
 Pre-releases create GitHub releases marked as "pre-release" but don't trigger package manager updates.
 
+### Tagging Limits
+
+Due to MSI version constraints, there are practical limits on prerelease counts:
+
+| Limit | Max Value | If exceeded... |
+|-------|-----------|----------------|
+| Patches per minor | 6 | Bump the minor version |
+| Prereleases per stage | 999 | Bump the patch or stage |
+
+**In practice:** If you hit `alpha.999` or `0.1.7`, bump the minor version. These limits far exceed normal usage.
+
 ---
 
 ## How to Release

@@ -37,18 +37,19 @@ jobs:
           echo "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
           Write-Host "Release: $tag (v$version), Prerelease: $isPrerelease"
 
-      - name: Stop on prerelease
+      - name: Skip prerelease
         if: steps.release.outputs.is_prerelease == 'true'
         shell: pwsh
         run: |
           Write-Host "::notice::Skipping Chocolatey publish for prerelease: ${{ steps.release.outputs.tag }}"
-          exit 0
 
       - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
         with:
           ref: ${{ steps.release.outputs.tag }}
 
       - name: Download MSI installer
+        if: steps.release.outputs.is_prerelease != 'true'
         shell: pwsh
         run: |
           $version = "${{ steps.release.outputs.version }}"
@@ -61,6 +62,7 @@ jobs:
         id: download
 
       - name: Prepare Chocolatey package
+        if: steps.release.outputs.is_prerelease != 'true'
         shell: pwsh
         run: |
           $version = "${{ steps.release.outputs.version }}"
@@ -80,6 +82,7 @@ jobs:
           Write-Host "Updated package for version $version with checksum $checksum"
 
       - name: Pack Chocolatey package
+        if: steps.release.outputs.is_prerelease != 'true'
         shell: pwsh
         run: |
           cd packaging/chocolatey
@@ -87,6 +90,7 @@ jobs:
           Get-ChildItem *.nupkg
 
       - name: Push to Chocolatey
+        if: steps.release.outputs.is_prerelease != 'true'
         shell: pwsh
         env:
           CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}

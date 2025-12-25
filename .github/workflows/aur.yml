@@ -36,18 +36,19 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Release tag: $TAG, Prerelease: $IS_PRERELEASE"
 
-      - name: Stop on prerelease
+      - name: Skip prerelease
         if: steps.release.outputs.is_prerelease == 'true'
         run: |
           echo "::notice::Skipping AUR update for prerelease: ${{ steps.release.outputs.tag }}"
-          exit 0
 
       - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
         with:
           ref: ${{ steps.release.outputs.tag }}
 
       # This action automatically updates checksums and pkgver in PKGBUILD
       - name: Publish gittop-bin
+        if: steps.release.outputs.is_prerelease != 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
           pkgname: gittop-bin

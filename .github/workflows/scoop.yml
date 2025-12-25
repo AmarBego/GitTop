@@ -40,13 +40,14 @@ jobs:
         if: steps.release.outputs.is_prerelease == 'true'
         run: |
           echo "::notice::Skipping Scoop update for prerelease: ${{ steps.release.outputs.tag }}"
-          exit 0
 
       - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
         with:
           ref: main
 
       - name: Download Windows release and calculate checksum
+        if: steps.release.outputs.is_prerelease != 'true'
         id: download
         run: |
           VERSION="${{ steps.release.outputs.version }}"
@@ -59,6 +60,7 @@ jobs:
           echo "Checksum: $CHECKSUM"
 
       - name: Update Scoop manifest
+        if: steps.release.outputs.is_prerelease != 'true'
         run: |
           VERSION="${{ steps.release.outputs.version }}"
           CHECKSUM="${{ steps.download.outputs.checksum }}"
@@ -71,6 +73,7 @@ jobs:
           cat bucket/gittop.json
 
       - name: Commit and push
+        if: steps.release.outputs.is_prerelease != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
