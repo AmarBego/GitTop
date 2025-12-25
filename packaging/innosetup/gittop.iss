@@ -15,7 +15,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={autopf}\{#MyAppName}
+DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=..\..\LICENSE.md
@@ -27,7 +27,7 @@ SolidCompression=yes
 WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]
@@ -54,6 +54,30 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+// Kill running GitTop process before install/uninstall
+function KillRunningApp(): Boolean;
+var
+  ResultCode: Integer;
+begin
+  // taskkill /F /IM gittop.exe - force kill any running instance
+  Exec('taskkill', '/F /IM {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  // Give it a moment to fully terminate
+  Sleep(500);
+  Result := True;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  KillRunningApp();
+  Result := '';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  KillRunningApp();
+  Result := True;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   AppDataPath: String;
