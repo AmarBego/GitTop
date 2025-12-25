@@ -22,8 +22,7 @@
             Languages='1033'
             Compressed='yes'
             InstallScope='perUser'
-            SummaryCodepage='1252'
-            Platform='x64'/>
+            SummaryCodepage='1252'/>
 
         <MajorUpgrade
             Schedule='afterInstallInitialize'
@@ -35,7 +34,8 @@
         <Directory Id='TARGETDIR' Name='SourceDir'>
             <Directory Id='LocalAppDataFolder'>
                 <Directory Id='APPLICATIONFOLDER' Name='GitTop'>
-                    <Component Id='MainApplication' Guid='*' Win64='yes'>
+                    <Component Id='MainApplication'
+                        Guid='{6F7E8D8F-0E79-4E35-A8A7-7B8A5A1F9D1E}'>
                         <File Id='gittop.exe'
                             Name='gittop.exe'
                             DiskId='1'
@@ -58,11 +58,11 @@
                 <Directory Id='ApplicationProgramsFolder' Name='GitTop'/>
             </Directory>
 
-            <Directory Id='DesktopFolder' Name='Desktop'/>
+            <Directory Id='DesktopFolder'/>
         </Directory>
 
         <DirectoryRef Id='ApplicationProgramsFolder'>
-            <Component Id='ApplicationShortcut' Guid='*' Win64='yes'>
+            <Component Id='ApplicationShortcut' Guid='{9C1A2F74-5A9F-4F71-8C7B-9CDAE2F5E0B6}'>
                 <Shortcut Id='ApplicationStartMenuShortcut'
                     Name='GitTop'
                     Description='A lightweight GitHub notifications client'
@@ -75,7 +75,7 @@
         </DirectoryRef>
 
         <DirectoryRef Id='DesktopFolder'>
-            <Component Id='DesktopShortcut' Guid='*' Win64='yes'>
+            <Component Id='DesktopShortcut' Guid='{D3E52E7A-9F91-41B3-8A8F-6D35A3B7A91C}'>
                 <Shortcut Id='ApplicationDesktopShortcut'
                     Name='GitTop'
                     Description='A lightweight GitHub notifications client'
@@ -132,7 +132,5 @@
         </UI>
 
         <WixVariable Id='WixUILicenseRtf' Value='packaging\wix\License.rtf'/>
-
     </Product>
-
 </Wix>
