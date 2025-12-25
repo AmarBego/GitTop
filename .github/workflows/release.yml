@@ -60,8 +60,11 @@ jobs:
       - name: Build MSI installer (WiX)
         shell: pwsh
         run: |
+          $version = "${{ steps.version.outputs.version }}"
+          # Substitute version placeholder in WXS
+          (Get-Content packaging/wix/main.wxs) -replace '\{\{VERSION\}\}', $version | Set-Content packaging/wix/main.wxs
           cargo install cargo-wix --version 0.3.8
-          cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-${{ steps.version.outputs.version }}.msi
+          cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-$version.msi
 
       - name: Build EXE installer (Inno Setup)
         shell: pwsh
@@ -100,11 +103,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev libxdo-dev
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -112,6 +110,11 @@ jobs:
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev libxdo-dev
 
       - name: Build release
         run: cargo build --release --target ${{ env.TARGET_LINUX }}

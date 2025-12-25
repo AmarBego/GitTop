@@ -12,7 +12,7 @@
         Manufacturer='AmarBego'
         Language='1033'
         Codepage='1252'
-        Version='!(bind.FileVersion.gittop.exe)'>
+        Version='{{VERSION}}'>
 
         <Package Id='*'
             Keywords='Installer'
