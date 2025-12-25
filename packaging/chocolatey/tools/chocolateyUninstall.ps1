@@ -1,11 +1,6 @@
 $ErrorActionPreference = 'Stop'
 
-$toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
-
-Uninstall-BinFile -Name 'gittop'
-
-$extractedDir = Join-Path $toolsDir 'gittop-windows-x86_64'
-if (Test-Path $extractedDir) {
-    Remove-Item $extractedDir -Recurse -Force
-}
-
+# MSI uninstallation is handled automatically by Windows Installer
+# User settings are stored in $env:APPDATA\GitTop
+# To remove settings, delete that folder manually or run:
+#   Remove-Item "$env:APPDATA\GitTop" -Recurse -Force

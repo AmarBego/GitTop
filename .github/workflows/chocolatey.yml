@@ -48,15 +48,15 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
 
-      - name: Download Windows release
+      - name: Download MSI installer
         shell: pwsh
         run: |
           $version = "${{ steps.release.outputs.version }}"
-          $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-windows-x86_64.zip"
-          Invoke-WebRequest -Uri $url -OutFile gittop-windows-x86_64.zip
+          $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version.msi"
+          Invoke-WebRequest -Uri $url -OutFile gittop.msi
           
           # Calculate checksum
-          $hash = (Get-FileHash gittop-windows-x86_64.zip -Algorithm SHA256).Hash
+          $hash = (Get-FileHash gittop.msi -Algorithm SHA256).Hash
           echo "checksum=$hash" >> $env:GITHUB_OUTPUT
         id: download
 

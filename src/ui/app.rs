@@ -555,7 +555,6 @@ impl App {
 
         match cmd {
             TrayCommand::ShowWindow => {
-                let is_currently_hidden = window_state::is_hidden();
                 let was_hidden = window_state::restore_from_hidden();
 
                 // On Linux with daemon mode, we closed the window - reopen it

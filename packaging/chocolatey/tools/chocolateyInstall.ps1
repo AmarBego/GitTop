@@ -4,20 +4,18 @@ $packageName = 'gittop'
 $toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
 
 $version = '{{VERSION}}'
-$url64 = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-windows-x86_64.zip"
+$url64 = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version.msi"
 $checksum64 = '{{CHECKSUM}}'
 $checksumType64 = 'sha256'
 
 $packageArgs = @{
     packageName    = $packageName
-    unzipLocation  = $toolsDir
+    fileType       = 'msi'
     url64bit       = $url64
     checksum64     = $checksum64
     checksumType64 = $checksumType64
+    silentArgs     = '/quiet /norestart'
+    validExitCodes = @(0, 3010)
 }
 
-Install-ChocolateyZipPackage @packageArgs
-
-$exePath = Join-Path $toolsDir 'gittop-windows-x86_64\gittop.exe'
-Install-BinFile -Name 'gittop' -Path $exePath
-
+Install-ChocolateyPackage @packageArgs

@@ -57,6 +57,19 @@ jobs:
       - name: Build release
         run: cargo build --release --target ${{ env.TARGET_WINDOWS }}
 
+      - name: Build MSI installer (WiX)
+        shell: pwsh
+        run: |
+          cargo install cargo-wix --version 0.3.8
+          cargo wix --no-build --nocapture --output target/wix/gittop-${{ steps.version.outputs.version }}.msi
+
+      - name: Build EXE installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          # Inno Setup is pre-installed on windows-latest at this path
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DMyAppVersion="$version" packaging/innosetup/gittop.iss
+
       - name: Package Windows release
         shell: pwsh
         run: |
@@ -65,7 +78,7 @@ jobs:
           
           Copy-Item "target/${{ env.TARGET_WINDOWS }}/release/${{ env.APP_NAME }}.exe" "$stagingDir/"
           Copy-Item "LICENSE.md" "$stagingDir/"
-          Copy-Item "README.md" "$stagingDir/"
+          Copy-Item "README.txt" "$stagingDir/"
           
           # Zip the directory (not glob) for deterministic contents
           Compress-Archive -Path $stagingDir -DestinationPath "${{ env.APP_NAME }}-windows-x86_64.zip"
@@ -74,7 +87,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-x86_64
-          path: ${{ env.APP_NAME }}-windows-x86_64.zip
+          path: |
+            ${{ env.APP_NAME }}-windows-x86_64.zip
+            target/wix/*.msi
+            target/installer/*.exe
 
   build-linux:
     name: Build Linux
@@ -105,7 +121,7 @@ jobs:
           mkdir -p ${{ env.APP_NAME }}-linux-x86_64
           cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} ${{ env.APP_NAME }}-linux-x86_64/
           cp LICENSE.md ${{ env.APP_NAME }}-linux-x86_64/
-          cp README.md ${{ env.APP_NAME }}-linux-x86_64/
+          cp README.txt ${{ env.APP_NAME }}-linux-x86_64/
           cp src/platform/resources/gittop.desktop ${{ env.APP_NAME }}-linux-x86_64/
           cp assets/images/GitTop-256x256.png ${{ env.APP_NAME }}-linux-x86_64/gittop.png
           chmod +x ${{ env.APP_NAME }}-linux-x86_64/${{ env.APP_NAME }}
@@ -145,6 +161,8 @@ jobs:
         run: |
           sha256sum \
             artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip \
+            artifacts/windows-x86_64/target/wix/*.msi \
+            artifacts/windows-x86_64/target/installer/*.exe \
             artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz \
             | sort > SHA256SUMS.txt
 
@@ -157,6 +175,8 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip
+            artifacts/windows-x86_64/target/wix/*.msi
+            artifacts/windows-x86_64/target/installer/*.exe
             artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz
             SHA256SUMS.txt
 

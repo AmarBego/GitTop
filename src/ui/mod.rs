@@ -7,4 +7,4 @@ pub mod theme;
 mod widgets;
 pub mod window_state;
 
-pub use app::{App, Message};
+pub use app::App;

@@ -12,4 +12,6 @@ post_upgrade() {
 post_remove() {
     gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
     update-desktop-database -q 2>/dev/null || true
+    echo "Note: User settings in ~/.config/GitTop were preserved."
+    echo "To remove them: rm -rf ~/.config/GitTop"
 }
