@@ -2,7 +2,7 @@
 ; SPDX-License-Identifier: AGPL-3.0-only
 
 #define MyAppName "GitTop"
-#define MyAppPublisher "Amar"
+#define MyAppPublisher "AmarBego"
 #define MyAppURL "https://github.com/AmarBego/GitTop"
 #define MyAppExeName "gittop.exe"
 #define MyAppDataFolder "GitTop"

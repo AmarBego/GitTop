@@ -9,7 +9,7 @@
         Id='*'
         Name='GitTop'
         UpgradeCode='F8E9D4C3-B2A1-4567-8901-2345ABCDEF01'
-        Manufacturer='Amar'
+        Manufacturer='AmarBego'
         Language='1033'
         Codepage='1252'
         Version='!(bind.FileVersion.gittop.exe)'>
@@ -17,7 +17,7 @@
         <Package Id='*'
             Keywords='Installer'
             Description='GitTop - A lightweight GitHub notifications client'
-            Manufacturer='Amar'
+            Manufacturer='AmarBego'
             InstallerVersion='450'
             Languages='1033'
             Compressed='yes'
