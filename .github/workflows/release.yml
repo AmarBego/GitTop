@@ -61,7 +61,7 @@ jobs:
         shell: pwsh
         run: |
           cargo install cargo-wix --version 0.3.8
-          cargo wix --no-build --nocapture --output target/wix/gittop-${{ steps.version.outputs.version }}.msi
+          cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-${{ steps.version.outputs.version }}.msi
 
       - name: Build EXE installer (Inno Setup)
         shell: pwsh
