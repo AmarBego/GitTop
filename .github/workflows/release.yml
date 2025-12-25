@@ -53,12 +53,11 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-        with:
-          prefix-key: "sccache-windows-"
 
       - name: Build release
         env:
           SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_GHA_CACHE_PREFIX: "sccache-windows"
           RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_WINDOWS }}
 
@@ -151,8 +150,6 @@ jobs:
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
-        with:
-          prefix-key: "sccache-linux-"
 
       - name: Install system dependencies
         run: |
@@ -162,6 +159,7 @@ jobs:
       - name: Build release
         env:
           SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_GHA_CACHE_PREFIX: "sccache-linux"
           RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_LINUX }}
 
