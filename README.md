@@ -113,6 +113,8 @@ sudo pacman -S gcc-libs gtk3 xdotool libappindicator-gtk3
 
 ## Development
 
+See https://amarbego.github.io/GitTop/dev/ for development covering architecture, branching strategy, release process, and more.
+
 ```bash
 # Run in development mode
 cargo run
@@ -123,8 +125,6 @@ bacon run
 # Format + lint + test (pre-commit)
 prek run
 ```
-
-See [RELEASING.md](RELEASING.md) for version tagging and release process.
 
 ## License
 
