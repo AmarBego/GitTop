@@ -1,22 +1,24 @@
 $ErrorActionPreference = 'Stop'
 
-$toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
+$packageName = 'gittop'
 
-# Remove shim
-Uninstall-BinFile -Name 'gittop'
+# Find the Inno Setup uninstaller in LocalAppData
+$uninstallPath = Join-Path $env:LOCALAPPDATA 'GitTop\unins000.exe'
 
-# Clean up extracted files
-$exePath = Join-Path $toolsDir 'gittop.exe'
-if (Test-Path $exePath) {
-    Remove-Item $exePath -Force
+if (Test-Path $uninstallPath) {
+    $packageArgs = @{
+        packageName    = $packageName
+        fileType       = 'exe'
+        file           = $uninstallPath
+        silentArgs     = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+        validExitCodes = @(0)
+    }
+
+    Uninstall-ChocolateyPackage @packageArgs
+}
+else {
+    Write-Warning "Uninstaller not found at $uninstallPath - GitTop may have been removed manually"
 }
 
-$licensePath = Join-Path $toolsDir 'LICENSE.md'
-if (Test-Path $licensePath) {
-    Remove-Item $licensePath -Force
-}
-
-$readmePath = Join-Path $toolsDir 'README.md'
-if (Test-Path $readmePath) {
-    Remove-Item $readmePath -Force
-}
+# Note: User settings are stored in $env:APPDATA\GitTop
+# These are preserved by default. To remove settings, delete that folder manually.

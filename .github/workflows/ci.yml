@@ -21,8 +21,12 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Build release
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          SCCACHE_GHA_CACHE_PREFIX: "sccache-windows"
+          RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target x86_64-pc-windows-msvc

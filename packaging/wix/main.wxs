@@ -1,0 +1,136 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<!--
+  GitTop WiX installer configuration
+  SPDX-License-Identifier: AGPL-3.0-only
+-->
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+    <Product
+        Id='*'
+        Name='GitTop'
+        UpgradeCode='F8E9D4C3-B2A1-4567-8901-2345ABCDEF01'
+        Manufacturer='AmarBego'
+        Language='1033'
+        Codepage='1252'
+        Version='{{VERSION}}'>
+
+        <Package Id='*'
+            Keywords='Installer'
+            Description='GitTop - A lightweight GitHub notifications client'
+            Manufacturer='AmarBego'
+            InstallerVersion='450'
+            Languages='1033'
+            Compressed='yes'
+            InstallScope='perUser'
+            SummaryCodepage='1252'/>
+
+        <MajorUpgrade
+            Schedule='afterInstallInitialize'
+            DowngradeErrorMessage='A newer version of [ProductName] is already installed. Setup will now exit.'/>
+
+        <Media Id='1' Cabinet='media1.cab' EmbedCab='yes' DiskPrompt='CD-ROM #1'/>
+        <Property Id='DiskPrompt' Value='GitTop Installation'/>
+
+        <Directory Id='TARGETDIR' Name='SourceDir'>
+            <Directory Id='LocalAppDataFolder'>
+                <Directory Id='APPLICATIONFOLDER' Name='GitTop'>
+                    <Component Id='MainApplication'
+                        Guid='{6F7E8D8F-0E79-4E35-A8A7-7B8A5A1F9D1E}'>
+                        <File Id='gittop.exe'
+                            Name='gittop.exe'
+                            DiskId='1'
+                            Source='target\x86_64-pc-windows-msvc\release\gittop.exe'/>
+                        <File Id='LicenseFile'
+                            Name='LICENSE.md'
+                            DiskId='1'
+                            Source='LICENSE.md'/>
+                        <File Id='ReadmeFile'
+                            Name='README.txt'
+                            DiskId='1'
+                            Source='README.txt'/>
+                        <RemoveFolder Id='RemoveAppFolder' Directory='APPLICATIONFOLDER' On='uninstall'/>
+                        <RegistryValue Root='HKCU' Key='Software\GitTop' Name='InstallPath' Type='string' Value='[APPLICATIONFOLDER]' KeyPath='yes'/>
+                    </Component>
+                </Directory>
+            </Directory>
+
+            <Directory Id='ProgramMenuFolder'>
+                <Directory Id='ApplicationProgramsFolder' Name='GitTop'/>
+            </Directory>
+
+            <Directory Id='DesktopFolder'/>
+        </Directory>
+
+        <DirectoryRef Id='ApplicationProgramsFolder'>
+            <Component Id='ApplicationShortcut' Guid='{9C1A2F74-5A9F-4F71-8C7B-9CDAE2F5E0B6}'>
+                <Shortcut Id='ApplicationStartMenuShortcut'
+                    Name='GitTop'
+                    Description='A lightweight GitHub notifications client'
+                    Target='[!gittop.exe]'
+                    WorkingDirectory='APPLICATIONFOLDER'
+                    Icon='ProductICO'/>
+                <RemoveFolder Id='CleanUpShortCut' Directory='ApplicationProgramsFolder' On='uninstall'/>
+                <RegistryValue Root='HKCU' Key='Software\GitTop' Name='installed' Type='integer' Value='1' KeyPath='yes'/>
+            </Component>
+        </DirectoryRef>
+
+        <DirectoryRef Id='DesktopFolder'>
+            <Component Id='DesktopShortcut' Guid='{D3E52E7A-9F91-41B3-8A8F-6D35A3B7A91C}'>
+                <Shortcut Id='ApplicationDesktopShortcut'
+                    Name='GitTop'
+                    Description='A lightweight GitHub notifications client'
+                    Target='[!gittop.exe]'
+                    WorkingDirectory='APPLICATIONFOLDER'
+                    Icon='ProductICO'/>
+                <RegistryValue Root='HKCU' Key='Software\GitTop' Name='desktopShortcut' Type='integer' Value='1' KeyPath='yes'/>
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+            Id='Binaries'
+            Title='Application'
+            Description='Installs GitTop executable and license.'
+            Level='1'
+            ConfigurableDirectory='APPLICATIONFOLDER'
+            AllowAdvertise='no'
+            Display='expand'
+            Absent='disallow'>
+
+            <ComponentRef Id='MainApplication'/>
+
+            <Feature
+                Id='StartMenuShortcut'
+                Title='Start Menu Shortcut'
+                Description='Add a shortcut to the Start Menu.'
+                Level='1'
+                AllowAdvertise='no'
+                Absent='allow'>
+                <ComponentRef Id='ApplicationShortcut'/>
+            </Feature>
+
+            <Feature
+                Id='DesktopShortcut'
+                Title='Desktop Shortcut'
+                Description='Add a shortcut to the Desktop.'
+                Level='1'
+                AllowAdvertise='no'
+                Absent='allow'>
+                <ComponentRef Id='DesktopShortcut'/>
+            </Feature>
+        </Feature>
+
+        <SetProperty Id='ARPINSTALLLOCATION' Value='[APPLICATIONFOLDER]' After='CostFinalize'/>
+
+        <Icon Id='ProductICO' SourceFile='assets\images\favicon.ico'/>
+        <Property Id='ARPPRODUCTICON' Value='ProductICO' />
+        <Property Id='ARPHELPLINK' Value='https://github.com/AmarBego/GitTop'/>
+
+        <UI>
+            <UIRef Id='WixUI_FeatureTree'/>
+            <Publish Dialog='WelcomeDlg' Control='Next' Event='NewDialog' Value='CustomizeDlg' Order='99'>1</Publish>
+            <Publish Dialog='CustomizeDlg' Control='Back' Event='NewDialog' Value='WelcomeDlg' Order='99'>1</Publish>
+        </UI>
+
+        <WixVariable Id='WixUILicenseRtf' Value='packaging\wix\License.rtf'/>
+    </Product>
+</Wix>

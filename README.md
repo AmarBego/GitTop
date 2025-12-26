@@ -37,10 +37,16 @@
 
 ### Windows
 
+**Installer (recommended):**
+- [Download MSI installer](https://github.com/AmarBego/GitTop/releases/latest) — Standard Windows installer
+- [Download EXE installer](https://github.com/AmarBego/GitTop/releases/latest) — Wizard-based setup with optional startup integration
+
 **Scoop:**
 ```pwsh
-Coming soon
+scoop bucket add gittop https://github.com/AmarBego/GitTop
+scoop install gittop
 ```
+> *Once GitTop is added to the [Scoop Extras](https://github.com/ScoopInstaller/Extras) bucket, you'll be able to install directly with `scoop install gittop`.*
 
 **Chocolatey:**
 ```pwsh

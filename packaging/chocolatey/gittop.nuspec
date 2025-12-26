@@ -4,8 +4,8 @@
     <id>gittop</id>
     <version>{{VERSION}}</version>
     <title>GitTop</title>
-    <authors>Amar</authors>
-    <owners>Amar</owners>
+    <authors>AmarBego</authors>
+    <owners>AmarBego</owners>
     <license type="expression">AGPL-3.0-only</license>
     <projectUrl>https://github.com/AmarBego/GitTop</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>

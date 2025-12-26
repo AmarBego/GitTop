@@ -1,47 +1,74 @@
 name: AUR Distribution
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
 
 jobs:
   # Job for stable releases (gittop-bin)
-  aur-stable:
+  aur-stable-bin:
     name: Update gittop-bin (AUR)
     runs-on: ubuntu-latest
-    if: "!github.event.release.prerelease"
+    permissions:
+      actions: read    # Required to download artifacts from another workflow
+      contents: read   # Required to checkout the repo
+    # Only run if Release workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      # Download the release metadata artifact from the triggering workflow
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-meta
+          path: release-meta
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read release info
+        id: release
+        run: |
+          TAG=$(cat release-meta/tag)
+          IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release tag: $TAG, Prerelease: $IS_PRERELEASE"
+
+      - name: Skip prerelease
+        if: steps.release.outputs.is_prerelease == 'true'
+        run: |
+          echo "::notice::Skipping AUR update for prerelease: ${{ steps.release.outputs.tag }}"
+
       - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
+        with:
+          ref: ${{ steps.release.outputs.tag }}
 
       # This action automatically updates checksums and pkgver in PKGBUILD
       - name: Publish gittop-bin
+        if: steps.release.outputs.is_prerelease != 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
           pkgname: gittop-bin
-          pkgbuild: ./packaging/aur/PKGBUILD
+          pkgbuild: ./packaging/aur/stable-bin/PKGBUILD
+          assets: ./packaging/aur/stable-bin/gittop.install
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: Update to ${{ github.event.release.tag_name }}
-          ssh_keyscan_types: rsa,dsa,ecdsa,ed25519
-          # Force update of checksums even if version didn't change (useful for fixing broken builds)
+          commit_message: Update to ${{ steps.release.outputs.tag }}
+          ssh_keyscan_types: ed25519
           updpkgsums: true
 
-  # Job for beta releases (gittop-beta-bin)
-  aur-beta:
-    name: Update gittop-beta-bin (AUR)
-    runs-on: ubuntu-latest
-    if: "github.event.release.prerelease"
-    steps:
-      - uses: actions/checkout@v4
-  
-      - name: Publish gittop-beta-bin
-        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
-        with:
-          pkgname: gittop-beta-bin
-          pkgbuild: ./packaging/aur-beta/PKGBUILD  # You would need a separate PKGBUILD for beta
-          commit_username: ${{ secrets.AUR_USERNAME }}
-          commit_email: ${{ secrets.AUR_EMAIL }}
-          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: Update to ${{ github.event.release.tag_name }}
-          updpkgsums: true
+  # TODO: Job for beta releases (gittop-beta-bin)
+  # aur-beta-bin:
+  #   name: Update gittop-beta-bin (AUR)
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     actions: read
+  #     contents: read
+  #   if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  #   steps:
+  #     - name: Download release metadata
+  #       ...

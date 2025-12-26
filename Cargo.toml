@@ -3,8 +3,11 @@ name = "GitTop"
 version = "0.1.0"
 edition = "2024"
 description = "Why spin up a browser just to check your GitHub notifications?"
-authors = ["Amar"]
+authors = ["AmarBego"]
 license = "AGPL-3.0-only"
+
+[package.metadata.wix]
+wxs = ["packaging/wix/main.wxs"]
 
 [[bin]]
 name = "gittop"

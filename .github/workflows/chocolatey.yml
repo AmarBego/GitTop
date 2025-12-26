@@ -1,0 +1,100 @@
+name: Chocolatey Distribution
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+jobs:
+  chocolatey:
+    name: Publish to Chocolatey
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-meta
+          path: release-meta
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read release info
+        id: release
+        shell: pwsh
+        run: |
+          $tag = Get-Content release-meta/tag
+          $isPrerelease = Get-Content release-meta/is_prerelease
+          $version = $tag -replace '^v', ''
+          
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+          Write-Host "Release: $tag (v$version), Prerelease: $isPrerelease"
+
+      - name: Skip prerelease
+        if: steps.release.outputs.is_prerelease == 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::notice::Skipping Chocolatey publish for prerelease: ${{ steps.release.outputs.tag }}"
+
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Download EXE installer
+        if: steps.release.outputs.is_prerelease != 'true'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.release.outputs.version }}"
+          $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-setup.exe"
+          Invoke-WebRequest -Uri $url -OutFile gittop-setup.exe
+          
+          # Calculate checksum
+          $hash = (Get-FileHash gittop-setup.exe -Algorithm SHA256).Hash
+          echo "checksum=$hash" >> $env:GITHUB_OUTPUT
+        id: download
+
+      - name: Prepare Chocolatey package
+        if: steps.release.outputs.is_prerelease != 'true'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.release.outputs.version }}"
+          $checksum = "${{ steps.download.outputs.checksum }}"
+          
+          # Update nuspec
+          $nuspec = Get-Content packaging/chocolatey/gittop.nuspec -Raw
+          $nuspec = $nuspec -replace '\{\{VERSION\}\}', $version
+          Set-Content packaging/chocolatey/gittop.nuspec $nuspec
+          
+          # Update install script
+          $install = Get-Content packaging/chocolatey/tools/chocolateyInstall.ps1 -Raw
+          $install = $install -replace '\{\{VERSION\}\}', $version
+          $install = $install -replace '\{\{CHECKSUM\}\}', $checksum
+          Set-Content packaging/chocolatey/tools/chocolateyInstall.ps1 $install
+          
+          Write-Host "Updated package for version $version with checksum $checksum"
+
+      - name: Pack Chocolatey package
+        if: steps.release.outputs.is_prerelease != 'true'
+        shell: pwsh
+        run: |
+          cd packaging/chocolatey
+          choco pack
+          Get-ChildItem *.nupkg
+
+      - name: Push to Chocolatey
+        if: steps.release.outputs.is_prerelease != 'true'
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          cd packaging/chocolatey
+          $nupkg = Get-ChildItem *.nupkg | Select-Object -First 1
+          choco push $nupkg.Name --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY

@@ -1,4 +1,5 @@
 //! macOS-specific platform implementations.
+//! the notes are to help later this is all i could find from  documentations and resources so not complete
 
 /// Focus an existing GitTop window.
 /// TODO: Implement using NSRunningApplication or AppleScript.

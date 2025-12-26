@@ -1,0 +1,5 @@
+gittop-linux-x86_64.tar.gz
+gittop-linux-x86_64-*.tar.gz
+gittop-bin-*.pkg.tar.zst
+pkg/
+src/

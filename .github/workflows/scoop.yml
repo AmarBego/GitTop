@@ -1,0 +1,83 @@
+name: Scoop Distribution
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+jobs:
+  scoop:
+    name: Update Scoop Bucket
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Download release metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: release-meta
+          path: release-meta
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Read release info
+        id: release
+        run: |
+          TAG=$(cat release-meta/tag)
+          IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          VERSION="${TAG#v}"
+          
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
+
+      - name: Skip prerelease
+        if: steps.release.outputs.is_prerelease == 'true'
+        run: |
+          echo "::notice::Skipping Scoop update for prerelease: ${{ steps.release.outputs.tag }}"
+
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.is_prerelease != 'true'
+        with:
+          ref: main
+
+      - name: Download Windows release and calculate checksum
+        if: steps.release.outputs.is_prerelease != 'true'
+        id: download
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-windows-x86_64.zip"
+          
+          curl -L -o gittop-windows-x86_64.zip "$URL"
+          CHECKSUM=$(sha256sum gittop-windows-x86_64.zip | cut -d' ' -f1)
+          
+          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "Checksum: $CHECKSUM"
+
+      - name: Update Scoop manifest
+        if: steps.release.outputs.is_prerelease != 'true'
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          CHECKSUM="${{ steps.download.outputs.checksum }}"
+          
+          # Update the manifest with actual values
+          sed -i "s/{{VERSION}}/$VERSION/g" bucket/gittop.json
+          sed -i "s/{{CHECKSUM}}/$CHECKSUM/g" bucket/gittop.json
+          
+          echo "Updated bucket/gittop.json:"
+          cat bucket/gittop.json
+
+      - name: Commit and push
+        if: steps.release.outputs.is_prerelease != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add bucket/gittop.json
+          git diff --staged --quiet || git commit -m "scoop: update to ${{ steps.release.outputs.tag }}"
+          git push

@@ -55,18 +55,22 @@ git push origin v0.1.0
 ### 4. What happens automatically
 
 1. **release.yml** triggers on the tag
-2. Builds Windows + Linux binaries
+2. Builds Windows + Linux binaries and installers
 3. Creates GitHub Release with:
-   - `gittop-windows-x86_64.zip`
-   - `gittop-linux-x86_64.tar.gz`
+   - `gittop-windows-x86_64.zip` — Portable archive
+   - `gittop-X.Y.Z-setup.exe` — EXE installer (Inno Setup)
+   - `gittop-linux-x86_64.tar.gz` — Linux archive
    - `SHA256SUMS.txt`
+4. Downstream workflows update package managers (stable releases only)
 
-### 5. Update package managers (manual for now)
+### 5. Package manager updates (automated)
 
-After release, update checksums in:
-- `packaging/scoop/gittop.json`
-- `packaging/chocolatey/tools/chocolateyInstall.ps1`
-- `packaging/aur/PKGBUILD`
+For **stable releases only**, downstream workflows automatically update:
+- **Scoop** — Updates `bucket/gittop.json` with new version/checksum
+- **Chocolatey** — Builds and pushes `.nupkg` to Chocolatey.org
+- **AUR** — Updates `PKGBUILD` and pushes to AUR
+
+Prereleases (`-alpha`, `-beta`, `-rc`) skip package manager updates.
 
 ---
 
@@ -96,3 +100,36 @@ git tag v0.1.0 && git push origin v0.1.0
 git tag -d v0.1.0-rc.1
 git push origin :refs/tags/v0.1.0-rc.1
 ```
+
+---
+
+## OBSOLETE FOR NOW
+
+> The following sections document MSI installer functionality that is currently disabled pending code signing setup.
+
+### Tagging Limits (MSI-specific)
+
+Due to MSI version constraints, there are practical limits on prerelease counts:
+
+| Limit | Max Value | If exceeded... |
+|-------|-----------|----------------|
+| Patches per minor | 6 | Bump the minor version |
+| Prereleases per stage | 999 | Bump the patch or stage |
+
+**In practice:** If you hit `alpha.999` or `0.1.7`, bump the minor version. These limits far exceed normal usage.
+
+### MSI Version Mapping
+
+Windows Installer (MSI) requires numeric `Major.Minor.Build.Revision` format. SemVer is mapped using:
+
+**Formula:** `Build = (patch × 10000) + base_offset + N`
+
+| Stage | Base | Example SemVer | MSI ProductVersion |
+|-------|------|----------------|---------------------|
+| alpha | 1000 | `0.1.0-alpha.5` | `0.1.1005.0` |
+| stable | 4000 | `0.1.0` | `0.1.4000.0` |
+| stable | 4000 | `0.1.1` | `0.1.14000.0` |
+
+This ensures upgrades work correctly: **0.1.0 → 0.1.1-alpha.1 → 0.1.1**.
+
+> Max 6 patches per minor (build > 65535 fails). Filename uses full SemVer for humans.

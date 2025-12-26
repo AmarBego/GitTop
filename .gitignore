@@ -16,3 +16,6 @@ packaging/chocolatey/*.nupkg
 # OS
 .DS_Store
 Thumbs.db
+
+# Binaries
+gittop-linux-x86_64
