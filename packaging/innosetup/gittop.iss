@@ -18,7 +18,6 @@ AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\..\LICENSE.md
 OutputDir=..\..\target\installer
 OutputBaseFilename=gittop-{#MyAppVersion}-setup
 SetupIconFile=..\..\assets\images\favicon.ico
