@@ -8,6 +8,7 @@
     <owners>AmarBego</owners>
     <licenseUrl>https://github.com/AmarBego/GitTop/blob/main/LICENSE.md</licenseUrl>
     <projectUrl>https://github.com/AmarBego/GitTop</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/AmarBego/GitTop/main/assets/images/GitTop-256x256.png</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?</description>
     <summary>Lightweight GitHub notifications desktop client</summary>
