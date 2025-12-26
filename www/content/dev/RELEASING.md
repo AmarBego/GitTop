@@ -4,8 +4,6 @@ description = "How to version and release GitTop"
 weight = 4
 +++
 
-# Release Process
-
 This guide covers how we version and release GitTop.
 
 ## Versioning Strategy
@@ -34,8 +32,6 @@ We use suffixes to mark pre-release builds.
 - `1.3.1-rc.1` (Release candidate)
 
 > Pre-releases may exist for any version (including patch releases) to validate cross-platform builds and installers. Cargo.toml does NOT need to be updated for pre-releases, only the base version must match.
-
----
 
 ## How to Release
 
@@ -92,15 +88,11 @@ Once the tag is pushed, the `release.yml` workflow kicks in:
 
 > **Note**: Pre-releases do not trigger package manager updates.
 
----
-
 ## Important Rules
 
 **Tag Matching**: The git tag must match the version in `Cargo.toml`.
 - `Cargo.toml`: `0.1.0` -> Tag: `v0.1.0` or `v0.1.0-rc.1`
 - If they don't match, the release workflow will fail.
-
----
 
 ## Cheat Sheet
 
@@ -117,8 +109,6 @@ git tag v0.1.0 && git push origin v0.1.0
 git tag -d v0.1.0-rc.1
 git push origin :refs/tags/v0.1.0-rc.1
 ```
-
----
 
 ## Inactive: MSI Installer Details
 

@@ -38,8 +38,8 @@
 ### Windows
 
 **Installer (recommended):**
-- [Download MSI installer](https://github.com/AmarBego/GitTop/releases/latest) — Standard Windows installer
-- [Download EXE installer](https://github.com/AmarBego/GitTop/releases/latest) — Wizard-based setup with optional startup integration
+- [Download MSI installer](https://github.com/AmarBego/GitTop/releases/latest) Standard Windows installer
+- [Download EXE installer](https://github.com/AmarBego/GitTop/releases/latest) Wizard-based setup with optional startup integration
 
 **Scoop:**
 ```pwsh

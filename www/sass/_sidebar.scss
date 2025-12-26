@@ -1,0 +1,236 @@
+// Sidebar Styles
+// This file handles all sidebar navigation including page TOC
+
+.sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    background: $bg-secondary;
+    border-right: 1px solid $border;
+    padding: 1.5rem 0;
+    position: fixed;
+    top: 64px;
+    left: 0;
+    height: calc(100vh - 64px);
+    overflow-y: auto;
+    z-index: 50;
+
+    // Custom scrollbar
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: $border;
+        border-radius: 3px;
+
+        &:hover {
+            background: $border-light;
+        }
+    }
+}
+
+.sidebar-nav {
+    padding: 0 1rem;
+}
+
+.sidebar-section {
+    margin-bottom: 1rem;
+}
+
+.sidebar-title {
+    display: block;
+    color: white;
+    font-weight: 600;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+
+    &:hover {
+        color: $accent;
+    }
+}
+
+.sidebar-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.sidebar-link {
+    display: block;
+    padding: 0.4rem 0.75rem;
+    color: $text-muted;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    margin-left: 0.5rem;
+
+    &:hover {
+        color: white;
+        background: rgba(white, 0.05);
+    }
+
+    &.active {
+        color: $primary;
+        background: rgba($primary, 0.1);
+        border-left-color: $primary;
+        font-weight: 500;
+    }
+}
+
+// Expandable page with TOC
+.sidebar-page {
+    margin-bottom: 0.25rem;
+}
+
+.sidebar-page-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.4rem 0.75rem;
+    color: $text-muted;
+    font-size: 0.875rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    border-left: 2px solid transparent;
+    margin-left: 0.5rem;
+    cursor: pointer;
+
+    &:hover {
+        color: white;
+        background: rgba(white, 0.05);
+    }
+
+    &.active {
+        color: $primary;
+        background: rgba($primary, 0.1);
+        border-left-color: $primary;
+        font-weight: 500;
+    }
+
+    .expand-icon {
+        font-size: 0.7rem;
+        transition: transform 0.2s ease;
+        opacity: 0.5;
+    }
+
+    &.expanded .expand-icon {
+        transform: rotate(90deg);
+    }
+}
+
+// Table of Contents (headers within a page)
+.sidebar-toc {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+
+    &.expanded {
+        max-height: 500px;
+    }
+}
+
+.toc-link {
+    display: block;
+    padding: 0.3rem 0.75rem 0.3rem 1.5rem;
+    color: $text-muted;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+    border-left: 1px solid $border;
+    margin-left: 1rem;
+
+    &:hover {
+        color: white;
+        border-left-color: $text-muted;
+    }
+
+    &.active {
+        color: $primary;
+        border-left-color: $primary;
+    }
+
+    // Indentation for h3, h4 etc
+    &.toc-h3 {
+        padding-left: 2rem;
+    }
+
+    &.toc-h4 {
+        padding-left: 2.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+// Mobile sidebar toggle
+.sidebar-toggle {
+    display: none;
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: $primary;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 100;
+
+    &:hover {
+        background: $primary-light;
+    }
+
+    svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+// Mobile responsive
+@media (max-width: 900px) {
+    .sidebar {
+        left: 0 !important;
+        transform: translateX(-100%);
+        z-index: 99;
+        transition: transform 0.3s ease;
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.3);
+
+        &.open {
+            transform: translateX(0);
+        }
+    }
+
+    .docs-content {
+        margin-left: 0;
+        padding: 2rem;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: 64px;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 98;
+
+        &.open {
+            display: block;
+        }
+    }
+}

@@ -4,8 +4,6 @@ description = "High-level codebase structure and platform-specific implementatio
 weight = 1
 +++
 
-# Architecture & Codebase
-
 This document explains both the high-level codebase structure and the low-level platform specifics.
 
 ## Codebase Map
@@ -71,7 +69,7 @@ A "screen" is a top-level page (Notifications, Settings, Login). Each screen liv
 |------|--------------|
 | `screen.rs` | Owns the state, handles messages, orchestrates the layout |
 | `messages.rs` | Defines all the things a user can do on this screen |
-| `view/` | Pure rendering functions—no state mutation, just turning data into pixels |
+| `view/` | Pure rendering functions no state mutation, just turning data into pixels |
 
 **The `screen.rs` file always has three things:**
 
@@ -79,7 +77,7 @@ A "screen" is a top-level page (Notifications, Settings, Login). Each screen liv
 2.  An `update()` method that handles incoming messages
 3.  A `view()` method that renders the UI
 
-The `view()` method doesn't do much itself—it calls into smaller view helpers to build the layout. Think of it as the conductor.
+The `view()` method doesn't do much itself it calls into smaller view helpers to build the layout. Think of it as the conductor.
 
 **Two ways to write view code:**
 
@@ -140,8 +138,6 @@ Handles all interaction with the GitHub API.
     *   `disk`: Persistent storage using `sled`.
 *   **`specs/`**:
     *   `mock_notifications`: Generates fake data for testing.
-
----
 
 ## Platform Specifics (`src/platform`)
 

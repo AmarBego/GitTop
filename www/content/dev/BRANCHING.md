@@ -4,8 +4,6 @@ description = "How we manage branches and code flow in GitTop"
 weight = 2
 +++
 
-# Branching Strategy
-
 This is how we manage code in GitTop. We use a **Release Branch** model, which is common for desktop software that needs support for older versions.
 
 ## The Gist
@@ -24,8 +22,6 @@ This is how we manage code in GitTop. We use a **Release Branch** model, which i
 | `feature/*` | New stuff. Merge into `main` via PR. |
 | `fix/*` | Bug fixes for future releases. Merge into `main`. |
 | `hotfix/*` | Emergency fixes for *shipped* releases. Merge into `release/X.Y`. |
-
----
 
 ## How it Works
 

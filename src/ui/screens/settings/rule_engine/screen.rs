@@ -361,24 +361,24 @@ Rules only exist to restrict, silence, hide, or elevate notifications."
                 ..Default::default()
             }),
             text(
-                "• Show — Visible in the in-app list and triggers a desktop notification. \
+                "• Show - Visible in the in-app list and triggers a desktop notification. \
 This is the default behavior when no rules apply."
             )
             .size(13)
             .color(p.text_secondary),
             text(
-                "• Silent — Visible in the in-app list but does NOT trigger a desktop notification."
+                "• Silent - Visible in the in-app list but does NOT trigger a desktop notification."
             )
             .size(13)
             .color(p.text_secondary),
             text(
-                "• Hide — Completely hidden. The notification does NOT appear in the list \
+                "• Hide - Completely hidden. The notification does NOT appear in the list \
 and does NOT trigger a desktop notification."
             )
             .size(13)
             .color(p.text_secondary),
             text(
-                "• Important — Always visible and always triggers a desktop notification. \
+                "• Important - Always visible and always triggers a desktop notification. \
 Important notifications bypass account rules, schedules, Hide, and Silent actions, \
 and are shown across ALL configured accounts. Important notifications are pinned \
 at the top of every notification list."

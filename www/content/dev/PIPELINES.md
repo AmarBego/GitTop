@@ -4,8 +4,6 @@ description = "CI/CD pipelines and distribution workflows for GitTop releases"
 weight = 3
 +++
 
-# Release Architecture
-
 This document maps out how GitTop gets from a git tag to a published release.
 
 ## The Big Picture
@@ -16,8 +14,6 @@ Automated pipelines handle everything from building the binary to updating packa
 2.  **GitHub Actions builds the app** for Windows and Linux.
 3.  **A Release is created** on GitHub with all the artifacts (installers, archives).
 4.  **Distribution bots wake up** (for stable releases) and push the update to AUR, Chocolatey, etc.
-
----
 
 ## The Workflows
 
@@ -57,8 +53,6 @@ These workflows run *only* after `release.yml` completes successfully. They down
 *   Updates `bucket/gittop.json` in our repository.
 *   Commits the changes, making the update instantly available to Scoop users.
 
----
-
 ## Packaging Files
 
 Where the magic files live:
@@ -67,8 +61,6 @@ Where the magic files live:
 *   **Chocolatey**: `packaging/chocolatey/` (`gittop.nuspec`, scripts)
 *   **Scoop**: `bucket/gittop.json`
 *   **Inno Setup**: `packaging/innosetup/gittop.iss` (The Windows installer script)
-
----
 
 ## Adding a New Distributor
 
@@ -86,8 +78,6 @@ Want to add Homebrew or Snap?
 4.  **Fetch Metadata**: usage the `release-meta` artifact to get the correct version tag.
 5.  **Skip Pre-releases**: Check `is_prerelease` before publishing.
 
----
-
 ## Inactive: MSI Installer
 
 > We are currently using Inno Setup (EXE) instead of MSI because we don't have code signing yet. The following details are preserved for future use.
@@ -104,7 +94,7 @@ MSI requires specific numeric versions (`Major.Minor.Build.Revision`). To suppor
 **Formula**: `Build = (Patch * 10000) + StageOffset + N`
 
 | Stage | Offset | Example | MSI Version |
-|-------|--------|---------|-------------|
+|-|--||-|
 | alpha | 1000 | `0.1.0-alpha.5` | `0.1.1005.0` |
 | stable | 4000 | `0.1.0` | `0.1.4000.0` |
 

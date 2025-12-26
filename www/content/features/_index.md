@@ -1,6 +1,7 @@
 +++
 title = "Features"
 sort_by = "weight"
+template = "section.html"
 +++
 
-Learn more about what GitTop can do.
+Explore everything GitTop can do to help you stay on top of your GitHub notifications.

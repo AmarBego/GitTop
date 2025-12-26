@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="docs-layout">
+  <aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+      {% if page %}
+        {% set current_section = page.ancestors | last %}
+        {% set section_data = get_section(path=current_section) %}
+      {% else %}
+        {% set section_data = section %}
+      {% endif %}
+      
+      <div class="sidebar-section">
+        <a href="{{ section_data.permalink }}" class="sidebar-title">
+          {{ section_data.title }}
+        </a>
+        <ul class="sidebar-links">
+          {% for p in section_data.pages %}
+            {% set is_active = page and page.permalink == p.permalink %}
+            <li class="sidebar-page">
+              <a href="{{ p.permalink }}" class="sidebar-page-link {% if is_active %}active expanded{% endif %}">
+                {{ p.title }}
+                {% if p.toc and p.toc | length > 0 %}
+                  <span class="expand-icon">▶</span>
+                {% endif %}
+              </a>
+              {% if p.toc and p.toc | length > 0 %}
+                <ul class="sidebar-toc {% if is_active %}expanded{% endif %}">
+                  {% for h in p.toc %}
+                    <li>
+                      <a href="{{ p.permalink }}#{{ h.id }}" class="toc-link toc-h{{ h.level }}">
+                        {{ h.title }}
+                      </a>
+                    </li>
+                    {% if h.children %}
+                      {% for child in h.children %}
+                        <li>
+                          <a href="{{ p.permalink }}#{{ child.id }}" class="toc-link toc-h{{ child.level }}">
+                            {{ child.title }}
+                          </a>
+                        </li>
+                      {% endfor %}
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+      
+      {% for subsection in section_data.subsections %}
+        {% set sub = get_section(path=subsection) %}
+        <div class="sidebar-section">
+          <a href="{{ sub.permalink }}" class="sidebar-title">
+            {{ sub.title }}
+          </a>
+          <ul class="sidebar-links">
+            {% for p in sub.pages %}
+              {% set is_active = page and page.permalink == p.permalink %}
+              <li class="sidebar-page">
+                <a href="{{ p.permalink }}" class="sidebar-page-link {% if is_active %}active expanded{% endif %}">
+                  {{ p.title }}
+                  {% if p.toc and p.toc | length > 0 %}
+                    <span class="expand-icon">▶</span>
+                  {% endif %}
+                </a>
+                {% if p.toc and p.toc | length > 0 %}
+                  <ul class="sidebar-toc {% if is_active %}expanded{% endif %}">
+                    {% for h in p.toc %}
+                      <li>
+                        <a href="{{ p.permalink }}#{{ h.id }}" class="toc-link toc-h{{ h.level }}">
+                          {{ h.title }}
+                        </a>
+                      </li>
+                      {% if h.children %}
+                        {% for child in h.children %}
+                          <li>
+                            <a href="{{ p.permalink }}#{{ child.id }}" class="toc-link toc-h{{ child.level }}">
+                              {{ child.title }}
+                            </a>
+                          </li>
+                        {% endfor %}
+                      {% endif %}
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </nav>
+  </aside>
+  
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  
+  <main class="docs-content">
+    {% if page %}
+      <h1>{{ page.title }}</h1>
+      <div class="content">
+        {{ page.content | safe }}
+      </div>
+    {% else %}
+      <h1>{{ section.title }}</h1>
+      <div class="content">
+        {{ section.content | safe }}
+        
+        {% if section.pages | length > 0 %}
+        <div class="page-list">
+          <h2>In this section</h2>
+          <div class="page-cards">
+            {% for p in section.pages %}
+              <a href="{{ p.permalink }}" class="page-card">
+                <h3>{{ p.title }}</h3>
+                {% if p.description %}
+                  <p>{{ p.description }}</p>
+                {% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </main>
+</div>
+
+<button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M4 6h16M4 12h16M4 18h16"></path>
+  </svg>
+</button>
+
+<script>
+  // Mobile sidebar toggle
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const toggle = document.getElementById('sidebar-toggle');
+
+  toggle?.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+  });
+
+  overlay?.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  });
+
+  // Highlight current TOC item on scroll
+  const tocLinks = document.querySelectorAll('.toc-link');
+  const headings = [];
+  
+  tocLinks.forEach(link => {
+    const id = link.getAttribute('href').split('#')[1];
+    const heading = document.getElementById(id);
+    if (heading) headings.push({ id, el: heading, link });
+  });
+
+  function updateActiveToc() {
+    const scrollPos = window.scrollY + 100;
+    let active = null;
+    
+    for (const h of headings) {
+      if (h.el.offsetTop <= scrollPos) active = h;
+    }
+    
+    tocLinks.forEach(l => l.classList.remove('active'));
+    if (active) active.link.classList.add('active');
+  }
+
+  window.addEventListener('scroll', updateActiveToc);
+  updateActiveToc();
+</script>
+{% endblock content %}
