@@ -11,7 +11,7 @@ use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, Rule
 use crate::ui::theme;
 
 use super::super::components::{view_empty_state, view_type_rule_card};
-use super::super::messages::RuleEngineMessage;
+use super::super::messages::{RuleEngineMessage, TypeMessage};
 
 /// State for the "New Rule" form.
 #[derive(Debug, Clone)]
@@ -80,7 +80,9 @@ fn view_grouped_rules<'a>(
             .padding([8, 12]),
         )
         .style(theme::ghost_button)
-        .on_press(RuleEngineMessage::ToggleTypeGroup(group_name.clone()))
+        .on_press(RuleEngineMessage::Type(TypeMessage::ToggleGroup(
+            group_name.clone(),
+        )))
         .width(Fill);
 
         let header_container = container(header).style(move |_| container::Style {
@@ -128,7 +130,7 @@ pub fn view_type_rules_tab<'a>(
             pick_list(
                 crate::github::types::NotificationReason::ALL,
                 Some(form_state.notification_type),
-                RuleEngineMessage::NewTypeRuleTypeChanged
+                |r| RuleEngineMessage::Type(TypeMessage::FormTypeChanged(r))
             )
             .width(Length::Fixed(180.0))
             .style(theme::pick_list_style)
@@ -152,7 +154,7 @@ pub fn view_type_rules_tab<'a>(
                     options
                 },
                 Some(selected_account),
-                RuleEngineMessage::NewTypeRuleAccountChanged
+                |s| RuleEngineMessage::Type(TypeMessage::FormAccountChanged(s))
             )
             .width(Length::Fixed(150.0))
             .style(theme::pick_list_style)
@@ -174,7 +176,7 @@ pub fn view_type_rules_tab<'a>(
             slider(
                 -100..=100,
                 form_state.priority,
-                RuleEngineMessage::NewTypeRulePriorityChanged
+                |p| RuleEngineMessage::Type(TypeMessage::FormPriorityChanged(p))
             )
             .width(Length::Fixed(150.0)),
         ]
@@ -196,11 +198,9 @@ pub fn view_type_rules_tab<'a>(
     let action_input = container(
         column![
             action_label_row,
-            pick_list(
-                RuleAction::ALL,
-                Some(form_state.action),
-                RuleEngineMessage::NewTypeRuleActionChanged
-            )
+            pick_list(RuleAction::ALL, Some(form_state.action), |a| {
+                RuleEngineMessage::Type(TypeMessage::FormActionChanged(a))
+            })
             .width(Length::Fixed(100.0))
             .style(theme::pick_list_style)
             .menu_style(theme::menu_style),
@@ -210,7 +210,7 @@ pub fn view_type_rules_tab<'a>(
 
     let add_btn = button(text("Add Rule").size(13))
         .style(theme::primary_button)
-        .on_press(RuleEngineMessage::AddTypeRule)
+        .on_press(RuleEngineMessage::Type(TypeMessage::Add))
         .padding([8, 16]);
 
     let form_row = row![

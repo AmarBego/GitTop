@@ -8,7 +8,10 @@ use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, Rule
 use crate::ui::{icons, theme};
 use chrono::NaiveTime;
 
-use super::messages::{RuleEngineMessage, RuleTab};
+use super::messages::{
+    AccountMessage, ExplainMessage, InspectorMessage, OrgMessage, RuleEngineMessage, RuleTab,
+    TypeMessage,
+};
 use super::tabs;
 
 /// Rule Engine screen state.
@@ -99,22 +102,30 @@ impl RuleEngineScreen {
                 let _ = self.rules.save();
                 Task::none()
             }
-
-            // ================================================================
-            // Account Rules (New Design)
-            // ================================================================
-            RuleEngineMessage::SelectAccount(id) => {
-                self.selected_account_id = Some(id);
+            RuleEngineMessage::ToggleHandbook => {
+                self.show_handbook = !self.show_handbook;
                 Task::none()
             }
-            RuleEngineMessage::ToggleAccountEnabled(id, enabled) => {
+            RuleEngineMessage::Account(msg) => self.update_account(msg),
+            RuleEngineMessage::Org(msg) => self.update_org(msg),
+            RuleEngineMessage::Type(msg) => self.update_type(msg),
+            RuleEngineMessage::Inspector(msg) => self.update_inspector(msg),
+            RuleEngineMessage::Explain(msg) => self.update_explain(msg),
+        }
+    }
+
+    fn update_account(&mut self, message: AccountMessage) -> Task<RuleEngineMessage> {
+        match message {
+            AccountMessage::Select(id) => {
+                self.selected_account_id = Some(id);
+            }
+            AccountMessage::ToggleEnabled(id, enabled) => {
                 if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
                     rule.enabled = enabled;
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
-            RuleEngineMessage::ToggleAccountDay(id, day) => {
+            AccountMessage::ToggleDay(id, day) => {
                 if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
                     if rule.active_days.contains(&day) {
                         rule.active_days.remove(&day);
@@ -123,107 +134,102 @@ impl RuleEngineScreen {
                     }
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
-            RuleEngineMessage::SetAccountTimeWindow(id, start_str, end_str) => {
+            AccountMessage::SetTimeWindow(id, start_str, end_str) => {
                 if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
                     let start = start_str.and_then(|s| NaiveTime::parse_from_str(&s, "%H:%M").ok());
                     let end = end_str.and_then(|s| NaiveTime::parse_from_str(&s, "%H:%M").ok());
-
                     rule.start_time = start;
                     rule.end_time = end;
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
-            RuleEngineMessage::SetAccountTimeWindowExpanded(id, expanded) => {
+            AccountMessage::SetTimeWindowExpanded(id, expanded) => {
                 if expanded {
                     self.expanded_account_time_windows.insert(id);
                 } else {
                     self.expanded_account_time_windows.remove(&id);
                 }
-                Task::none()
             }
-            RuleEngineMessage::SetOutsideScheduleBehavior(id, behavior) => {
+            AccountMessage::SetOutsideBehavior(id, behavior) => {
                 if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
                     rule.outside_behavior = behavior;
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
+        }
+        Task::none()
+    }
 
-            // ================================================================
-            // Org Rules
-            // ================================================================
-            RuleEngineMessage::ToggleOrgRule(id, enabled) => {
+    fn update_org(&mut self, message: OrgMessage) -> Task<RuleEngineMessage> {
+        match message {
+            OrgMessage::Toggle(id, enabled) => {
                 if let Some(rule) = self.rules.org_rules.iter_mut().find(|r| r.id == id) {
                     rule.enabled = enabled;
                 }
                 let _ = self.rules.save();
-                Task::none()
             }
-            RuleEngineMessage::DeleteOrgRule(id) => {
+            OrgMessage::Delete(id) => {
                 self.rules.org_rules.retain(|r| r.id != id);
                 let _ = self.rules.save();
-                Task::none()
             }
-            RuleEngineMessage::DuplicateOrgRule(id) => {
+            OrgMessage::Duplicate(id) => {
                 if let Some(rule) = self.rules.org_rules.iter().find(|r| r.id == id).cloned() {
                     let mut new_rule = rule;
                     new_rule.id = uuid::Uuid::new_v4().to_string();
                     self.rules.org_rules.push(new_rule);
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
+        }
+        Task::none()
+    }
 
-            // ================================================================
-            // Type Rules
-            // ================================================================
-            RuleEngineMessage::ToggleTypeRule(id, enabled) => {
+    fn update_type(&mut self, message: TypeMessage) -> Task<RuleEngineMessage> {
+        match message {
+            TypeMessage::Toggle(id, enabled) => {
                 if let Some(rule) = self.rules.type_rules.iter_mut().find(|r| r.id == id) {
                     rule.enabled = enabled;
                 }
                 let _ = self.rules.save();
-                Task::none()
             }
-            RuleEngineMessage::DeleteTypeRule(id) => {
+            TypeMessage::Delete(id) => {
                 self.rules.type_rules.retain(|r| r.id != id);
                 let _ = self.rules.save();
-                Task::none()
             }
-            RuleEngineMessage::DuplicateTypeRule(id) => {
+            TypeMessage::Duplicate(id) => {
                 if let Some(rule) = self.rules.type_rules.iter().find(|r| r.id == id).cloned() {
                     let mut new_rule = rule;
                     new_rule.id = uuid::Uuid::new_v4().to_string();
                     self.rules.type_rules.push(new_rule);
                     let _ = self.rules.save();
                 }
-                Task::none()
             }
-            RuleEngineMessage::NewTypeRuleTypeChanged(s) => {
+            TypeMessage::ToggleGroup(group_name) => {
+                if self.expanded_type_groups.contains(&group_name) {
+                    self.expanded_type_groups.remove(&group_name);
+                } else {
+                    self.expanded_type_groups.insert(group_name);
+                }
+            }
+            TypeMessage::FormTypeChanged(s) => {
                 self.new_type_rule_type = s;
-                Task::none()
             }
-            RuleEngineMessage::NewTypeRuleAccountChanged(s) => {
+            TypeMessage::FormAccountChanged(s) => {
                 self.new_type_rule_account = if s == "Global" || s.trim().is_empty() {
                     None
                 } else {
                     Some(s)
                 };
-                Task::none()
             }
-            RuleEngineMessage::NewTypeRulePriorityChanged(p) => {
-                self.new_type_rule_priority = p; // Now takes String
-                Task::none()
+            TypeMessage::FormPriorityChanged(p) => {
+                self.new_type_rule_priority = p;
             }
-            RuleEngineMessage::NewTypeRuleActionChanged(a) => {
+            TypeMessage::FormActionChanged(a) => {
                 self.new_type_rule_action = a;
-                Task::none()
             }
-            RuleEngineMessage::AddTypeRule => {
+            TypeMessage::Add => {
                 let priority = self.new_type_rule_priority;
-
                 let account = self.new_type_rule_account.clone();
 
                 let mut rule = TypeRule::new(self.new_type_rule_type.label(), account, priority);
@@ -236,35 +242,30 @@ impl RuleEngineScreen {
                 self.new_type_rule_account = None;
                 self.new_type_rule_priority = 0;
                 self.new_type_rule_action = RuleAction::Show;
-
-                Task::none()
-            }
-            RuleEngineMessage::ToggleTypeGroup(group_name) => {
-                if self.expanded_type_groups.contains(&group_name) {
-                    self.expanded_type_groups.remove(&group_name);
-                } else {
-                    self.expanded_type_groups.insert(group_name);
-                }
-                Task::none()
-            }
-            RuleEngineMessage::SelectRule(rule_id) => {
-                self.selected_rule_id = Some(rule_id);
-                Task::none()
-            }
-            RuleEngineMessage::ClearRuleSelection => {
-                self.selected_rule_id = None;
-                Task::none()
-            }
-
-            RuleEngineMessage::SetExplainTestType(test_type) => {
-                self.explain_test_type = test_type;
-                Task::none()
-            }
-            RuleEngineMessage::ToggleHandbook => {
-                self.show_handbook = !self.show_handbook;
-                Task::none()
             }
         }
+        Task::none()
+    }
+
+    fn update_inspector(&mut self, message: InspectorMessage) -> Task<RuleEngineMessage> {
+        match message {
+            InspectorMessage::Select(rule_id) => {
+                self.selected_rule_id = Some(rule_id);
+            }
+            InspectorMessage::Close => {
+                self.selected_rule_id = None;
+            }
+        }
+        Task::none()
+    }
+
+    fn update_explain(&mut self, message: ExplainMessage) -> Task<RuleEngineMessage> {
+        match message {
+            ExplainMessage::SetTestType(test_type) => {
+                self.explain_test_type = test_type;
+            }
+        }
+        Task::none()
     }
 
     // ========================================================================

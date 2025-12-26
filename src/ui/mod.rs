@@ -1,5 +1,3 @@
-//! UI module - Iced application and screens.
-
 pub(crate) mod app;
 pub mod icons;
 mod screens;

@@ -12,7 +12,6 @@ use crate::ui::{icons, theme};
 
 use super::sidebar_state::SidebarState;
 
-/// Render the sidebar.
 pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
     if state.power_mode {
         view_power_sidebar(state)
@@ -22,7 +21,6 @@ pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMess
 }
 
 fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
-    // Scrollable content (branding, types, repos)
     let scrollable_content = column![view_branding(), Space::new().height(16)]
         .push(view_types_section(
             state.type_counts,
@@ -45,7 +43,6 @@ fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, Notificatio
             scrollable(scrollable_content)
                 .height(Fill)
                 .style(theme::scrollbar),
-            // User section pinned at the bottom
             container(view_user_section(
                 state.user,
                 &state.accounts,
@@ -210,7 +207,6 @@ fn view_user_section<'a>(
 
     // Account selector or just label
     let account_control: Element<'_, _, _, iced::Renderer> = if accounts.len() > 1 {
-        // Dropdown for switching
         iced::widget::pick_list(accounts.to_vec(), Some(user.login.clone()), |s| {
             NotificationMessage::Navigation(NavigationMessage::SwitchAccount(s))
         })
@@ -219,7 +215,6 @@ fn view_user_section<'a>(
         .style(theme::pick_list_style)
         .into()
     } else {
-        // Just the username
         text(&user.login).size(13).color(p.text_primary).into()
     };
 

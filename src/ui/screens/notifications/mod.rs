@@ -1,5 +1,3 @@
-//! Notifications screen module.
-
 mod engine;
 pub mod helper;
 pub mod messages;

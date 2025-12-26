@@ -1,20 +1,15 @@
-//! Notification screen helpers - grouping, filtering, URL conversion.
-//!
 //! Architecture Notes:
-//! - `ProcessedNotification` and `NotificationGroup`: Data structures for processed data
-//! - `FilterSettings`: UI filter state
-//! - `group_processed_notifications`: Presentation logic (time-based grouping)
-//! - `apply_filters`, `count_by_type`, `count_by_repo`: Pure data transformations
+//! - `ProcessedNotification` and `NotificationGroup` hold our view data.
+//! - `group_processed_notifications` handles the presentation logic (time buckets).
+//! - `apply_filters`, `count_by_type`, `count_by_repo` are just pure data transformations.
 //!
-//! For rule evaluation, use `NotificationEngine` from `engine.rs` instead of
-//! the legacy `process_with_rules` function.
+//! Note: For rule evaluation, check `engine.rs` instead.
 
 use crate::github::{NotificationView, SubjectType};
 use crate::ui::screens::settings::rule_engine::RuleAction;
 use chrono::Local;
 use std::collections::HashMap;
 
-/// A notification with its evaluated rule action.
 #[derive(Debug, Clone)]
 pub struct ProcessedNotification {
     pub notification: NotificationView,
@@ -27,29 +22,24 @@ impl ProcessedNotification {
     }
 }
 
-/// Group of notifications by time period.
 #[derive(Debug, Clone)]
 pub struct NotificationGroup {
     pub title: String,
     pub notifications: Vec<ProcessedNotification>,
     pub is_expanded: bool,
-    /// True if this is the priority group (always shown first, special styling).
+    /// We flag this so the UI knows to give it special styling and keep it at the top.
     pub is_priority: bool,
 }
 
-/// Filter settings for notification list.
 #[derive(Debug, Clone, Default)]
 pub struct FilterSettings {
-    /// Show all notifications including read ones.
     pub show_all: bool,
-    /// Filter by specific subject type (None = show all).
+    /// None means "All Types"
     pub selected_type: Option<SubjectType>,
-    /// Filter by specific repository (None = show all).
+    /// None means "All Repos"
     pub selected_repo: Option<String>,
 }
 
-/// Group processed notifications by time period (Today, This Week, Older).
-/// Important notifications are extracted into a separate group shown first (only if `show_priority_group` is true).
 pub fn group_processed_notifications(
     processed: &[ProcessedNotification],
     show_priority_group: bool,
@@ -57,7 +47,8 @@ pub fn group_processed_notifications(
     let now_date = Local::now().date_naive();
     let one_week_ago = now_date - chrono::Duration::days(7);
 
-    // Single pass accumulation into buckets
+    // We do a single pass fold here instead of multiple filters so we don't have to
+    // iterate over the list 4 times.
     let (priority, today, this_week, older) = processed.iter().fold(
         (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
         |(mut p, mut t, mut w, mut o), notif| {
@@ -84,7 +75,6 @@ pub fn group_processed_notifications(
 
     let mut groups = Vec::with_capacity(4);
 
-    // Important group always first (if not empty and enabled)
     if show_priority_group && !priority.is_empty() {
         groups.push(NotificationGroup {
             title: "Important".to_string(),
@@ -118,7 +108,6 @@ pub fn group_processed_notifications(
     groups
 }
 
-/// Apply filters to a list of notifications.
 pub fn apply_filters(
     notifications: &[NotificationView],
     filters: &FilterSettings,
@@ -151,7 +140,6 @@ const SUBJECT_TYPE_ORDER: &[SubjectType] = &[
     SubjectType::RepositoryVulnerabilityAlert,
 ];
 
-/// Count notifications by subject type.
 pub fn count_by_type(notifications: &[NotificationView]) -> Vec<(SubjectType, usize)> {
     let counts = notifications.iter().fold(HashMap::new(), |mut acc, n| {
         *acc.entry(n.subject_type).or_insert(0) += 1;
@@ -164,7 +152,6 @@ pub fn count_by_type(notifications: &[NotificationView]) -> Vec<(SubjectType, us
         .collect()
 }
 
-/// Count notifications by repository.
 pub fn count_by_repo(notifications: &[NotificationView]) -> Vec<(String, usize)> {
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for n in notifications {
@@ -177,7 +164,6 @@ pub fn count_by_repo(notifications: &[NotificationView]) -> Vec<(String, usize)>
     result
 }
 
-/// Convert GitHub API URL to web URL.
 pub fn api_url_to_web_url(api_url: &str) -> String {
     api_url
         .replace("api.github.com/repos", "github.com")

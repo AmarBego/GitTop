@@ -14,7 +14,6 @@ use crate::ui::screens::notifications::messages::{BulkMessage, NotificationMessa
 use crate::ui::screens::notifications::screen::NotificationsScreen;
 
 impl NotificationsScreen {
-    /// Renders the main content area (header or bulk bar + content).
     pub fn view_main_content(
         &self,
         icon_theme: IconTheme,
@@ -41,9 +40,6 @@ impl NotificationsScreen {
     }
 
     /// Renders the notification list with virtual scrolling.
-    ///
-    /// Supports both normal mode and bulk selection mode with proper
-    /// virtual scrolling for performance.
     pub fn view_content(
         &self,
         icon_theme: IconTheme,

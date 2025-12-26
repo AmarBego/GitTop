@@ -1,13 +1,9 @@
-//! Notifications screen - main notification list view.
-//!
-//! Layout: Sidebar | Main Content
-//! - Sidebar: Types filter, Repositories filter, User info
-//! - Main: Content header + notification list
+//! Notifications screen.
 //!
 //! Architecture:
-//! - Uses `NotificationEngine` for centralized rule evaluation (single pass)
-//! - `rebuild_groups()` operates on already-processed notifications
-//! - `send_desktop_notifications()` uses the same processed data
+//! - uses `NotificationEngine` for safe, centralized rule evaluation
+//! - `rebuild_groups()` operates on already-processed notifications to avoid redundant work
+//! - `send_desktop_notifications()` reuses this data for consistency
 
 use iced::widget::row;
 use iced::{Element, Fill, Task};
@@ -35,35 +31,26 @@ pub struct NotificationsScreen {
     pub client: GitHubClient,
     pub user: UserInfo,
     pub all_notifications: Vec<NotificationView>,
-    /// Notifications after filtering (by type, repo, read status).
     pub filtered_notifications: Vec<NotificationView>,
-    /// Processed notifications with rule actions applied.
+    /// Processed notifications with rule actions applied (Silent, Important, etc).
     pub processed_notifications: Vec<ProcessedNotification>,
     pub groups: Vec<NotificationGroup>,
     pub filters: FilterSettings,
     pub is_loading: bool,
     pub error_message: Option<String>,
-    /// Cached counts by subject type (computed on data change).
     pub type_counts: Vec<(SubjectType, usize)>,
-    /// Cached counts by repository (computed on data change).
     pub repo_counts: Vec<(String, usize)>,
-    /// Track seen notifications by ID -> updated_at timestamp.
-    /// This detects both new notifications AND updates to existing ones.
+    /// Tracks notification timestamps to detect updates vs new items.
     seen_notification_timestamps: HashMap<String, chrono::DateTime<chrono::Utc>>,
-    /// Cached rule set for evaluation.
     rules: NotificationRuleSet,
-    /// Important notifications from ALL accounts (persists across account switches).
-    /// These are always shown at the top, regardless of current account.
+    /// Important notifications from ALL accounts.
+    /// Always pinned to top regardless of current account.
     cross_account_priority: Vec<ProcessedNotification>,
-    /// Virtual scrolling: current scroll offset in pixels.
     pub(crate) scroll_offset: f32,
-    /// Virtual scrolling: viewport height in pixels.
     pub(crate) viewport_height: f32,
-    /// Currently selected notification ID (for power mode details panel).
     selected_notification_id: Option<String>,
-    /// Fetched details for the selected notification.
     selected_notification_details: Option<crate::github::NotificationSubjectDetail>,
-    /// Whether we're currently loading details for a selected notification.
+    /// Loading state for the details panel.
     pub is_loading_details: bool,
     /// Set of selected notification IDs for bulk actions (Power Mode only).
     pub selected_ids: HashSet<String>,
@@ -110,23 +97,17 @@ impl NotificationsScreen {
         )
     }
 
-    /// Collapse all groups to reset view state (e.g. when switching modes).
     pub fn collapse_all_groups(&mut self) {
         for group in &mut self.groups {
             group.is_expanded = false;
         }
     }
 
-    /// Aggressively free all memory for tray mode.
+    /// Aggressively free memory for tray mode.
     ///
-    /// Clears all cached data while preserving only essential state
-    /// (client credentials, user info, seen timestamps for desktop notifications).
-    ///
-    /// Note: The GPU/OpenGL context cannot be fully destroyed without closing
-    /// the window in Iced. However, clearing widget data and resetting scroll
-    /// state reduces GPU memory usage by minimizing cached rendering data.
+    /// Iced doesn't fully destroy the GPU context without closing the window,
+    /// but we can minimize VRAM usage by clearing widget data and scroll state.
     pub fn enter_low_memory_mode(&mut self) {
-        // Clear all notification data
         self.all_notifications = Vec::new();
         self.filtered_notifications = Vec::new();
         self.processed_notifications = Vec::new();
@@ -136,15 +117,12 @@ impl NotificationsScreen {
         self.cross_account_priority = Vec::new();
         self.error_message = None;
 
-        // Reset scroll state to minimize GPU cached rendering data
         self.scroll_offset = 0.0;
         self.viewport_height = 600.0;
 
-        // Keep seen_notification_timestamps - needed for desktop notification deduplication
-        // But shrink it if it's grown too large (keep last 500 entries)
+        // needed for desktop notification deduplication
+        // shrink if it's grown too large (keep last 500 entries)
         if self.seen_notification_timestamps.len() > 500 {
-            // Keep the HashMap but it will naturally be cleaned up
-            // when we next refresh (only current notifications are tracked)
             self.seen_notification_timestamps.shrink_to_fit();
         }
     }
@@ -171,7 +149,6 @@ impl NotificationsScreen {
     }
 
     /// Extract Important notifications from current account and add to cross-account store.
-    /// Only tracks UNREAD Important notifications.
     fn update_cross_account_priority(&mut self) {
         // Get unread Important notifications from current account's processed list
         let current_priority: Vec<ProcessedNotification> = self
@@ -202,22 +179,17 @@ impl NotificationsScreen {
         );
     }
 
-    /// Process all notifications through the rule engine (single pass).
-    /// This is called once after fetching, and the results are reused.
     fn process_notifications(&mut self) {
         let engine = NotificationEngine::new(self.rules.clone());
 
-        // Apply filters first (type, repo, read status)
         self.filtered_notifications = apply_filters(&self.all_notifications, &self.filters);
-
-        // Process through rule engine once (applies actions, filters hidden)
         self.processed_notifications = engine.process_all(&self.filtered_notifications);
     }
 
     fn rebuild_groups(&mut self) {
-        // Compute dynamic counts based on current filter selections:
-        // - type_counts: filtered by selected_repo (if any) so we show types available in that repo
-        // - repo_counts: filtered by selected_type (if any) so we show repos containing that type
+        // Dynamic Counts Logic:
+        // - type_counts: filtered by selected_repo (show types available in that repo)
+        // - repo_counts: filtered by selected_type (show repos containing that type)
 
         let notifications_for_types: Vec<_> = if let Some(ref repo) = self.filters.selected_repo {
             self.all_notifications
@@ -243,8 +215,7 @@ impl NotificationsScreen {
         self.type_counts = count_by_type(&notifications_for_types);
         self.repo_counts = count_by_repo(&notifications_for_repos);
 
-        // Validate current selections - clear if they become invalid after cross-filtering
-        // This prevents selecting a type that has no notifications in the selected repo (or vice versa)
+        // Clear selections if they become invalid (e.g. selected type no longer exists in selected repo)
         if let Some(ref selected_type) = self.filters.selected_type {
             let type_valid = self
                 .type_counts
@@ -264,20 +235,14 @@ impl NotificationsScreen {
             }
         }
 
-        // Process notifications through rule engine (single pass)
         self.process_notifications();
-
-        // Update cross-account priority store with current account's priority notifications
-        // (only track unread priority notifications)
         self.update_cross_account_priority();
 
-        // Only show cross-account priority in "Unread" mode, not "All"
+        // Only show cross-account priority in "Unread" mode.
         let all_processed = if self.filters.show_all {
-            // In "All" mode, just show current account's notifications without cross-account priority
             eprintln!("[DEBUG] rebuild_groups: show_all mode, skipping cross-account priority");
             self.processed_notifications.clone()
         } else {
-            // In "Unread" mode, merge cross-account priority notifications from other accounts
             let current_account = &self.user.login;
             let other_account_priority: Vec<ProcessedNotification> = self
                 .cross_account_priority
@@ -314,14 +279,14 @@ impl NotificationsScreen {
             combined
         };
 
-        // Preserve expansion state from existing groups before rebuilding
+        // Preserve expansion state
         let previous_expansion: std::collections::HashMap<String, bool> = self
             .groups
             .iter()
             .map(|g| (g.title.clone(), g.is_expanded))
             .collect();
 
-        // Group by time. Important group only shown in "Unread" mode (not "All").
+        // Important group only shown in "Unread" mode.
         let show_priority_group = !self.filters.show_all;
         self.groups = group_processed_notifications(&all_processed, show_priority_group);
 
@@ -343,18 +308,14 @@ impl NotificationsScreen {
         }
     }
 
-    /// Send desktop notifications for new or updated unread notifications.
-    /// Only called when window is hidden in tray.
-    ///
-    /// Uses the already-processed notifications to avoid re-running rules.
-    /// Respects rule engine: Silent/Hide actions suppress desktop notifications.
+    /// Send desktop notifications for new/updated unread items.
+    /// Only called when window is hidden.
     fn send_desktop_notifications(&self, processed: &[ProcessedNotification]) {
         eprintln!(
             "[DEBUG] send_desktop_notifications called with {} processed notifications",
             processed.len()
         );
 
-        // Use DesktopNotificationBatch to categorize notifications (uses already-processed data)
         let batch =
             DesktopNotificationBatch::from_processed(processed, &self.seen_notification_timestamps);
 
@@ -767,9 +728,7 @@ impl NotificationsScreen {
         sidebar_width: f32,
         power_mode: bool,
     ) -> Element<'a, NotificationMessage> {
-        // Compute dynamic totals for the "All" items in sidebar:
-        // - total_count (for Types "All"): count filtered by selected_repo
-        // - total_repo_count (for Repos "All"): count filtered by selected_type
+        // Compute dynamic sidebar totals
         let total_count = if let Some(ref repo) = self.filters.selected_repo {
             self.all_notifications
                 .iter()
@@ -810,14 +769,12 @@ impl NotificationsScreen {
         .into()
     }
 
-    /// Get the currently selected notification (for details panel).
     pub fn selected_notification(&self) -> Option<&NotificationView> {
         self.selected_notification_id
             .as_ref()
             .and_then(|id| self.all_notifications.iter().find(|n| &n.id == id))
     }
 
-    /// Get the fetched details for the selected notification.
     pub fn selected_details(&self) -> Option<&crate::github::NotificationSubjectDetail> {
         self.selected_notification_details.as_ref()
     }

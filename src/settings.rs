@@ -6,18 +6,13 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-/// Icon rendering theme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum IconTheme {
-    /// SVG icons from Lucide (better quality, ~4MB extra).
     #[default]
     Svg,
-    /// Emoji/Unicode icons (minimal memory).
     Emoji,
 }
 
-/// Visual theme preset.
-/// Platform-aware defaults: Linux uses GTK, Windows uses Windows11, macOS uses native.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum AppTheme {
@@ -104,38 +99,27 @@ pub struct StoredAccount {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub icon_theme: IconTheme,
-    /// Visual theme preset.
     #[serde(default)]
     pub theme: AppTheme,
     pub accounts: Vec<StoredAccount>,
-    /// Whether closing the window minimizes to tray instead of quitting.
     #[serde(default = "default_minimize_to_tray")]
     pub minimize_to_tray: bool,
-    /// Font scale for notification items (1.0 = default, range 0.8-1.5)
     #[serde(default = "default_font_scale")]
     pub notification_font_scale: f32,
-    /// Font scale for sidebar (1.0 = default, range 0.8-1.5)
     #[serde(default = "default_font_scale")]
     pub sidebar_font_scale: f32,
-    /// Sidebar width in pixels (180-400, default 220)
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f32,
-    /// Window X position (None = center on screen)
     #[serde(default)]
     pub window_x: Option<i32>,
-    /// Window Y position (None = center on screen)
     #[serde(default)]
     pub window_y: Option<i32>,
-    /// Window width in pixels
     #[serde(default = "default_window_width")]
     pub window_width: f32,
-    /// Window height in pixels
     #[serde(default = "default_window_height")]
     pub window_height: f32,
-    /// Enable "Power Mode" (Enterprise Layout)
     #[serde(default = "default_power_mode")]
     pub power_mode: bool,
-    /// Show the details panel in Power Mode
     #[serde(default = "default_show_details_panel")]
     pub show_details_panel: bool,
 }

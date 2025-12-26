@@ -8,7 +8,7 @@ use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::theme;
 
-use super::super::messages::RuleEngineMessage;
+use super::super::messages::{ExplainMessage, RuleEngineMessage};
 
 pub fn view_overview_tab(
     rules: &NotificationRuleSet,
@@ -183,7 +183,9 @@ pub fn view_overview_tab(
             theme::ghost_button
         })
         .padding([6, 12])
-        .on_press(RuleEngineMessage::SetExplainTestType(value_owned));
+        .on_press(RuleEngineMessage::Explain(ExplainMessage::SetTestType(
+            value_owned,
+        )));
 
         type_buttons = type_buttons.push(btn);
     }

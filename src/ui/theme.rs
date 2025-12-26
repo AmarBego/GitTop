@@ -15,13 +15,11 @@ use crate::settings::AppTheme;
 // HELPERS - boilerplate reduction
 // ============================================================================
 
-/// Access palette with less boilerplate
 #[inline]
 fn with_palette<T>(f: impl FnOnce(ThemePalette) -> T) -> T {
     f(palette())
 }
 
-/// Standard button status color helper
 #[inline]
 fn hover_active(status: button::Status, normal: Color, hover: Color, active: Color) -> Color {
     match status {
@@ -31,7 +29,6 @@ fn hover_active(status: button::Status, normal: Color, hover: Color, active: Col
     }
 }
 
-/// Standard card border helper
 #[inline]
 fn card_border(radius: f32) -> Border {
     Border {
@@ -45,119 +42,98 @@ fn card_border(radius: f32) -> Border {
 // THEME PALETTE - Dynamic colors based on selected theme
 // ============================================================================
 
-/// Complete color palette for a theme
 #[derive(Debug, Clone, Copy)]
 pub struct ThemePalette {
-    /// Main background
     pub bg_base: Color,
-    /// Card/panel background
     pub bg_card: Color,
-    /// Control/input background
     pub bg_control: Color,
-    /// Hover state background
     pub bg_hover: Color,
-    /// Active/pressed state
     pub bg_active: Color,
-    /// Sidebar background
     pub bg_sidebar: Color,
-
-    /// Primary text (high contrast)
     pub text_primary: Color,
-    /// Secondary text (medium contrast)
     pub text_secondary: Color,
-    /// Muted text (still readable!)
     pub text_muted: Color,
-
-    /// Primary accent color
     pub accent: Color,
-    /// Success/green accent
     pub accent_success: Color,
-    /// Warning/orange accent
     pub accent_warning: Color,
-    /// Danger/red accent
     pub accent_danger: Color,
-    /// Purple accent
     pub accent_purple: Color,
-
-    /// Border color
     pub border: Color,
-    /// Subtle border/divider
     pub border_subtle: Color,
 }
 
-// Static palette definitions
 pub const LIGHT: ThemePalette = ThemePalette {
     // Backgrounds - white/light grey
-    bg_base: Color::from_rgb(0.98, 0.98, 0.98), // #fafafa
-    bg_card: Color::WHITE,                      // #ffffff
-    bg_control: Color::from_rgb(0.94, 0.94, 0.94), // #f0f0f0
-    bg_hover: Color::from_rgb(0.90, 0.92, 0.95), // #e6ebf2 light blue tint
-    bg_active: Color::from_rgb(0.85, 0.88, 0.92), // #d9e0eb
-    bg_sidebar: Color::from_rgb(0.96, 0.96, 0.97), // #f5f5f7
+    bg_base: Color::from_rgb(0.98, 0.98, 0.98),
+    bg_card: Color::WHITE,
+    bg_control: Color::from_rgb(0.94, 0.94, 0.94),
+    bg_hover: Color::from_rgb(0.90, 0.92, 0.95),
+    bg_active: Color::from_rgb(0.85, 0.88, 0.92),
+    bg_sidebar: Color::from_rgb(0.96, 0.96, 0.97),
 
     // Text - dark for contrast
-    text_primary: Color::from_rgb(0.10, 0.10, 0.12), // #1a1a1e nearly black
-    text_secondary: Color::from_rgb(0.35, 0.35, 0.40), // #595966
-    text_muted: Color::from_rgb(0.55, 0.55, 0.60),   // #8c8c99
+    text_primary: Color::from_rgb(0.10, 0.10, 0.12),
+    text_secondary: Color::from_rgb(0.35, 0.35, 0.40),
+    text_muted: Color::from_rgb(0.55, 0.55, 0.60),
 
     // Accents - vibrant blue
-    accent: Color::from_rgb(0.10, 0.46, 0.82), // #1a75d1
-    accent_success: Color::from_rgb(0.15, 0.65, 0.30), // #26a64d
-    accent_warning: Color::from_rgb(0.90, 0.60, 0.05), // #e6990d
-    accent_danger: Color::from_rgb(0.85, 0.20, 0.20), // #d93333
-    accent_purple: Color::from_rgb(0.55, 0.35, 0.75), // #8c59bf
+    accent: Color::from_rgb(0.10, 0.46, 0.82),
+    accent_success: Color::from_rgb(0.15, 0.65, 0.30),
+    accent_warning: Color::from_rgb(0.90, 0.60, 0.05),
+    accent_danger: Color::from_rgb(0.85, 0.20, 0.20),
+    accent_purple: Color::from_rgb(0.55, 0.35, 0.75),
 
     // Borders - light grey
-    border: Color::from_rgb(0.82, 0.82, 0.85), // #d1d1d9
-    border_subtle: Color::from_rgb(0.90, 0.90, 0.92), // #e6e6eb
+    border: Color::from_rgb(0.82, 0.82, 0.85),
+    border_subtle: Color::from_rgb(0.90, 0.90, 0.92),
 };
 
 pub const STEAM: ThemePalette = ThemePalette {
     // Backgrounds - rich blue-grey, not too dark
-    bg_base: Color::from_rgb(0.12, 0.16, 0.22), // #1e2936
-    bg_card: Color::from_rgb(0.15, 0.20, 0.27), // #263444
-    bg_control: Color::from_rgb(0.18, 0.24, 0.32), // #2e3d52
-    bg_hover: Color::from_rgb(0.22, 0.30, 0.40), // #384d66
-    bg_active: Color::from_rgb(0.25, 0.35, 0.45), // #405973
-    bg_sidebar: Color::from_rgb(0.10, 0.13, 0.18), // #1a212e
+    bg_base: Color::from_rgb(0.12, 0.16, 0.22),
+    bg_card: Color::from_rgb(0.15, 0.20, 0.27),
+    bg_control: Color::from_rgb(0.18, 0.24, 0.32),
+    bg_hover: Color::from_rgb(0.22, 0.30, 0.40),
+    bg_active: Color::from_rgb(0.25, 0.35, 0.45),
+    bg_sidebar: Color::from_rgb(0.10, 0.13, 0.18),
 
     // Text - high contrast, clearly readable
-    text_primary: Color::from_rgb(0.95, 0.96, 0.98), // #f2f5fa almost white
-    text_secondary: Color::from_rgb(0.75, 0.80, 0.85), // #bfccd9
-    text_muted: Color::from_rgb(0.55, 0.62, 0.70),   // #8c9eb3 still visible!
+    text_primary: Color::from_rgb(0.95, 0.96, 0.98),
+    text_secondary: Color::from_rgb(0.75, 0.80, 0.85),
+    text_muted: Color::from_rgb(0.55, 0.62, 0.70),
 
     // Accents - vibrant and visible
-    accent: Color::from_rgb(0.40, 0.75, 0.95), // #66bff2 steam blue
-    accent_success: Color::from_rgb(0.40, 0.80, 0.45), // #66cc73
-    accent_warning: Color::from_rgb(0.95, 0.65, 0.25), // #f2a640
-    accent_danger: Color::from_rgb(0.90, 0.35, 0.35), // #e65959
-    accent_purple: Color::from_rgb(0.70, 0.55, 0.90), // #b38ce6
+    accent: Color::from_rgb(0.40, 0.75, 0.95),
+    accent_success: Color::from_rgb(0.40, 0.80, 0.45),
+    accent_warning: Color::from_rgb(0.95, 0.65, 0.25),
+    accent_danger: Color::from_rgb(0.90, 0.35, 0.35),
+    accent_purple: Color::from_rgb(0.70, 0.55, 0.90),
 
     // Borders
-    border: Color::from_rgb(0.30, 0.38, 0.48), // #4d6179
-    border_subtle: Color::from_rgb(0.22, 0.28, 0.36), // #38475c
+    border: Color::from_rgb(0.30, 0.38, 0.48),
+    border_subtle: Color::from_rgb(0.22, 0.28, 0.36),
 };
 
 pub const GTK_DARK: ThemePalette = ThemePalette {
     // Backgrounds - Adwaita dark grey
-    bg_base: Color::from_rgb(0.14, 0.14, 0.14), // #242424
-    bg_card: Color::from_rgb(0.19, 0.19, 0.19), // #303030
-    bg_control: Color::from_rgb(0.24, 0.24, 0.24), // #3d3d3d
-    bg_hover: Color::from_rgb(0.30, 0.30, 0.30), // #4d4d4d
-    bg_active: Color::from_rgb(0.35, 0.35, 0.35), // #595959
-    bg_sidebar: Color::from_rgb(0.12, 0.12, 0.12), // #1e1e1e
+    bg_base: Color::from_rgb(0.14, 0.14, 0.14),
+    bg_card: Color::from_rgb(0.19, 0.19, 0.19),
+    bg_control: Color::from_rgb(0.24, 0.24, 0.24),
+    bg_hover: Color::from_rgb(0.30, 0.30, 0.30),
+    bg_active: Color::from_rgb(0.35, 0.35, 0.35),
+    bg_sidebar: Color::from_rgb(0.12, 0.12, 0.12),
 
     // Text - Adwaita uses warm whites
-    text_primary: Color::from_rgb(0.96, 0.94, 0.92), // #f5f0eb
-    text_secondary: Color::from_rgb(0.78, 0.76, 0.74), // #c7c2bc
-    text_muted: Color::from_rgb(0.58, 0.56, 0.54),   // #948f8a
+    text_primary: Color::from_rgb(0.96, 0.94, 0.92),
+    text_secondary: Color::from_rgb(0.78, 0.76, 0.74),
+    text_muted: Color::from_rgb(0.58, 0.56, 0.54),
 
     // Accents - Adwaita blue
-    accent: Color::from_rgb(0.21, 0.52, 0.89), // #3584e4
-    accent_success: Color::from_rgb(0.30, 0.76, 0.35), // #4dc259
-    accent_warning: Color::from_rgb(0.96, 0.76, 0.07), // #f5c211
-    accent_danger: Color::from_rgb(0.90, 0.29, 0.24), // #e64a3d
-    accent_purple: Color::from_rgb(0.61, 0.35, 0.71), // #9c59b5
+    accent: Color::from_rgb(0.21, 0.52, 0.89),
+    accent_success: Color::from_rgb(0.30, 0.76, 0.35),
+    accent_warning: Color::from_rgb(0.96, 0.76, 0.07),
+    accent_danger: Color::from_rgb(0.90, 0.29, 0.24),
+    accent_purple: Color::from_rgb(0.61, 0.35, 0.71),
 
     // Borders
     border: Color::from_rgb(0.35, 0.35, 0.35),
@@ -166,24 +142,24 @@ pub const GTK_DARK: ThemePalette = ThemePalette {
 
 pub const WINDOWS11: ThemePalette = ThemePalette {
     // Backgrounds - Mica dark
-    bg_base: Color::from_rgb(0.12, 0.12, 0.12), // #202020
-    bg_card: Color::from_rgb(0.17, 0.17, 0.17), // #2b2b2b
-    bg_control: Color::from_rgb(0.22, 0.22, 0.22), // #383838
-    bg_hover: Color::from_rgb(0.28, 0.28, 0.28), // #474747
-    bg_active: Color::from_rgb(0.33, 0.33, 0.33), // #545454
-    bg_sidebar: Color::from_rgb(0.10, 0.10, 0.10), // #1a1a1a
+    bg_base: Color::from_rgb(0.12, 0.12, 0.12),
+    bg_card: Color::from_rgb(0.17, 0.17, 0.17),
+    bg_control: Color::from_rgb(0.22, 0.22, 0.22),
+    bg_hover: Color::from_rgb(0.28, 0.28, 0.28),
+    bg_active: Color::from_rgb(0.33, 0.33, 0.33),
+    bg_sidebar: Color::from_rgb(0.10, 0.10, 0.10),
 
     // Text - pure white hierarchy
     text_primary: Color::WHITE,
-    text_secondary: Color::from_rgb(0.82, 0.82, 0.82), // #d1d1d1
-    text_muted: Color::from_rgb(0.60, 0.60, 0.60),     // #999
+    text_secondary: Color::from_rgb(0.82, 0.82, 0.82),
+    text_muted: Color::from_rgb(0.60, 0.60, 0.60),
 
     // Accents - Windows blue
-    accent: Color::from_rgb(0.38, 0.80, 1.0), // #60cdff
-    accent_success: Color::from_rgb(0.42, 0.80, 0.37), // #6bcc5e
-    accent_warning: Color::from_rgb(0.99, 0.72, 0.11), // #fcb81c
-    accent_danger: Color::from_rgb(0.95, 0.32, 0.32), // #f25252
-    accent_purple: Color::from_rgb(0.78, 0.65, 0.95), // #c7a6f2
+    accent: Color::from_rgb(0.38, 0.80, 1.0),
+    accent_success: Color::from_rgb(0.42, 0.80, 0.37),
+    accent_warning: Color::from_rgb(0.99, 0.72, 0.11),
+    accent_danger: Color::from_rgb(0.95, 0.32, 0.32),
+    accent_purple: Color::from_rgb(0.78, 0.65, 0.95),
 
     // Borders
     border: Color::from_rgb(0.35, 0.35, 0.35),
@@ -192,24 +168,24 @@ pub const WINDOWS11: ThemePalette = ThemePalette {
 
 pub const MACOS: ThemePalette = ThemePalette {
     // Backgrounds - macOS dark grey
-    bg_base: Color::from_rgb(0.11, 0.11, 0.12), // #1c1c1e
-    bg_card: Color::from_rgb(0.17, 0.17, 0.18), // #2c2c2e
-    bg_control: Color::from_rgb(0.22, 0.22, 0.24), // #38383c
-    bg_hover: Color::from_rgb(0.28, 0.28, 0.30), // #48484c
-    bg_active: Color::from_rgb(0.34, 0.34, 0.36), // #57575c
-    bg_sidebar: Color::from_rgb(0.09, 0.09, 0.10), // #17171a
+    bg_base: Color::from_rgb(0.11, 0.11, 0.12),
+    bg_card: Color::from_rgb(0.17, 0.17, 0.18),
+    bg_control: Color::from_rgb(0.22, 0.22, 0.24),
+    bg_hover: Color::from_rgb(0.28, 0.28, 0.30),
+    bg_active: Color::from_rgb(0.34, 0.34, 0.36),
+    bg_sidebar: Color::from_rgb(0.09, 0.09, 0.10),
 
     // Text
     text_primary: Color::WHITE,
-    text_secondary: Color::from_rgb(0.78, 0.78, 0.80), // #c7c7cc
-    text_muted: Color::from_rgb(0.55, 0.55, 0.58),     // #8c8c94
+    text_secondary: Color::from_rgb(0.78, 0.78, 0.80),
+    text_muted: Color::from_rgb(0.55, 0.55, 0.58),
 
     // Accents - macOS system blue
-    accent: Color::from_rgb(0.04, 0.52, 1.0), // #0a84ff
-    accent_success: Color::from_rgb(0.20, 0.78, 0.35), // #32c759
-    accent_warning: Color::from_rgb(1.0, 0.62, 0.04), // #ff9f0a
-    accent_danger: Color::from_rgb(1.0, 0.27, 0.23), // #ff453a
-    accent_purple: Color::from_rgb(0.75, 0.35, 0.95), // #bf5af2
+    accent: Color::from_rgb(0.04, 0.52, 1.0),
+    accent_success: Color::from_rgb(0.20, 0.78, 0.35),
+    accent_warning: Color::from_rgb(1.0, 0.62, 0.04),
+    accent_danger: Color::from_rgb(1.0, 0.27, 0.23),
+    accent_purple: Color::from_rgb(0.75, 0.35, 0.95),
 
     // Borders
     border: Color::from_rgb(0.30, 0.30, 0.32),
@@ -231,11 +207,11 @@ pub const HIGH_CONTRAST: ThemePalette = ThemePalette {
     text_muted: Color::from_rgb(0.75, 0.75, 0.75),
 
     // Accents - bright, saturated
-    accent: Color::from_rgb(0.0, 0.80, 1.0), // pure cyan
-    accent_success: Color::from_rgb(0.0, 1.0, 0.40), // bright green
-    accent_warning: Color::from_rgb(1.0, 0.85, 0.0), // yellow
-    accent_danger: Color::from_rgb(1.0, 0.20, 0.20), // red
-    accent_purple: Color::from_rgb(0.85, 0.45, 1.0), // bright purple
+    accent: Color::from_rgb(0.0, 0.80, 1.0),
+    accent_success: Color::from_rgb(0.0, 1.0, 0.40),
+    accent_warning: Color::from_rgb(1.0, 0.85, 0.0),
+    accent_danger: Color::from_rgb(1.0, 0.20, 0.20),
+    accent_purple: Color::from_rgb(0.85, 0.45, 1.0),
 
     // Borders - visible
     border: Color::from_rgb(0.50, 0.50, 0.50),

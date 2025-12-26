@@ -1,5 +1,3 @@
-//! Tab views for Rule Engine.
-
 mod account_rules;
 mod org;
 mod overview;

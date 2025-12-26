@@ -14,7 +14,7 @@ This is how we manage code in GitTop. We use a **Release Branch** model, which i
 | Branch | What's in it? |
 |--------|---------------|
 | `main` | The bleeding edge. This is effectively the "next" version of the app. |
-| `release/X.Y` | Stable lines. e.g., `release/0.3` is where `0.3.0`, `0.3.1`, etc. live. |
+| `release/X.Y` | Stable lines. Receives **bugfixes only** (vX.Y.Z). New features go to X.Y+1. |
 | `feature/*` | New stuff. Merge into `main` via PR. |
 | `fix/*` | Bug fixes for future releases. Merge into `main`. |
 | `hotfix/*` | Emergency fixes for *shipped* releases. Merge into `release/X.Y`. |
@@ -42,6 +42,7 @@ We enable testing by tagging directly on `main`.
 git tag v0.3.0-alpha.1
 git push origin v0.3.0-alpha.1
 ```
+
 
 *   **GitHub Releases**: Users can download the `alpha`/`beta` installers.
 *   **Package Managers**: They ignore these (by design).

@@ -8,7 +8,6 @@ use crate::ui::screens::notifications::helper::NotificationGroup;
 use crate::ui::screens::notifications::messages::{NotificationMessage, ViewMessage};
 use crate::ui::{icons, theme};
 
-/// Render a collapsible notification group header.
 pub fn view_group_header<'a>(
     group: &'a NotificationGroup,
     group_index: usize,

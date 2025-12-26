@@ -1,5 +1,3 @@
-//! Reusable UI widgets for GitTop.
-
 mod notification_item;
 pub mod power;
 

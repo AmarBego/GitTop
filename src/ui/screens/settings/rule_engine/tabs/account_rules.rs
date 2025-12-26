@@ -14,7 +14,7 @@ use crate::ui::screens::settings::rule_engine::rules::{
 };
 use crate::ui::theme;
 
-use super::super::messages::RuleEngineMessage;
+use super::super::messages::{AccountMessage, RuleEngineMessage};
 
 pub fn view_account_rules_tab<'a>(
     rules: &'a NotificationRuleSet,
@@ -156,7 +156,9 @@ fn view_account_list<'a>(
                 }
             })
             .width(Fill)
-            .on_press(RuleEngineMessage::SelectAccount(rule.id.clone()))
+            .on_press(RuleEngineMessage::Account(AccountMessage::Select(
+                rule.id.clone(),
+            )))
             .into()
     });
 
@@ -187,27 +189,30 @@ fn view_schedule_config<'a>(
     let p = theme::palette();
 
     // Section 1: Availability
-    let availability_section = column![
-        text("Account Availability").size(16).font(iced::Font {
-            weight: iced::font::Weight::Bold,
-            ..Default::default()
-        }),
-        container(
-            row![
-                text("Enabled").size(14).color(p.text_primary),
-                Space::new().width(8),
-                toggler(rule.enabled)
-                    .on_toggle(move |v| RuleEngineMessage::ToggleAccountEnabled(rule.id.clone(), v))
-                    .width(Length::Shrink),
-                Space::new().width(12),
-                text("Notifications are allowed for this account")
-                    .size(13)
-                    .color(p.text_secondary)
-            ]
-            .align_y(Alignment::Center)
-        )
-        .padding([12, 0])
-    ];
+    let availability_section =
+        column![
+            text("Account Availability").size(16).font(iced::Font {
+                weight: iced::font::Weight::Bold,
+                ..Default::default()
+            }),
+            container(
+                row![
+                    text("Enabled").size(14).color(p.text_primary),
+                    Space::new().width(8),
+                    toggler(rule.enabled)
+                        .on_toggle(move |v| RuleEngineMessage::Account(
+                            AccountMessage::ToggleEnabled(rule.id.clone(), v)
+                        ))
+                        .width(Length::Shrink),
+                    Space::new().width(12),
+                    text("Notifications are allowed for this account")
+                        .size(13)
+                        .color(p.text_secondary)
+                ]
+                .align_y(Alignment::Center)
+            )
+            .padding([12, 0])
+        ];
 
     // Section 2: Weekly Schedule
     let days = [
@@ -253,7 +258,10 @@ fn view_schedule_config<'a>(
             ]
             .align_x(Alignment::Center),
         )
-        .on_press(RuleEngineMessage::ToggleAccountDay(rule.id.clone(), *day))
+        .on_press(RuleEngineMessage::Account(AccountMessage::ToggleDay(
+            rule.id.clone(),
+            *day,
+        )))
         .style(theme::ghost_button)
         .into()
     });
@@ -292,51 +300,51 @@ fn view_schedule_config<'a>(
         .align_y(Alignment::Center),
     )
     .style(theme::ghost_button)
-    .on_press(RuleEngineMessage::SetAccountTimeWindowExpanded(
-        rule.id.clone(),
-        !is_expanded,
+    .on_press(RuleEngineMessage::Account(
+        AccountMessage::SetTimeWindowExpanded(rule.id.clone(), !is_expanded),
     ))
     .padding(0);
 
-    let time_windows_content = if is_expanded {
-        let start_val = rule
-            .start_time
-            .map(|t| t.format("%H:%M").to_string())
-            .unwrap_or_else(|| "09:00".to_string());
-        let end_val = rule
-            .end_time
-            .map(|t| t.format("%H:%M").to_string())
-            .unwrap_or_else(|| "17:00".to_string());
-        // For the setters, we just pass the current value (formatted) if the other one is changed.
-        // But since we are inside a value binding, we simply get the string value to display.
-        // We know we need to pass a valid string to SetAccountTimeWindow.
-        // However, SetAccountTimeWindow expects Option<String>.
+    let time_windows_content =
+        if is_expanded {
+            let start_val = rule
+                .start_time
+                .map(|t| t.format("%H:%M").to_string())
+                .unwrap_or_else(|| "09:00".to_string());
+            let end_val = rule
+                .end_time
+                .map(|t| t.format("%H:%M").to_string())
+                .unwrap_or_else(|| "17:00".to_string());
+            // For the setters, we just pass the current value (formatted) if the other one is changed.
+            // But since we are inside a value binding, we simply get the string value to display.
+            // We know we need to pass a valid string to SetAccountTimeWindow.
+            // However, SetAccountTimeWindow expects Option<String>.
 
-        let current_start_str = start_val.clone();
-        let current_end_str = end_val.clone();
+            let current_start_str = start_val.clone();
+            let current_end_str = end_val.clone();
 
-        column![
+            column![
             Space::new().height(12),
             text("Default Window").size(13).color(p.text_secondary),
             Space::new().height(8),
             row![
                 text("From:").size(13).color(p.text_muted),
                 text_input("09:00", &start_val)
-                    .on_input(move |s| RuleEngineMessage::SetAccountTimeWindow(
+                    .on_input(move |s| RuleEngineMessage::Account(AccountMessage::SetTimeWindow(
                         rule.id.clone(),
                         Some(s),
                         Some(current_end_str.clone())
-                    ))
+                    )))
                     .width(Length::Fixed(80.0))
                     .padding(6),
                 Space::new().width(16),
                 text("To:").size(13).color(p.text_muted),
                 text_input("17:00", &end_val)
-                    .on_input(move |s| RuleEngineMessage::SetAccountTimeWindow(
+                    .on_input(move |s| RuleEngineMessage::Account(AccountMessage::SetTimeWindow(
                         rule.id.clone(),
                         Some(current_start_str.clone()),
                         Some(s)
-                    ))
+                    )))
                     .width(Length::Fixed(80.0))
                     .padding(6),
             ]
@@ -346,10 +354,10 @@ fn view_schedule_config<'a>(
                 .size(12)
                 .color(p.text_muted)
         ]
-        .padding([0, 24])
-    } else {
-        column![]
-    };
+            .padding([0, 24])
+        } else {
+            column![]
+        };
 
     // Section 4: Outside Schedule Behavior
     let behavior_section = column![
@@ -363,7 +371,10 @@ fn view_schedule_config<'a>(
                 "Hide notifications",
                 OutsideScheduleBehavior::Suppress,
                 Some(rule.outside_behavior),
-                move |b| RuleEngineMessage::SetOutsideScheduleBehavior(rule.id.clone(), b)
+                move |b| RuleEngineMessage::Account(AccountMessage::SetOutsideBehavior(
+                    rule.id.clone(),
+                    b
+                ))
             )
             .size(14)
             .spacing(8),
@@ -375,7 +386,10 @@ fn view_schedule_config<'a>(
                 "Silent (no desktop notification)",
                 OutsideScheduleBehavior::Defer,
                 Some(rule.outside_behavior),
-                move |b| RuleEngineMessage::SetOutsideScheduleBehavior(rule.id.clone(), b)
+                move |b| RuleEngineMessage::Account(AccountMessage::SetOutsideBehavior(
+                    rule.id.clone(),
+                    b
+                ))
             )
             .size(14)
             .spacing(8),

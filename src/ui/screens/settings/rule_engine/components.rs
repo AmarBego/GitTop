@@ -8,7 +8,7 @@ use crate::settings::IconTheme;
 use crate::ui::screens::settings::rule_engine::rules::{OrgRule, RuleAction, TypeRule};
 use crate::ui::{icons, theme};
 
-use super::messages::RuleEngineMessage;
+use super::messages::{InspectorMessage, OrgMessage, RuleEngineMessage, TypeMessage};
 
 // ============================================================================
 // Empty State
@@ -88,91 +88,7 @@ fn view_warning_row(
 }
 
 // ============================================================================
-// Generic Rule Card Wrapper
-// ============================================================================
-
-/// Creates a rule card with consistent styling, toggler, action buttons, and context menu.
-///
-/// This extracts the common pattern shared by all rule card types:
-/// - Card container with bg_card background and rounded corners
-/// - Info content on the left (clickable for inspector)
-/// - Visible action buttons: Duplicate, Delete
-/// - Toggler on the right
-/// - Context menu with Duplicate and Delete (for keyboard/right-click users)
-fn view_rule_card<F1, F2, F3>(
-    id: String,
-    enabled: bool,
-    info_content: Element<'static, RuleEngineMessage>,
-    icon_theme: IconTheme,
-    on_toggle: F1,
-    on_duplicate: F2,
-    on_delete: F3,
-) -> Element<'static, RuleEngineMessage>
-where
-    F1: Fn(String, bool) -> RuleEngineMessage + 'static + Clone,
-    F2: Fn(String) -> RuleEngineMessage + 'static + Clone,
-    F3: Fn(String) -> RuleEngineMessage + 'static + Clone,
-{
-    let p = theme::palette();
-    let id_toggle = id.clone();
-    let id_dup = id.clone();
-    let id_dup2 = id.clone();
-    let id_delete = id.clone();
-    let id_delete2 = id.clone();
-    let id_select = id;
-
-    // Make info content clickable to open inspector
-    let clickable_info = button(info_content)
-        .style(theme::ghost_button)
-        .padding(0)
-        .on_press(RuleEngineMessage::SelectRule(id_select));
-
-    // Visible action buttons
-    let dup_btn = button(icons::icon_plus(14.0, p.text_muted, icon_theme))
-        .style(theme::ghost_button)
-        .padding(6)
-        .on_press(on_duplicate(id_dup));
-
-    let delete_btn = button(icons::icon_trash(14.0, p.text_muted, icon_theme))
-        .style(theme::ghost_button)
-        .padding(6)
-        .on_press(on_delete(id_delete));
-
-    let action_buttons = row![dup_btn, delete_btn,].spacing(2);
-
-    let card_content = container(
-        row![
-            clickable_info,
-            Space::new().width(Fill),
-            action_buttons,
-            Space::new().width(8),
-            toggler(enabled)
-                .on_toggle(move |e| on_toggle(id_toggle.clone(), e))
-                .size(18),
-        ]
-        .align_y(Alignment::Center)
-        .padding(14),
-    )
-    .style(|_| theme::rule_card_container());
-
-    ContextMenu::new(card_content, move || {
-        container(
-            column![
-                view_context_menu_item("Duplicate", on_duplicate(id_dup2.clone())),
-                view_context_menu_item("Delete", on_delete(id_delete2.clone())),
-            ]
-            .spacing(2),
-        )
-        .style(|_| theme::context_menu_container())
-        .padding(4)
-        .width(140)
-        .into()
-    })
-    .into()
-}
-
-// ============================================================================
-// Rule Cards
+// Org Rule Card
 // ============================================================================
 
 pub fn view_org_rule_card(
@@ -180,6 +96,14 @@ pub fn view_org_rule_card(
     icon_theme: IconTheme,
 ) -> Element<'static, RuleEngineMessage> {
     let p = theme::palette();
+    let id = rule.id.clone();
+    let id_toggle = id.clone();
+    let id_dup = id.clone();
+    let id_dup2 = id.clone();
+    let id_delete = id.clone();
+    let id_delete2 = id.clone();
+    let id_select = id;
+    let enabled = rule.enabled;
 
     let priority = format!("Priority: {}", rule.priority);
     let action_str = format!("Action: {}", rule.action.display_label());
@@ -200,22 +124,84 @@ pub fn view_org_rule_card(
         info_column = info_column.push(view_warning_row("Hides notifications", icon_theme));
     }
 
-    view_rule_card(
-        rule.id.clone(),
-        rule.enabled,
-        info_column.into(),
-        icon_theme,
-        RuleEngineMessage::ToggleOrgRule,
-        RuleEngineMessage::DuplicateOrgRule,
-        RuleEngineMessage::DeleteOrgRule,
+    // Make info content clickable to open inspector
+    let clickable_info = button(info_column)
+        .style(theme::ghost_button)
+        .padding(0)
+        .on_press(RuleEngineMessage::Inspector(InspectorMessage::Select(
+            id_select,
+        )));
+
+    // Visible action buttons
+    let dup_btn = button(icons::icon_plus(14.0, p.text_muted, icon_theme))
+        .style(theme::ghost_button)
+        .padding(6)
+        .on_press(RuleEngineMessage::Org(OrgMessage::Duplicate(id_dup)));
+
+    let delete_btn = button(icons::icon_trash(14.0, p.text_muted, icon_theme))
+        .style(theme::ghost_button)
+        .padding(6)
+        .on_press(RuleEngineMessage::Org(OrgMessage::Delete(id_delete)));
+
+    let action_buttons = row![dup_btn, delete_btn,].spacing(2);
+
+    let card_content = container(
+        row![
+            clickable_info,
+            Space::new().width(Fill),
+            action_buttons,
+            Space::new().width(8),
+            toggler(enabled)
+                .on_toggle(move |e| RuleEngineMessage::Org(OrgMessage::Toggle(
+                    id_toggle.clone(),
+                    e
+                )))
+                .size(18),
+        ]
+        .align_y(Alignment::Center)
+        .padding(14),
     )
+    .style(|_| theme::rule_card_container());
+
+    ContextMenu::new(card_content, move || {
+        container(
+            column![
+                view_context_menu_item(
+                    "Duplicate",
+                    RuleEngineMessage::Org(OrgMessage::Duplicate(id_dup2.clone()))
+                ),
+                view_context_menu_item(
+                    "Delete",
+                    RuleEngineMessage::Org(OrgMessage::Delete(id_delete2.clone()))
+                ),
+            ]
+            .spacing(2),
+        )
+        .style(|_| theme::context_menu_container())
+        .padding(4)
+        .width(140)
+        .into()
+    })
+    .into()
 }
+
+// ============================================================================
+// Type Rule Card
+// ============================================================================
 
 pub fn view_type_rule_card(
     rule: &TypeRule,
     icon_theme: IconTheme,
 ) -> Element<'static, RuleEngineMessage> {
     let p = theme::palette();
+    let id = rule.id.clone();
+    let id_toggle = id.clone();
+    let id_dup = id.clone();
+    let id_dup2 = id.clone();
+    let id_delete = id.clone();
+    let id_delete2 = id.clone();
+    let id_select = id;
+    let enabled = rule.enabled;
 
     let account = rule.account.clone().unwrap_or_else(|| "Global".to_string());
     let priority = format!("Priority: {}", rule.priority);
@@ -245,13 +231,63 @@ pub fn view_type_rule_card(
         info_column = info_column.push(view_warning_row("Hides notifications", icon_theme));
     }
 
-    view_rule_card(
-        rule.id.clone(),
-        rule.enabled,
-        info_column.into(),
-        icon_theme,
-        RuleEngineMessage::ToggleTypeRule,
-        RuleEngineMessage::DuplicateTypeRule,
-        RuleEngineMessage::DeleteTypeRule,
+    // Make info content clickable to open inspector
+    let clickable_info = button(info_column)
+        .style(theme::ghost_button)
+        .padding(0)
+        .on_press(RuleEngineMessage::Inspector(InspectorMessage::Select(
+            id_select,
+        )));
+
+    // Visible action buttons
+    let dup_btn = button(icons::icon_plus(14.0, p.text_muted, icon_theme))
+        .style(theme::ghost_button)
+        .padding(6)
+        .on_press(RuleEngineMessage::Type(TypeMessage::Duplicate(id_dup)));
+
+    let delete_btn = button(icons::icon_trash(14.0, p.text_muted, icon_theme))
+        .style(theme::ghost_button)
+        .padding(6)
+        .on_press(RuleEngineMessage::Type(TypeMessage::Delete(id_delete)));
+
+    let action_buttons = row![dup_btn, delete_btn,].spacing(2);
+
+    let card_content = container(
+        row![
+            clickable_info,
+            Space::new().width(Fill),
+            action_buttons,
+            Space::new().width(8),
+            toggler(enabled)
+                .on_toggle(move |e| RuleEngineMessage::Type(TypeMessage::Toggle(
+                    id_toggle.clone(),
+                    e
+                )))
+                .size(18),
+        ]
+        .align_y(Alignment::Center)
+        .padding(14),
     )
+    .style(|_| theme::rule_card_container());
+
+    ContextMenu::new(card_content, move || {
+        container(
+            column![
+                view_context_menu_item(
+                    "Duplicate",
+                    RuleEngineMessage::Type(TypeMessage::Duplicate(id_dup2.clone()))
+                ),
+                view_context_menu_item(
+                    "Delete",
+                    RuleEngineMessage::Type(TypeMessage::Delete(id_delete2.clone()))
+                ),
+            ]
+            .spacing(2),
+        )
+        .style(|_| theme::context_menu_container())
+        .padding(4)
+        .width(140)
+        .into()
+    })
+    .into()
 }

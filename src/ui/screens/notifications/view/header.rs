@@ -12,7 +12,6 @@ use crate::ui::screens::notifications::messages::{
 use crate::ui::screens::notifications::screen::NotificationsScreen;
 
 impl NotificationsScreen {
-    /// Renders the content header with title, sync status, filter toggle, and actions.
     pub fn view_content_header(&self, icon_theme: IconTheme) -> Element<'_, NotificationMessage> {
         let p = theme::palette();
         let unread_count = self
@@ -47,11 +46,9 @@ impl NotificationsScreen {
         let unread_btn = view_filter_pill("Unread", is_unread_filter, FilterMessage::ToggleShowAll);
         let all_btn = view_filter_pill("All", !is_unread_filter, FilterMessage::ToggleShowAll);
 
-        // Wrap in container with border
         let filter_segment =
             container(row![unread_btn, all_btn].spacing(0)).style(theme::segment_container);
 
-        // Unified Mark All Read button logic
         let has_unread = unread_count > 0;
         let mark_all_btn = button(
             row![
@@ -89,7 +86,6 @@ impl NotificationsScreen {
             has_unread.then_some(NotificationMessage::Thread(ThreadMessage::MarkAllAsRead)),
         );
 
-        // Refresh button with subtle styling
         let refresh_btn = button(icons::icon_refresh(14.0, p.text_secondary, icon_theme))
             .style(theme::ghost_button)
             .padding(8)
@@ -109,7 +105,6 @@ impl NotificationsScreen {
         .align_y(Alignment::Center)
         .padding([14, 16]);
 
-        // Header with subtle bottom border
         container(header_row)
             .width(Fill)
             .style(theme::header)
@@ -117,7 +112,6 @@ impl NotificationsScreen {
     }
 }
 
-/// Helper to render filter segment buttons (Unread/All pills)
 fn view_filter_pill<'a>(
     label: &'a str,
     is_active: bool,

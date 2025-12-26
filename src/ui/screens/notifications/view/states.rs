@@ -7,7 +7,6 @@ use crate::settings::IconTheme;
 use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
-/// Render the loading state.
 pub fn view_loading<'a>() -> Element<'a, NotificationMessage> {
     let p = theme::palette();
     container(
@@ -23,7 +22,6 @@ pub fn view_loading<'a>() -> Element<'a, NotificationMessage> {
     .into()
 }
 
-/// Render the error state with retry button.
 pub fn view_error<'a>(error: &'a str, icon_theme: IconTheme) -> Element<'a, NotificationMessage> {
     let p = theme::palette();
     let content = column![
@@ -51,13 +49,11 @@ pub fn view_error<'a>(error: &'a str, icon_theme: IconTheme) -> Element<'a, Noti
         .into()
 }
 
-/// State for the empty view.
 pub enum EmptyState {
     NoNotifications,
     AllCaughtUp,
 }
 
-/// Render the empty state (no notifications).
 pub fn view_empty<'a>(
     state: EmptyState,
     icon_theme: IconTheme,

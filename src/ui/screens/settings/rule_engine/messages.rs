@@ -1,80 +1,63 @@
-//! Rule Engine messages.
+use crate::github::types::NotificationReason;
+use crate::ui::screens::settings::rule_engine::rules::{OutsideScheduleBehavior, RuleAction};
+use chrono::Weekday;
 
-/// Rule Engine screen messages.
 #[derive(Debug, Clone)]
 pub enum RuleEngineMessage {
-    /// Go back to settings.
     Back,
-    /// Select a rule tab.
     SelectTab(RuleTab),
-    /// Toggle the rule engine globally.
     ToggleEnabled(bool),
-
-    // ========================================================================
-    // Account Rules (New Design)
-    // ========================================================================
-    /// Select an account in the Accounts tab to view/edit schedule.
-    SelectAccount(String), // account rule ID
-
-    // Master switch
-    ToggleAccountEnabled(String, bool),
-
-    // Weekly Schedule Grid
-    ToggleAccountDay(String, chrono::Weekday), // id, day
-
-    // Time Windows
-    SetAccountTimeWindow(String, Option<String>, Option<String>), // id, start, end
-    SetAccountTimeWindowExpanded(String, bool),                   // id, is_expanded
-
-    // Outside Schedule Behavior
-    SetOutsideScheduleBehavior(
-        String,
-        crate::ui::screens::settings::rule_engine::rules::OutsideScheduleBehavior,
-    ),
-
-    // ========================================================================
-    // Org Rules
-    // ========================================================================
-    ToggleOrgRule(String, bool),
-    DeleteOrgRule(String),
-    DuplicateOrgRule(String),
-
-    // ========================================================================
-    // Type Rules
-    // ========================================================================
-    ToggleTypeRule(String, bool),
-    DeleteTypeRule(String),
-    DuplicateTypeRule(String),
-
-    // Type Rule Creation
-    NewTypeRuleTypeChanged(crate::github::types::NotificationReason),
-    NewTypeRuleAccountChanged(String),
-    NewTypeRulePriorityChanged(i32),
-    NewTypeRuleActionChanged(crate::ui::screens::settings::rule_engine::rules::RuleAction),
-    AddTypeRule,
-
-    // Type Rule Grouping
-    /// Toggle a type rule group (expand/collapse)
-    ToggleTypeGroup(String),
-
-    // Rule Inspector
-    /// Select a rule for inspection
-    SelectRule(String),
-    /// Clear rule selection (close inspector)
-    ClearRuleSelection,
-
-    // Explain Decision
-    /// Set the test notification type for explain decision
-    SetExplainTestType(String),
-
-    /// Toggle the handbook/help popup
     ToggleHandbook,
-
-    /// No-op message (used to block event propagation)
     NoOp,
+    Account(AccountMessage),
+    Org(OrgMessage),
+    Type(TypeMessage),
+    Inspector(InspectorMessage),
+    Explain(ExplainMessage),
 }
 
-/// Rule Engine tabs for navigation.
+#[derive(Debug, Clone)]
+pub enum AccountMessage {
+    Select(String),
+    ToggleEnabled(String, bool),
+    ToggleDay(String, Weekday),
+    SetTimeWindow(String, Option<String>, Option<String>),
+    SetTimeWindowExpanded(String, bool),
+    SetOutsideBehavior(String, OutsideScheduleBehavior),
+}
+
+#[derive(Debug, Clone)]
+pub enum OrgMessage {
+    Toggle(String, bool),
+    Delete(String),
+    Duplicate(String),
+}
+
+/// Type rule messages.
+#[derive(Debug, Clone)]
+pub enum TypeMessage {
+    Toggle(String, bool),
+    Delete(String),
+    Duplicate(String),
+    ToggleGroup(String),
+    FormTypeChanged(NotificationReason),
+    FormAccountChanged(String),
+    FormPriorityChanged(i32),
+    FormActionChanged(RuleAction),
+    Add,
+}
+
+#[derive(Debug, Clone)]
+pub enum InspectorMessage {
+    Select(String),
+    Close,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExplainMessage {
+    SetTestType(String),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RuleTab {
     #[default]

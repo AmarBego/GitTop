@@ -9,8 +9,8 @@ We follow a standard `vMAJOR.MINOR.PATCH` format with optional pre-release suffi
 | Component | Description |
 |-----------|-------------|
 | **MAJOR** | Major milestones that redefine the maturity or direction of the product. |
-| **MINOR** | New features and stable improvements. |
-| **PATCH** | Incremental improvements toward the next stable release (bug fixes, refinements, small features). |
+| **MINOR** | New features, improvements, and functionality updates. |
+| **PATCH** | Critical bug fixes and security patches only. No new features. |
 
 This versioning scheme prioritizes clarity for users over strict semantic versioning rules.
 
@@ -26,6 +26,8 @@ We use suffixes to mark pre-release builds.
 - `1.3.0` (Stable)
 - `1.3.1-alpha.1` (Internal test)
 - `1.3.1-rc.1` (Release candidate)
+
+> Pre-releases may exist for any version (including patch releases) to validate cross-platform builds and installers. Cargo.toml does NOT need to be updated for pre-releases, only the base version must match.
 
 ---
 
@@ -48,6 +50,8 @@ git add Cargo.toml
 git commit -m "chore: bump version to 0.1.0"
 git push
 ```
+
+> Note: The version in Cargo.toml must match the base version of the tag (e.g. 0.1.0 > v0.1.0 OR v0.1.0-rc.1). If they don’t match, the release workflow will fail.
 
 ### 2. Create the Tag
 

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>{{ config.title }}
+			|
+			{{ page.title | default(value="Home") }}</title>
+		<link rel="stylesheet" href="{{ get_url(path="style.css") }}">
+	</head>
+	<body>
+		<nav style="padding: 1rem; background: #161b22; border-bottom: 1px solid #30363d; display: flex; gap: 1rem; align-items: center;">
+			<a href="{{ config.base_url }}" style="font-weight: bold; color: white;">GitTop</a>
+			<a href="{{ get_url(path="features") }}">Features</a>
+			<a href="{{ get_url(path="dev") }}">Dev</a>
+			<a href="{{ config.extra.github }}">GitHub</a>
+		</nav>
+
+		{% block content %}
+			<main>
+				{{ section.content | safe }}
+			</main>
+		{% endblock content %}
+	</body>
+</html>

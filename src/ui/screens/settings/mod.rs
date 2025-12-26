@@ -1,5 +1,3 @@
-//! Settings screen module.
-
 mod components;
 mod messages;
 mod screen;

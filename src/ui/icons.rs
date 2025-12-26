@@ -82,7 +82,6 @@ fn themed_icon<M: 'static>(
 macro_rules! impl_icons {
     ($(fn $name:ident($icon:path, $emoji:literal);)+) => {
         $(
-            /// Auto-generated icon function.
             pub fn $name<M: 'static>(size: f32, color: Color, theme: IconTheme) -> Element<'static, M> {
                 themed_icon(theme, $icon, $emoji, size, color)
             }

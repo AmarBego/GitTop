@@ -11,7 +11,7 @@ use crate::ui::screens::settings::rule_engine::rules::{
 use crate::ui::theme;
 use chrono::Local;
 
-use super::messages::RuleEngineMessage;
+use super::messages::{InspectorMessage, RuleEngineMessage};
 
 /// Result of finding a rule by ID across all rule types.
 #[derive(Debug, Clone)]
@@ -111,7 +111,7 @@ pub fn view_inspector(
     let close_btn = button(icons::icon_x(14.0, p.text_secondary, icon_theme))
         .style(theme::ghost_button)
         .padding(4)
-        .on_press(RuleEngineMessage::ClearRuleSelection);
+        .on_press(RuleEngineMessage::Inspector(InspectorMessage::Close));
 
     let header = row![
         text("Rule Details").size(14).color(p.text_primary),

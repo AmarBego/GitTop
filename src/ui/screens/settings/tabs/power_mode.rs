@@ -9,7 +9,6 @@ use crate::ui::{icons, theme};
 use super::super::components::tab_title;
 use super::super::messages::SettingsMessage;
 
-/// Render the power mode tab content.
 pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
     let enabled = settings.power_mode;

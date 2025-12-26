@@ -6,7 +6,6 @@ use iced::{Alignment, Element, Fill, Length, Task};
 use crate::github::{GitHubClient, UserInfo, auth};
 use crate::ui::theme;
 
-/// Login screen state.
 #[derive(Debug, Clone, Default)]
 pub struct LoginScreen {
     token_input: String,
@@ -14,7 +13,6 @@ pub struct LoginScreen {
     error_message: Option<String>,
 }
 
-/// Login screen messages.
 #[derive(Debug, Clone)]
 pub enum LoginMessage {
     TokenInputChanged(String),

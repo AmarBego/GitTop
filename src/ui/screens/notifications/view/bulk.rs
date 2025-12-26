@@ -10,18 +10,14 @@ use crate::ui::screens::notifications::messages::{BulkMessage, NotificationMessa
 use crate::ui::screens::notifications::screen::NotificationsScreen;
 
 impl NotificationsScreen {
-    /// Renders the bulk action bar for Power Mode.
-    /// Shows "Select" button when not in bulk mode, or full action bar when in bulk mode.
     pub fn view_bulk_action_bar(&self, icon_theme: IconTheme) -> Element<'_, NotificationMessage> {
         let p = theme::palette();
         let selection_count = self.selected_ids.len();
 
-        // Only show action bar when in bulk mode (triggered from top bar Select button)
         if !self.bulk_mode {
             return Space::new().height(0).into();
         }
 
-        // In bulk mode: show action bar
         let selection_text = if selection_count == 0 {
             "Select items".to_string()
         } else {
@@ -52,7 +48,6 @@ impl NotificationsScreen {
         .padding([6, 10])
         .on_press(NotificationMessage::Bulk(BulkMessage::ToggleMode));
 
-        // Action buttons (only enabled when items selected)
         let mark_read_btn = button(
             row![
                 icons::icon_check(12.0, iced::Color::WHITE, icon_theme),

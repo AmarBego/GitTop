@@ -9,7 +9,6 @@ use crate::ui::theme;
 use super::super::components::{setting_card, tab_title};
 use super::super::messages::SettingsMessage;
 
-/// Render the general tab content.
 pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
 
@@ -19,16 +18,12 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        // Theme
         view_theme(settings),
         Space::new().height(8),
-        // Icon Style
         view_icons(settings),
         Space::new().height(8),
-        // Minimize to Tray
         view_minimize_to_tray(settings),
         Space::new().height(24),
-        // Section: Display
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
         view_notification_scale(settings),

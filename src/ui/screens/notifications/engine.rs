@@ -1,14 +1,11 @@
-//! Notification Engine - centralized rule evaluation and notification processing.
-//!
-//! This module addresses the "Double Evaluation of Rules" architectural issue by:
-//! 1. Providing a single entry point for rule evaluation
-//! 2. Processing notifications once and storing the results
-//! 3. Offering unified access for both desktop notifications and UI display
+//! Notification Engine - centralized rule evaluation.
 //!
 //! Architecture:
 //! - `NotificationEngine`: Owns the RuleEngine and provides evaluation methods
-//! - `process_all()`: Single-pass processing of all notifications
-//! - `should_notify_desktop()`: Checks if a processed notification should trigger desktop alert
+//! - `process_all()`: Single-passes all notifications for a view refresh.
+//! - `should_notify_desktop()`: Checks if we should annoy the user with a popup.
+//!
+//! Solves the "Double Evaluation" problem by processing once and storing results.
 
 use chrono::{DateTime, Local, Utc};
 use std::collections::HashMap;
@@ -22,18 +19,16 @@ use super::helper::ProcessedNotification;
 // Notification Engine
 // ============================================================================
 
-/// Centralized notification processing engine.
-///
 /// Encapsulates all rule evaluation logic, ensuring notifications are
 /// processed exactly once per refresh cycle.
 pub struct NotificationEngine {
     engine: RuleEngine,
-    /// Cached timestamp for consistent evaluation within a cycle.
+    /// We cache this so every rule sees the EXACT same "now", avoiding race conditions
+    /// or weird edge cases during a batch.
     evaluation_time: DateTime<Local>,
 }
 
 impl NotificationEngine {
-    /// Create a new engine from a rule set.
     pub fn new(rules: NotificationRuleSet) -> Self {
         Self {
             engine: RuleEngine::new(rules),
@@ -41,10 +36,7 @@ impl NotificationEngine {
         }
     }
 
-    /// Process all notifications through the rule engine in a single pass.
-    ///
-    /// Returns processed notifications with their actions, filtering out hidden ones.
-    /// This is the primary entry point - call this ONCE per refresh cycle.
+    /// Primary entry point. Call this ONCE per refresh cycle.
     pub fn process_all(&self, notifications: &[NotificationView]) -> Vec<ProcessedNotification> {
         notifications
             .iter()
@@ -52,12 +44,8 @@ impl NotificationEngine {
             .collect()
     }
 
-    /// Evaluate a single notification and return its processed form.
-    ///
-    /// Returns `None` if the notification should be hidden.
     fn evaluate_single(&self, notification: &NotificationView) -> Option<ProcessedNotification> {
-        // Extract reason label consistently - this is the canonical way to get
-        // the notification type for rule matching
+        // This extraction is subtle we must use the exact same label as the rules expected.
         let reason_label = Self::extract_reason_label(notification);
 
         let (action, _decision) = self.engine.evaluate_detailed(
@@ -67,7 +55,7 @@ impl NotificationEngine {
             &self.evaluation_time,
         );
 
-        // Filter out hidden notifications
+        // Filter out hidden notifications entirely from the UI view model
         if action == RuleAction::Hide {
             None
         } else {
@@ -78,28 +66,19 @@ impl NotificationEngine {
         }
     }
 
-    /// Extract the reason label from a notification.
-    ///
-    /// This is the single source of truth for how notification reasons
-    /// are converted to strings for rule matching. Previously this logic
-    /// was duplicated in `process_with_rules` and `send_desktop_notifications`.
+    /// Single source of truth for notification reason -> string conversion.
     #[inline]
     pub fn extract_reason_label(notification: &NotificationView) -> &str {
         notification.reason.label()
     }
 
-    /// Check if a processed notification should trigger a desktop notification.
-    ///
-    /// A notification triggers a desktop alert if:
-    /// 1. It's unread
-    /// 2. It's new or updated (based on seen_timestamps)
-    /// 3. Its action is Show or Important (not Silent or Hide)
     pub fn should_notify_desktop(
         processed: &ProcessedNotification,
         seen_timestamps: &HashMap<String, DateTime<Utc>>,
     ) -> bool {
         let notif = &processed.notification;
 
+        // Logic: Unread AND (Never seen OR Updated since seen) AND (Show OR Important)
         notif.unread
             && seen_timestamps
                 .get(&notif.id)
@@ -112,7 +91,6 @@ impl NotificationEngine {
 // Desktop Notification Helpers
 // ============================================================================
 
-/// Categorized notifications for desktop alerts.
 pub struct DesktopNotificationBatch<'a> {
     /// Important notifications (always shown prominently)
     pub priority: Vec<&'a ProcessedNotification>,
@@ -121,7 +99,6 @@ pub struct DesktopNotificationBatch<'a> {
 }
 
 impl<'a> DesktopNotificationBatch<'a> {
-    /// Create a batch from processed notifications, filtering for desktop-worthy ones.
     pub fn from_processed(
         processed: &'a [ProcessedNotification],
         seen_timestamps: &HashMap<String, DateTime<Utc>>,
@@ -134,12 +111,10 @@ impl<'a> DesktopNotificationBatch<'a> {
         Self { priority, regular }
     }
 
-    /// Check if there are any notifications to send.
     pub fn is_empty(&self) -> bool {
         self.priority.is_empty() && self.regular.is_empty()
     }
 
-    /// Total count of notifications.
     pub fn total_count(&self) -> usize {
         self.priority.len() + self.regular.len()
     }
