@@ -5,6 +5,7 @@ on:
     workflows: ["Release"]
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   scoop:
@@ -13,6 +14,7 @@ jobs:
     permissions:
       actions: read
       contents: write
+      pull-requests: write
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
