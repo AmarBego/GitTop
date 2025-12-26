@@ -1,32 +1,32 @@
 {
-    "version": "0.1.3",
-    "description": "A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?",
-    "homepage": "https://github.com/AmarBego/GitTop",
-    "license": {
-        "identifier": "AGPL-3.0-only",
-        "url": "https://github.com/AmarBego/GitTop/blob/main/LICENSE.md"
-    },
-    "notes": "User settings are stored in '$env:APPDATA\\GitTop'. Remove this folder manually for a clean uninstall.",
-    "architecture": {
-        "64bit": {
-            "url": "https://github.com/AmarBego/GitTop/releases/download/v0.1.3/gittop-windows-x86_64.zip",
-            "hash": "abae1a11691d95987cb1cf743fdf91f9b95b5cbac71d0ae0491f35b2f8218d4b"
-        }
-    },
-    "extract_dir": "gittop-windows-x86_64",
-    "bin": "gittop.exe",
-    "shortcuts": [
-        [
-            "gittop.exe",
-            "GitTop"
-        ]
-    ],
-    "checkver": "github",
-    "autoupdate": {
-        "architecture": {
-            "64bit": {
-                "url": "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-windows-x86_64.zip"
-            }
-        }
+  "version": "0.1.5",
+  "description": "A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?",
+  "homepage": "https://github.com/AmarBego/GitTop",
+  "license": {
+    "identifier": "AGPL-3.0-only",
+    "url": "https://github.com/AmarBego/GitTop/blob/main/LICENSE.md"
+  },
+  "notes": "User settings are stored in '$env:APPDATA\\GitTop'. Remove this folder manually for a clean uninstall.",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.1.5/gittop-windows-x86_64.zip",
+      "hash": "152de4963739eebd371da2e225c8b6e0221229e9a80dbdd92bfa87b4f837f3a1"
     }
+  },
+  "extract_dir": "gittop-windows-x86_64",
+  "bin": "gittop.exe",
+  "shortcuts": [
+    [
+      "gittop.exe",
+      "GitTop"
+    ]
+  ],
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-windows-x86_64.zip"
+      }
+    }
+  }
 }
