@@ -46,15 +46,20 @@ jobs:
         with:
           ref: main
 
-      - name: Download Windows release and calculate checksum
+      - name: Get checksum from release
         if: steps.release.outputs.is_prerelease != 'true'
-        id: download
+        id: checksum
         run: |
           VERSION="${{ steps.release.outputs.version }}"
-          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-windows-x86_64.zip"
+          curl -L -o SHA256SUMS.txt "https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/SHA256SUMS.txt"
           
-          curl -L -o gittop-windows-x86_64.zip "$URL"
-          CHECKSUM=$(sha256sum gittop-windows-x86_64.zip | cut -d' ' -f1)
+          # Extract checksum for the Windows zip (format: "hash  path/to/file.zip")
+          CHECKSUM=$(grep 'gittop-windows-x86_64\.zip$' SHA256SUMS.txt | cut -d' ' -f1)
+          
+          if [ -z "$CHECKSUM" ]; then
+            echo "::error::Could not find checksum for gittop-windows-x86_64.zip in SHA256SUMS.txt"
+            exit 1
+          fi
           
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
           echo "Checksum: $CHECKSUM"
@@ -63,7 +68,7 @@ jobs:
         if: steps.release.outputs.is_prerelease != 'true'
         run: |
           VERSION="${{ steps.release.outputs.version }}"
-          CHECKSUM="${{ steps.download.outputs.checksum }}"
+          CHECKSUM="${{ steps.checksum.outputs.checksum }}"
           
           # Update the manifest using jq for proper JSON manipulation
           jq --arg ver "$VERSION" --arg hash "$CHECKSUM" '

@@ -44,7 +44,6 @@
 ### Windows
 
 **Installer (recommended):**
-- [Download MSI installer](https://github.com/AmarBego/GitTop/releases/latest) Standard Windows installer
 - [Download EXE installer](https://github.com/AmarBego/GitTop/releases/latest) Wizard-based setup with optional startup integration
 
 **Scoop:**
@@ -65,7 +64,11 @@ choco install gittop
 
 **Arch Linux (AUR):**
 ```bash
+# If using yay
 yay -S gittop-bin
+
+# If using paru
+paru -S gittop-bin
 ```
 
 **Manual:** Download `gittop-linux-x86_64.tar.gz` from releases:
@@ -95,20 +98,10 @@ Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe`
 
 **Linux:**
 ```bash
-# Debian/Ubuntu
-sudo apt install pkg-config libglib2.0-dev libgtk-3-dev libxdo-dev
-
-# Fedora
-sudo dnf install pkg-config glib2-devel gtk3-devel
-
 # Arch
-sudo pacman -S pkg-config glib2 gtk3
+sudo pacman -S gcc-libs gtk3 xdotool libappindicator-gtk3
 
-# If building using clang (mold) instead of gcc additionally install
-sudo apt install clang xdotool
-sudo dnf install clang xdotool
-sudo pacman -S clang xdotool
-
+# Others coming soon...
 ```
 
 **Windows:** No additional dependencies.
