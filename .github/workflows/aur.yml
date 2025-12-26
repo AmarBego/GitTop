@@ -46,17 +46,28 @@ jobs:
         with:
           ref: ${{ steps.release.outputs.tag }}
 
-      # Update pkgver in PKGBUILD to match the release tag
-      - name: Update PKGBUILD version
+      # Update pkgver and sha256sums in PKGBUILD
+      - name: Update PKGBUILD version and checksum
         if: steps.release.outputs.is_prerelease != 'true'
         run: |
           VERSION="${{ steps.release.outputs.tag }}"
           VERSION="${VERSION#v}"
+          
+          # Download tarball and calculate checksum
+          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-linux-x86_64.tar.gz"
+          curl -L -o /tmp/gittop.tar.gz "$URL"
+          CHECKSUM=$(sha256sum /tmp/gittop.tar.gz | cut -d' ' -f1)
+          rm /tmp/gittop.tar.gz
+          
+          # Update PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${VERSION}/" ./packaging/aur/stable-bin/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${CHECKSUM}')/" ./packaging/aur/stable-bin/PKGBUILD
+          
           echo "Updated PKGBUILD to version: $VERSION"
-          grep "^pkgver=" ./packaging/aur/stable-bin/PKGBUILD
+          echo "Checksum: $CHECKSUM"
+          grep -E "^(pkgver|sha256sums)=" ./packaging/aur/stable-bin/PKGBUILD
 
-      # This action automatically updates checksums in PKGBUILD
+      # Publish to AUR (checksums already updated, no need for updpkgsums)
       - name: Publish gittop-bin
         if: steps.release.outputs.is_prerelease != 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
@@ -69,7 +80,7 @@ jobs:
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           commit_message: Update to ${{ steps.release.outputs.tag }}
           ssh_keyscan_types: ed25519
-          updpkgsums: true
+          updpkgsums: false
 
   # TODO: Job for beta releases (gittop-beta-bin)
   # aur-beta-bin:

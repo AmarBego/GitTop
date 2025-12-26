@@ -75,12 +75,31 @@ jobs:
           echo "Updated bucket/gittop.json:"
           cat bucket/gittop.json
 
-      - name: Commit and push
+      - name: Create PR for Scoop update
         if: steps.release.outputs.is_prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          BRANCH="scoop-update-${{ steps.release.outputs.version }}"
+          
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          # Check if there are changes
           git add bucket/gittop.json
-          git diff --staged --quiet || git commit -m "scoop: update to ${{ steps.release.outputs.tag }}"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Create branch and push
+          git checkout -b "$BRANCH"
+          git commit -m "scoop: update to ${{ steps.release.outputs.tag }}"
+          git push origin "$BRANCH"
+          
+          # Create PR
+          gh pr create \
+            --title "scoop: update to ${{ steps.release.outputs.tag }}" \
+            --body "Automated Scoop manifest update for release ${{ steps.release.outputs.tag }}" \
+            --base main \
+            --head "$BRANCH"

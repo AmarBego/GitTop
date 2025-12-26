@@ -6,7 +6,7 @@
     <title>GitTop</title>
     <authors>AmarBego</authors>
     <owners>AmarBego</owners>
-    <license type="expression">AGPL-3.0-only</license>
+    <licenseUrl>https://github.com/AmarBego/GitTop/blob/main/LICENSE.md</licenseUrl>
     <projectUrl>https://github.com/AmarBego/GitTop</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?</description>
