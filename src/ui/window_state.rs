@@ -12,6 +12,7 @@ const POWER_MODE_HEIGHT: f32 = 700.0;
 
 static MAIN_WINDOW_ID: Mutex<Option<WindowId>> = Mutex::new(None);
 static IS_WINDOW_HIDDEN: AtomicBool = AtomicBool::new(false);
+static IS_WINDOW_FOCUSED: AtomicBool = AtomicBool::new(true);
 
 pub fn set_window_id(id: WindowId) {
     if let Ok(mut guard) = MAIN_WINDOW_ID.lock() {
@@ -34,6 +35,14 @@ pub fn set_hidden(hidden: bool) {
 /// Set hidden to false and return the previous value.
 pub fn restore_from_hidden() -> bool {
     IS_WINDOW_HIDDEN.swap(false, Ordering::Relaxed)
+}
+
+pub fn is_focused() -> bool {
+    IS_WINDOW_FOCUSED.load(Ordering::Relaxed)
+}
+
+pub fn set_focused(focused: bool) {
+    IS_WINDOW_FOCUSED.store(focused, Ordering::Relaxed);
 }
 
 pub fn resize_for_power_mode<T: Send + 'static>() -> Task<T> {

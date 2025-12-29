@@ -690,7 +690,9 @@ impl NotificationsScreen {
                 let processed_for_desktop = engine.process_all(&notifications);
                 let is_hidden = window_state::is_hidden();
 
-                if is_hidden {
+                // Show desktop notifications when window is hidden or unfocused
+                let should_notify = is_hidden || !window_state::is_focused();
+                if should_notify {
                     self.send_desktop_notifications(&processed_for_desktop);
                 }
 

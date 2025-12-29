@@ -658,6 +658,16 @@ impl App {
                 }
             }
 
+            window::Event::Focused => {
+                window_state::set_focused(true);
+                Task::none()
+            }
+
+            window::Event::Unfocused => {
+                window_state::set_focused(false);
+                Task::none()
+            }
+
             _ => Task::none(),
         }
     }
