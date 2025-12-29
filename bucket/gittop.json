@@ -1,5 +1,5 @@
 {
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?",
   "homepage": "https://github.com/AmarBego/GitTop",
   "license": {
@@ -9,8 +9,8 @@
   "notes": "User settings are stored in '$env:APPDATA\\GitTop'. Remove this folder manually for a clean uninstall.",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.1.5/gittop-windows-x86_64.zip",
-      "hash": "152de4963739eebd371da2e225c8b6e0221229e9a80dbdd92bfa87b4f837f3a1"
+      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.1.8/gittop-windows-x86_64.zip",
+      "hash": "2a71bc942a48941848ddcfe0d28bb2e9c03e96bc8ba96ee09844bb947a62bd32"
     }
   },
   "extract_dir": "gittop-windows-x86_64",
