@@ -41,10 +41,19 @@ struct GitHubUser {
 }
 
 /// GitHub API client.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GitHubClient {
     client: reqwest::Client,
     token: String,
+}
+
+impl std::fmt::Debug for GitHubClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GitHubClient")
+            .field("client", &"reqwest::Client { ... }")
+            .field("token", &"***REDACTED***")
+            .finish()
+    }
 }
 
 impl GitHubClient {
@@ -530,4 +539,18 @@ fn parse_discussion_url(url: &str) -> Option<(String, String, u64)> {
     let number = parts.next()?.parse().ok()?;
 
     Some((owner, repo, number))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_debug_redaction() {
+        let client = GitHubClient::new("ghp_ABC123").unwrap();
+        let debug_str = format!("{:?}", client);
+
+        assert!(debug_str.contains("***REDACTED***"));
+        assert!(!debug_str.contains("ghp_ABC123"));
+    }
 }
