@@ -8,7 +8,7 @@
 #define MyAppDataFolder "GitTop"
 
 [Setup]
-AppId={{9C1A2F74-5A9F-4F71-8C7B-9CDAE2F5E0B6}
+AppId={{9C1A2F74-5A9F-4F71-8C7B-9CDAE2F5E0B6}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
