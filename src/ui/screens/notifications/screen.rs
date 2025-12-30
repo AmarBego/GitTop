@@ -87,6 +87,52 @@ impl NotificationsScreen {
         (screen, task)
     }
 
+    // Create an empty interface to initialize when login is skipped.
+    pub fn new_with_empty_session() -> (Self, Task<NotificationMessage>) {
+        use crate::github::{GitHubClient, UserInfo};
+        
+        let valid_token_format = format!("ghp_{}", "x".repeat(39));
+        let client = GitHubClient::new(&valid_token_format).unwrap_or_else(|_| {
+            // Use a valid token format but invalid content.
+            GitHubClient::new("ghp_validformatbutinvalidtoken01234567890123456789012345678").unwrap()
+        });
+
+        // Create guest user information
+        let user = UserInfo {
+            login: "Guest".to_string(),
+            name: Some("Guest User".to_string()),
+            avatar_url: "https://github.com/".to_string(),
+            html_url: "https://github.com/".to_string(),
+        };
+
+        let screen = Self {
+            client,
+            user,
+            all_notifications: Vec::new(),
+            filtered_notifications: Vec::new(),
+            processed_notifications: Vec::new(),
+            groups: Vec::new(),
+            filters: FilterSettings::default(),
+            is_loading: false, // Do not load beacuse of no vaild token
+            error_message: Some("No account configured. Sign in to view notifications.".to_string()),
+            type_counts: Vec::new(),
+            repo_counts: Vec::new(),
+            seen_notification_timestamps: HashMap::new(),
+            rules: NotificationRuleSet::load(),
+            cross_account_priority: Vec::new(),
+            scroll_offset: 0.0,
+            viewport_height: 600.0,
+            selected_notification_id: None,
+            selected_notification_details: None,
+            is_loading_details: false,
+            selected_ids: HashSet::new(),
+            bulk_mode: false,
+        };
+        
+        // // Do not perform the fetch because of no valid token.
+        (screen, Task::none())
+    }
+
     fn fetch_notifications(&self) -> Task<NotificationMessage> {
         let client = self.client.clone();
         let show_all = self.filters.show_all;

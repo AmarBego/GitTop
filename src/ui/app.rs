@@ -268,6 +268,23 @@ impl App {
                 );
                 task.map(Message::Notifications)
             }
+            LoginMessage::Skip => {
+                // User chose to skip login, initialize with empty sessions and default settings
+                let settings = AppSettings::load();
+                settings.apply_theme();
+                
+                // Create a default empty session manager
+                let sessions = SessionManager::new();
+                
+                // Initialize an empty notification screen
+                let (notif_screen, task) = NotificationsScreen::new_with_empty_session();
+                let ctx = AppContext::new(settings, sessions);
+                *self = App::Authenticated(
+                    Box::new(Screen::Notifications(Box::new(notif_screen))),
+                    ctx,
+                );
+                task.map(Message::Notifications)
+            }
             other => screen.update(other).map(Message::Login),
         }
     }
@@ -698,17 +715,23 @@ impl App {
             return Task::none();
         };
 
-        let Some(session) = ctx.sessions.primary() else {
-            return Task::none();
-        };
-
-        let (notif_screen, task) =
-            NotificationsScreen::new(session.client.clone(), session.user.clone());
-        *self = App::Authenticated(
-            Box::new(Screen::Notifications(Box::new(notif_screen))),
-            ctx.with_settings(settings),
-        );
-        task.map(Message::Notifications)
+        if let Some(session) = ctx.sessions.primary() {
+            let (notif_screen, task) =
+                NotificationsScreen::new(session.client.clone(), session.user.clone());
+            *self = App::Authenticated(
+                Box::new(Screen::Notifications(Box::new(notif_screen))),
+                ctx.with_settings(settings),
+            );
+            task.map(Message::Notifications)
+        } else {
+            // Using an empty session if the user skips the login process.
+            let (notif_screen, task) = NotificationsScreen::new_with_empty_session();
+            *self = App::Authenticated(
+                Box::new(Screen::Notifications(Box::new(notif_screen))),
+                ctx.with_settings(settings),
+            );
+            task.map(Message::Notifications)
+        }
     }
 
     /// Navigate to the settings screen.
