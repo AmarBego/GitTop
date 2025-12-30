@@ -1,6 +1,6 @@
 [package]
 name = "GitTop"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["AmarBego"]
