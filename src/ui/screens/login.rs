@@ -21,6 +21,7 @@ pub enum LoginMessage {
     LoginFailed(String),
     OpenTokenUrl,
     TokenUrlOpened,
+    Skip,
 }
 
 impl LoginScreen {
@@ -90,6 +91,10 @@ impl LoginScreen {
                 )
             }
             LoginMessage::TokenUrlOpened => Task::none(),
+            LoginMessage::Skip => {
+                // This will be handled by the parent to skip authentication
+                Task::none()
+            }
         }
     }
 
@@ -137,6 +142,17 @@ impl LoginScreen {
             .padding(12)
         };
 
+        let skip_button = button(
+            text("Skip for now")
+                .size(14)
+                .width(Fill)
+                .align_x(Alignment::Center),
+        )
+        .style(theme::ghost_button)
+        .on_press(LoginMessage::Skip)
+        .width(Fill)
+        .padding(12);
+
         let error_text: Element<'_, LoginMessage> = if let Some(ref error) = self.error_message {
             text(error).size(12).color(p.accent_danger).into()
         } else {
@@ -163,6 +179,8 @@ impl LoginScreen {
             error_text,
             Space::new().height(16),
             submit_button,
+            Space::new().height(8),
+            skip_button,
             Space::new().height(24),
             help_text,
         ]
