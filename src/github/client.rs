@@ -550,6 +550,7 @@ mod tests {
         let client = GitHubClient::new("ghp_ABC123").unwrap();
         let debug_str = format!("{:?}", client);
 
+        assert!(debug_str.contains("GitHubClient"));
         assert!(debug_str.contains("***REDACTED***"));
         assert!(!debug_str.contains("ghp_ABC123"));
     }
