@@ -8,7 +8,7 @@ use crate::settings::{AppSettings, IconTheme};
 use crate::ui::{icons, theme};
 
 use super::messages::{SettingsMessage, SettingsTab};
-use super::tabs::{accounts, general, power_mode};
+use super::tabs::{accounts, general, power_mode, network_proxy};
 
 /// Settings screen state.
 #[derive(Debug, Clone)]
@@ -136,6 +136,34 @@ impl SettingsScreen {
                 }
                 Task::none()
             }
+            SettingsMessage::ToggleProxyEnabled(enabled) => {
+                self.settings.proxy.enabled = enabled;
+                self.persist_settings();
+                Task::none()
+            }
+            SettingsMessage::ProxyUrlChanged(url) => {
+                self.settings.proxy.url = url;
+                self.persist_settings();
+                Task::none()
+            }
+            SettingsMessage::ProxyUsernameChanged(username) => {
+                if username.is_empty() {
+                    self.settings.proxy.username = None;
+                } else {
+                    self.settings.proxy.username = Some(username);
+                }
+                self.persist_settings();
+                Task::none()
+            }
+            SettingsMessage::ProxyPasswordChanged(password) => {
+                if password.is_empty() {
+                    self.settings.proxy.password = None;
+                } else {
+                    self.settings.proxy.password = Some(password);
+                }
+                self.persist_settings();
+                Task::none()
+            }
         }
     }
 
@@ -213,6 +241,11 @@ impl SettingsScreen {
                 SettingsTab::Accounts,
                 icons::icon_user(16.0, self.icon_color(SettingsTab::Accounts), icon_theme)
             ),
+            self.nav_item(
+                "Network Proxy",
+                SettingsTab::NetworkProxy,
+                icons::icon_wifi(16.0, self.icon_color(SettingsTab::NetworkProxy), icon_theme)
+            ),
         ]
         .spacing(4)
         .padding([16, 8]);
@@ -269,6 +302,7 @@ impl SettingsScreen {
             SettingsTab::PowerMode => power_mode::view(&self.settings),
             SettingsTab::General => general::view(&self.settings),
             SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
+            SettingsTab::NetworkProxy => network_proxy::view(&self.settings),
         };
 
         let scrollable_content = scrollable(content)

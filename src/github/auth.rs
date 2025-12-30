@@ -3,6 +3,8 @@
 use keyring::Entry;
 use thiserror::Error;
 
+use crate::settings::AppSettings;
+
 use super::client::{GitHubClient, GitHubError};
 use super::types::UserInfo;
 
@@ -46,8 +48,18 @@ pub fn delete_token() -> Result<(), AuthError> {
 
 /// Full authentication flow: validate token, save to keyring, return user info.
 pub async fn authenticate(token: &str) -> Result<(GitHubClient, UserInfo), AuthError> {
-    // Validate and create client
-    let (client, user) = GitHubClient::validate_token(token).await?;
+    // Validate token format first
+    validate_token_format(token)?;
+
+    // Load proxy settings
+    let settings = AppSettings::load();
+    let proxy_settings = &settings.proxy;
+
+    // Create client with proxy settings
+    let client = GitHubClient::new_with_proxy(token, proxy_settings)?;
+
+    // Fetch user info
+    let user = client.get_authenticated_user().await?;
 
     // Save to secure storage
     save_token(token)?;

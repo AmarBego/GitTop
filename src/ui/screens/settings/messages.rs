@@ -6,6 +6,7 @@ pub enum SettingsTab {
     PowerMode,
     General,
     Accounts,
+    NetworkProxy,
 }
 
 #[derive(Debug, Clone)]
@@ -24,4 +25,8 @@ pub enum SettingsMessage {
     TokenInputChanged(String),
     SubmitToken,
     TokenValidated(Result<String, String>),
+    ToggleProxyEnabled(bool),
+    ProxyUrlChanged(String),
+    ProxyUsernameChanged(String),
+    ProxyPasswordChanged(String),
 }

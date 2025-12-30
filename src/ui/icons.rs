@@ -123,4 +123,5 @@ impl_icons! {
     fn icon_eye_off(icondata_lu::LuEyeOff, "👁‍🗨");
     fn icon_at(icondata_lu::LuAtSign, "@");
     fn icon_info(icondata_lu::LuInfo, "i");
+    fn icon_wifi(icondata_lu::LuWifi, "📶");
 }

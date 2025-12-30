@@ -1,7 +1,6 @@
 //! Application settings with persistence.
-//!
-//! Stores user preferences like icon theme, app theme, and account list.
-
+///
+/// Stores user preferences like icon theme, app theme, and account list.
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -95,6 +94,17 @@ pub struct StoredAccount {
     pub is_active: bool,
 }
 
+/// Proxy settings
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProxySettings {
+    pub enabled: bool,
+    pub url: String,
+    #[serde(default)]
+    pub username: Option<String>,
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
 /// Application settings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -122,6 +132,8 @@ pub struct AppSettings {
     pub power_mode: bool,
     #[serde(default = "default_show_details_panel")]
     pub show_details_panel: bool,
+    #[serde(default)]
+    pub proxy: ProxySettings,
 }
 
 fn default_minimize_to_tray() -> bool {
@@ -168,6 +180,7 @@ impl Default for AppSettings {
             window_height: 640.0,
             power_mode: false,
             show_details_panel: true,
+            proxy: ProxySettings::default(),
         }
     }
 }

@@ -48,8 +48,12 @@ impl SessionManager {
         let token = keyring::load_token(username)?
             .ok_or_else(|| SessionError::AccountNotFound(username.to_string()))?;
 
-        // Validate the token using GitHubClient
-        let (client, user) = match GitHubClient::validate_token(&token).await {
+        // Load proxy settings
+        let settings = crate::settings::AppSettings::load();
+        let proxy_settings = &settings.proxy;
+        
+        // Validate the token using GitHubClient with proxy
+        let (client, user) = match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
             Ok((client, user)) => (client, user),
             Err(GitHubError::Unauthorized) => {
                 // Token expired, clean up

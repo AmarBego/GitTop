@@ -50,6 +50,14 @@ pub struct GitHubClient {
 impl GitHubClient {
     /// Creates a new GitHub client with the given Personal Access Token.
     pub fn new(token: impl Into<String>) -> Result<Self, GitHubError> {
+        Self::new_with_proxy(token, &crate::settings::AppSettings::load().proxy)
+    }
+
+    /// Creates a new GitHub client with the given Personal Access Token and proxy settings.
+    pub fn new_with_proxy(
+        token: impl Into<String>,
+        proxy_settings: &crate::settings::ProxySettings,
+    ) -> Result<Self, GitHubError> {
         let token = token.into();
 
         let mut headers = HeaderMap::new();
@@ -68,14 +76,30 @@ impl GitHubClient {
                 .map_err(|_| GitHubError::Unauthorized)?,
         );
 
-        // Configure for low memory usage in tray mode:
-        // - pool_idle_timeout: Connections released after 30s idle (default: 90s)
-        // - pool_max_idle_per_host: Only keep 1 idle connection (default: unlimited)
-        let client = reqwest::Client::builder()
+        let mut client_builder = reqwest::Client::builder()
             .default_headers(headers)
             .pool_idle_timeout(std::time::Duration::from_secs(30))
-            .pool_max_idle_per_host(1)
-            .build()?;
+            .pool_max_idle_per_host(1);
+
+        // Configure proxy if enabled
+        if proxy_settings.enabled && !proxy_settings.url.is_empty() {
+            let mut proxy_builder = reqwest::Proxy::all(&proxy_settings.url)
+                .map_err(|e| GitHubError::Request(format!("Invalid proxy URL: {}", e)))?;
+
+            if let Some(username) = &proxy_settings.username {
+                if !username.is_empty() {
+                    if let Some(password) = &proxy_settings.password {
+                        proxy_builder = proxy_builder.basic_auth(username, password);
+                    } else {
+                        proxy_builder = proxy_builder.basic_auth(username, "");
+                    }
+                }
+            }
+
+            client_builder = client_builder.proxy(proxy_builder);
+        }
+
+        let client = client_builder.build()?;
 
         Ok(Self { client, token })
     }
@@ -123,17 +147,30 @@ impl GitHubClient {
 
     /// Validates a token by creating a client and fetching user info.
     /// Returns the client and user info if valid.
+    #[allow(dead_code)]
     pub async fn validate_token(token: &str) -> Result<(Self, UserInfo), GitHubError> {
-        // Basic format validation
+        // Load proxy settings
+        let settings = crate::settings::AppSettings::load();
+        let proxy_settings = &settings.proxy;
+
+        Self::validate_token_with_proxy(token, proxy_settings).await
+    }
+
+    /// Validates a token by creating a client with proxy settings and fetching user info.
+    /// Returns the client and user info if valid.
+    pub async fn validate_token_with_proxy(
+        token: &str,
+        proxy_settings: &crate::settings::ProxySettings,
+    ) -> Result<(Self, UserInfo), GitHubError> {
         // Basic format validation
         if let Err(e) = super::auth::validate_token_format(token) {
             return Err(GitHubError::Api {
                 status: 400,
-                message: e.to_string(), // Unwrap the error string
+                message: e.to_string(),
             });
         }
 
-        let client = Self::new(token)?;
+        let client = Self::new_with_proxy(token, proxy_settings)?;
         let user = client.get_authenticated_user().await?;
         Ok((client, user))
     }
