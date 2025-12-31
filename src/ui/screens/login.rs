@@ -3,7 +3,7 @@
 use iced::widget::{Space, button, column, container, text, text_input, toggler};
 use iced::{Alignment, Element, Fill, Length, Task};
 
-use crate::github::{GitHubClient, UserInfo, auth};
+use crate::github::{GitHubClient, UserInfo, auth, proxy_keyring};
 use crate::settings::AppSettings;
 use crate::ui::theme;
 
@@ -39,6 +39,15 @@ impl LoginScreen {
         let settings = AppSettings::load();
         let proxy = &settings.proxy;
 
+        // Load credentials from keyring if they exist
+        let (proxy_username, proxy_password) = if proxy.has_credentials
+            && let Ok(Some((user, pass))) = proxy_keyring::load_proxy_credentials(&proxy.url)
+        {
+            (user, pass)
+        } else {
+            (String::new(), String::new())
+        };
+
         Self {
             token_input: String::new(),
             is_loading: false,
@@ -46,9 +55,22 @@ impl LoginScreen {
             showing_proxy_settings: false,
             proxy_enabled: proxy.enabled,
             proxy_url: proxy.url.clone(),
-            proxy_username: proxy.username.clone().unwrap_or_default(),
-            proxy_password: proxy.password.clone().unwrap_or_default(),
+            proxy_username,
+            proxy_password,
         }
+    }
+
+    /// Build ProxySettings from current UI state
+    fn build_proxy_settings(&self) -> AppSettings {
+        let mut settings = AppSettings::load();
+        settings.proxy.enabled = self.proxy_enabled;
+        settings.proxy.url = self.proxy_url.clone();
+
+        // Determine if we have credentials to store
+        settings.proxy.has_credentials =
+            !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
+
+        settings
     }
 
     pub fn update(&mut self, message: LoginMessage) -> Task<LoginMessage> {
@@ -69,7 +91,10 @@ impl LoginScreen {
                     return Task::none();
                 }
 
-                // Save proxy settings before login
+                // Build proxy settings from current state
+                let proxy_settings = self.build_proxy_settings();
+
+                // Save proxy settings to disk and credentials to keyring
                 self.save_proxy_settings();
 
                 self.is_loading = true;
@@ -77,7 +102,7 @@ impl LoginScreen {
 
                 let token = self.token_input.clone();
                 Task::perform(
-                    async move { auth::authenticate(&token).await },
+                    async move { auth::authenticate(&token, Some(&proxy_settings.proxy)).await },
                     |result| match result {
                         Ok((client, user)) => LoginMessage::LoginSuccess(client, user),
                         Err(e) => LoginMessage::LoginFailed(e.to_string()),
@@ -140,19 +165,22 @@ impl LoginScreen {
     }
 
     fn save_proxy_settings(&self) {
-        let mut settings = AppSettings::load();
-        settings.proxy.enabled = self.proxy_enabled;
-        settings.proxy.url = self.proxy_url.clone();
-        settings.proxy.username = if self.proxy_username.is_empty() {
-            None
+        let settings = self.build_proxy_settings();
+
+        // Save or delete credentials from keyring based on whether they're empty
+        if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
+            // Delete credentials if both are empty
+            let _ = proxy_keyring::delete_proxy_credentials(&self.proxy_url);
         } else {
-            Some(self.proxy_username.clone())
-        };
-        settings.proxy.password = if self.proxy_password.is_empty() {
-            None
-        } else {
-            Some(self.proxy_password.clone())
-        };
+            // Save credentials if at least one is not empty
+            let _ = proxy_keyring::save_proxy_credentials(
+                &self.proxy_url,
+                &self.proxy_username,
+                &self.proxy_password,
+            );
+        }
+
+        // Save settings to disk
         let _ = settings.save();
     }
 
@@ -273,7 +301,6 @@ impl LoginScreen {
         let subtitle = text("Configure proxy settings for GitHub API requests")
             .size(13)
             .style(theme::secondary_text);
-
 
         let proxy_switch = toggler(self.proxy_enabled)
             .on_toggle(LoginMessage::ProxyEnabledChanged)

@@ -3,12 +3,12 @@
 use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Element, Fill, Length, Task};
 
-use crate::github::{GitHubClient, keyring};
+use crate::github::{GitHubClient, keyring, proxy_keyring};
 use crate::settings::{AppSettings, IconTheme};
 use crate::ui::{icons, theme};
 
 use super::messages::{SettingsMessage, SettingsTab};
-use super::tabs::{accounts, general, power_mode, network_proxy};
+use super::tabs::{accounts, general, network_proxy, power_mode};
 
 /// Settings screen state.
 #[derive(Debug, Clone)]
@@ -16,14 +16,29 @@ pub struct SettingsScreen {
     pub settings: AppSettings,
     pub selected_tab: SettingsTab,
     pub accounts_state: accounts::AccountsTabState,
+    // Temporary state for proxy credentials (not persisted to settings.json)
+    pub proxy_username: String,
+    pub proxy_password: String,
 }
 
 impl SettingsScreen {
     pub fn new(settings: AppSettings) -> Self {
+        // Load proxy credentials from keyring if they exist
+        let (proxy_username, proxy_password) = if settings.proxy.has_credentials
+            && let Ok(Some((user, pass))) =
+                proxy_keyring::load_proxy_credentials(&settings.proxy.url)
+        {
+            (user, pass)
+        } else {
+            (String::new(), String::new())
+        };
+
         Self {
             settings,
             selected_tab: SettingsTab::default(),
             accounts_state: accounts::AccountsTabState::default(),
+            proxy_username,
+            proxy_password,
         }
     }
 
@@ -147,21 +162,13 @@ impl SettingsScreen {
                 Task::none()
             }
             SettingsMessage::ProxyUsernameChanged(username) => {
-                if username.is_empty() {
-                    self.settings.proxy.username = None;
-                } else {
-                    self.settings.proxy.username = Some(username);
-                }
-                self.persist_settings();
+                self.proxy_username = username;
+                self.update_proxy_credentials();
                 Task::none()
             }
             SettingsMessage::ProxyPasswordChanged(password) => {
-                if password.is_empty() {
-                    self.settings.proxy.password = None;
-                } else {
-                    self.settings.proxy.password = Some(password);
-                }
-                self.persist_settings();
+                self.proxy_password = password;
+                self.update_proxy_credentials();
                 Task::none()
             }
         }
@@ -302,7 +309,7 @@ impl SettingsScreen {
             SettingsTab::PowerMode => power_mode::view(&self.settings),
             SettingsTab::General => general::view(&self.settings),
             SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
-            SettingsTab::NetworkProxy => network_proxy::view(&self.settings),
+            SettingsTab::NetworkProxy => network_proxy::view(self),
         };
 
         let scrollable_content = scrollable(content)
@@ -323,5 +330,26 @@ impl SettingsScreen {
     fn persist_settings(&mut self) {
         let _ = self.settings.save();
         crate::platform::trim_memory();
+    }
+
+    fn update_proxy_credentials(&mut self) {
+        // Update has_credentials flag
+        self.settings.proxy.has_credentials =
+            !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
+
+        // Save or delete credentials from keyring based on whether they're empty
+        if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
+            // Delete credentials if both are empty
+            let _ = proxy_keyring::delete_proxy_credentials(&self.settings.proxy.url);
+        } else {
+            // Save credentials if at least one is not empty
+            let username = self.proxy_username.as_str();
+            let password = self.proxy_password.as_str();
+            let _ =
+                proxy_keyring::save_proxy_credentials(&self.settings.proxy.url, username, password);
+        }
+
+        // Persist settings
+        self.persist_settings();
     }
 }

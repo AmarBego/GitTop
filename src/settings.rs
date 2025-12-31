@@ -1,6 +1,7 @@
 //! Application settings with persistence.
-///
-/// Stores user preferences like icon theme, app theme, and account list.
+//!
+//! Stores user preferences like icon theme, app theme, and account list.
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -94,15 +95,14 @@ pub struct StoredAccount {
     pub is_active: bool,
 }
 
-/// Proxy settings
+/// Proxy settings (credentials stored securely in keyring)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProxySettings {
     pub enabled: bool,
     pub url: String,
+    /// Flag indicating if credentials are stored in keyring
     #[serde(default)]
-    pub username: Option<String>,
-    #[serde(default)]
-    pub password: Option<String>,
+    pub has_credentials: bool,
 }
 
 /// Application settings.

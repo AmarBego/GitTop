@@ -3,8 +3,6 @@
 use keyring::Entry;
 use thiserror::Error;
 
-use crate::settings::AppSettings;
-
 use super::client::{GitHubClient, GitHubError};
 use super::types::UserInfo;
 
@@ -47,16 +45,35 @@ pub fn delete_token() -> Result<(), AuthError> {
 }
 
 /// Full authentication flow: validate token, save to keyring, return user info.
-pub async fn authenticate(token: &str) -> Result<(GitHubClient, UserInfo), AuthError> {
+pub async fn authenticate(
+    token: &str,
+    proxy_settings: Option<&crate::settings::ProxySettings>,
+) -> Result<(GitHubClient, UserInfo), AuthError> {
     // Validate token format first
     validate_token_format(token)?;
 
-    // Load proxy settings
-    let settings = AppSettings::load();
-    let proxy_settings = &settings.proxy;
+    // Load proxy settings from AppSettings if not provided
+    let proxy_settings: crate::settings::ProxySettings = match proxy_settings {
+        Some(settings) => settings.clone(),
+        None => {
+            let app_settings = crate::settings::AppSettings::load();
+            app_settings.proxy
+        }
+    };
 
-    // Create client with proxy settings
-    let client = GitHubClient::new_with_proxy(token, proxy_settings)?;
+    // Load proxy credentials from keyring if settings indicate they exist
+    let (username, password) = if proxy_settings.has_credentials {
+        super::proxy_keyring::load_proxy_credentials(&proxy_settings.url)
+            .map_err(|e| AuthError::Keyring(e.to_string()))?
+            .map(|(u, p)| (Some(u), Some(p)))
+            .unwrap_or((None, None))
+    } else {
+        (None, None)
+    };
+
+    // Create client with proxy settings and credentials
+    let client =
+        GitHubClient::new_with_proxy_and_credentials(token, &proxy_settings, username, password)?;
 
     // Fetch user info
     let user = client.get_authenticated_user().await?;

@@ -54,9 +54,31 @@ impl GitHubClient {
     }
 
     /// Creates a new GitHub client with the given Personal Access Token and proxy settings.
+    /// Loads credentials from keyring if indicated by settings.
     pub fn new_with_proxy(
         token: impl Into<String>,
         proxy_settings: &crate::settings::ProxySettings,
+    ) -> Result<Self, GitHubError> {
+        let (username, password) = if proxy_settings.has_credentials {
+            crate::github::proxy_keyring::load_proxy_credentials(&proxy_settings.url)
+                .map_err(|e| {
+                    GitHubError::Request(format!("Failed to load proxy credentials: {}", e))
+                })?
+                .map(|(u, p)| (Some(u), Some(p)))
+                .unwrap_or((None, None))
+        } else {
+            (None, None)
+        };
+
+        Self::new_with_proxy_and_credentials(token, proxy_settings, username, password)
+    }
+
+    /// Creates a new GitHub client with explicit proxy credentials.
+    pub fn new_with_proxy_and_credentials(
+        token: impl Into<String>,
+        proxy_settings: &crate::settings::ProxySettings,
+        username: Option<String>,
+        password: Option<String>,
     ) -> Result<Self, GitHubError> {
         let token = token.into();
 
@@ -86,13 +108,10 @@ impl GitHubClient {
             let mut proxy_builder = reqwest::Proxy::all(&proxy_settings.url)
                 .map_err(|e| GitHubError::Request(format!("Invalid proxy URL: {}", e)))?;
 
-            if let Some(username) = &proxy_settings.username {
-                if !username.is_empty() {
-                    if let Some(password) = &proxy_settings.password {
-                        proxy_builder = proxy_builder.basic_auth(username, password);
-                    } else {
-                        proxy_builder = proxy_builder.basic_auth(username, "");
-                    }
+            if let Some(user) = username {
+                if !user.is_empty() {
+                    let pass = password.as_deref().unwrap_or("");
+                    proxy_builder = proxy_builder.basic_auth(&user, pass);
                 }
             }
 

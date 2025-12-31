@@ -1,6 +1,6 @@
 //! Network proxy settings tab.
 
-use iced::widget::{column, row, text, text_input, toggler, Space};
+use iced::widget::{Space, column, row, text, text_input, toggler};
 use iced::{Alignment, Element, Fill};
 
 use crate::settings::AppSettings;
@@ -8,9 +8,10 @@ use crate::ui::{icons, theme};
 
 use super::super::components::{setting_card, tab_title};
 use super::super::messages::SettingsMessage;
+use super::super::screen::SettingsScreen;
 
 /// View for network proxy settings
-pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
 
     column![
@@ -19,11 +20,11 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        view_proxy_enabled(settings),
+        view_proxy_enabled(&screen.settings),
         Space::new().height(8),
-        view_proxy_url(settings),
+        view_proxy_url(&screen.settings),
         Space::new().height(8),
-        view_proxy_auth(settings),
+        view_proxy_auth(screen),
     ]
     .spacing(4)
     .padding(24)
@@ -65,13 +66,6 @@ fn view_proxy_url(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         row![
             text("Proxy URL").size(14).color(p.text_primary),
             Space::new().width(Fill),
-            if settings.proxy.enabled {
-                text("http://proxy.company.com:8080")
-                    .size(11)
-                    .color(p.text_muted)
-            } else {
-                text("Disabled").size(11).color(p.text_muted)
-            },
         ]
         .align_y(Alignment::Center),
         Space::new().height(12),
@@ -85,10 +79,10 @@ fn view_proxy_url(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 }
 
 /// Proxy authentication card (username and password)
-fn view_proxy_auth(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_proxy_auth(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
 
-    let has_auth = settings.proxy.username.is_some() || settings.proxy.password.is_some();
+    let has_auth = screen.settings.proxy.has_credentials;
 
     setting_card(
         column![
@@ -106,22 +100,22 @@ fn view_proxy_auth(settings: &AppSettings) -> Element<'_, SettingsMessage> {
                 ]
                 .width(Fill),
                 if has_auth {
-                    icons::icon_check(16.0, p.accent_success, settings.icon_theme)
+                    icons::icon_check(16.0, p.accent_success, screen.settings.icon_theme)
                 } else {
-                    icons::icon_at(16.0, p.text_muted, settings.icon_theme)
+                    icons::icon_at(16.0, p.text_muted, screen.settings.icon_theme)
                 },
             ]
             .align_y(Alignment::Center),
             Space::new().height(16),
             row![
-                text_input("Username", settings.proxy.username.as_deref().unwrap_or(""))
+                text_input("Username", &screen.proxy_username)
                     .on_input(SettingsMessage::ProxyUsernameChanged)
                     .padding([8, 12])
                     .size(13)
                     .width(Fill)
                     .style(theme::text_input_style),
                 Space::new().width(8),
-                text_input("Password", settings.proxy.password.as_deref().unwrap_or(""))
+                text_input("Password", &screen.proxy_password)
                     .secure(true)
                     .on_input(SettingsMessage::ProxyPasswordChanged)
                     .padding([8, 12])
