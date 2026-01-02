@@ -60,7 +60,7 @@ pub enum Screen {
     /// Main notifications screen.
     Notifications(Box<NotificationsScreen>),
     /// Settings screen.
-    Settings(SettingsScreen),
+    Settings(Box<SettingsScreen>),
     /// Rule Engine screen.
     RuleEngine(Box<RuleEngineScreen>, RuleEngineOrigin),
 }
@@ -103,8 +103,8 @@ pub enum RuleEngineOrigin {
 #[derive(Debug, Clone)]
 pub enum Message {
     // -- Lifecycle --
-    /// Restore result (returns SessionManager with restored accounts).
-    RestoreComplete(SessionManager),
+    /// Restore result (SessionManager + optional network error message).
+    RestoreComplete(SessionManager, Option<String>),
     /// Session restored (for account addition).
     SessionRestored(Result<crate::github::session::Session, String>),
 
@@ -144,18 +144,34 @@ impl App {
             App::Loading,
             Task::perform(
                 async {
+                    use crate::github::session::SessionError;
+
                     let mut sessions = SessionManager::new();
                     let mut settings = AppSettings::load();
                     let mut failed_accounts = Vec::new();
+                    let mut network_error: Option<String> = None;
 
-                    // Restore all accounts, track failures
+                    // Restore all accounts, track failures by type
                     for account in &settings.accounts {
-                        if sessions.restore_account(&account.username).await.is_err() {
-                            failed_accounts.push(account.username.clone());
+                        match sessions.restore_account(&account.username).await {
+                            Ok(()) => {}
+                            Err(SessionError::AccountNotFound(_)) => {
+                                // Token invalid/expired - remove account
+                                failed_accounts.push(account.username.clone());
+                            }
+                            Err(SessionError::NetworkError(msg)) => {
+                                // Network/proxy error - keep account, track error
+                                network_error = Some(msg);
+                            }
+                            Err(e) => {
+                                // Other errors (keyring, etc) - treat as auth failure
+                                eprintln!("Failed to restore {}: {}", account.username, e);
+                                failed_accounts.push(account.username.clone());
+                            }
                         }
                     }
 
-                    // Remove corrupted/failed accounts from settings
+                    // Remove only truly failed accounts (not network errors)
                     if !failed_accounts.is_empty() {
                         for username in failed_accounts {
                             settings.remove_account(&username);
@@ -175,9 +191,9 @@ impl App {
                         sessions.set_primary(&username);
                     }
 
-                    sessions
+                    (sessions, network_error)
                 },
-                Message::RestoreComplete,
+                |(sessions, network_error)| Message::RestoreComplete(sessions, network_error),
             ),
         )
     }
@@ -209,27 +225,45 @@ impl App {
     // ========================================================================
 
     fn update_loading(&mut self, message: Message) -> Task<Message> {
-        if let Message::RestoreComplete(sessions) = message {
+        if let Message::RestoreComplete(sessions, network_error) = message {
+            // Case 1: We have a session - show notifications
             if let Some(session) = sessions.primary() {
                 let mut settings = AppSettings::load();
                 settings.set_active_account(&session.username);
                 settings.save_silent();
                 settings.apply_theme();
 
-                let (notif_screen, task) =
+                let (mut notif_screen, task) =
                     NotificationsScreen::new(session.client.clone(), session.user.clone());
+
+                // If there was a network error for other accounts, display it
+                if let Some(error) = network_error {
+                    notif_screen.error_message = Some(format!("Network error: {}", error));
+                }
+
                 let ctx = AppContext::new(settings, sessions);
                 *self = App::Authenticated(
                     Box::new(Screen::Notifications(Box::new(notif_screen))),
                     ctx,
                 );
                 return task.map(Message::Notifications);
-            } else {
-                let settings = AppSettings::load();
-                settings.apply_theme();
-                *self = App::Login(LoginScreen::new());
-                crate::platform::trim_memory();
             }
+
+            // Case 2: No sessions restored
+            let settings = AppSettings::load();
+            settings.apply_theme();
+
+            // Show login screen, but with error if network failed
+            let mut login_screen = LoginScreen::new();
+            if let Some(error) = network_error {
+                login_screen.error_message = Some(format!(
+                    "Network error: {}. Your accounts are preserved - fix connection and restart.",
+                    error
+                ));
+            }
+
+            *self = App::Login(login_screen);
+            crate::platform::trim_memory();
         }
         Task::none()
     }
@@ -507,7 +541,7 @@ impl App {
                 RuleEngineOrigin::Settings => {
                     let settings_screen = SettingsScreen::new(settings.clone());
                     *self = App::Authenticated(
-                        Box::new(Screen::Settings(settings_screen)),
+                        Box::new(Screen::Settings(Box::new(settings_screen))),
                         ctx.with_settings(settings),
                     );
                 }
@@ -564,7 +598,7 @@ impl App {
                     open_task
                 } else {
                     window_state::get_window_id()
-                        .map(|id| window::gain_focus(id))
+                        .map(window::gain_focus)
                         .unwrap_or_else(Task::none)
                 };
 
@@ -689,14 +723,36 @@ impl App {
 
     /// Navigate to the notifications screen.
     fn go_to_notifications(&mut self) -> Task<Message> {
-        let settings = self
-            .current_settings()
-            .cloned()
-            .unwrap_or_else(AppSettings::load);
-
-        let App::Authenticated(_, ctx) = self else {
+        let App::Authenticated(boxed_screen, ctx) = self else {
             return Task::none();
         };
+
+        let settings = match &**boxed_screen {
+            Screen::Settings(s) => s.settings.clone(),
+            _ => ctx.settings.clone(),
+        };
+
+        // Check if proxy settings changed and rebuild clients if needed
+        let proxy_changed = settings.proxy.enabled != ctx.settings.proxy.enabled
+            || settings.proxy.url != ctx.settings.proxy.url
+            || settings.proxy.has_credentials != ctx.settings.proxy.has_credentials;
+
+        let needs_rebuild = if let Screen::Settings(s) = &**boxed_screen {
+            s.proxy_needs_rebuild
+        } else {
+            false
+        };
+
+        if proxy_changed || needs_rebuild {
+            eprintln!(
+                "[PROXY] Rebuilding clients (settings_changed: {}, needs_rebuild: {})",
+                proxy_changed, needs_rebuild
+            );
+
+            if let Err(e) = ctx.sessions.rebuild_clients_with_proxy(&settings.proxy) {
+                eprintln!("[PROXY] Failed to rebuild clients: {}", e);
+            }
+        }
 
         let Some(session) = ctx.sessions.primary() else {
             return Task::none();
@@ -720,7 +776,7 @@ impl App {
         let settings = ctx.settings.clone();
         let settings_screen = SettingsScreen::new(settings.clone());
         *self = App::Authenticated(
-            Box::new(Screen::Settings(settings_screen)),
+            Box::new(Screen::Settings(Box::new(settings_screen))),
             ctx.with_settings(settings),
         );
         Task::none()

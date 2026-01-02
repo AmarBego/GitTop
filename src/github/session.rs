@@ -20,6 +20,9 @@ pub enum SessionError {
 
     #[error("Account not found: {0}")]
     AccountNotFound(String),
+
+    #[error("Network error: {0}")]
+    NetworkError(String),
 }
 
 /// An authenticated session for a single account.
@@ -48,16 +51,40 @@ impl SessionManager {
         let token = keyring::load_token(username)?
             .ok_or_else(|| SessionError::AccountNotFound(username.to_string()))?;
 
-        // Validate the token using GitHubClient
-        let (client, user) = match GitHubClient::validate_token(&token).await {
-            Ok((client, user)) => (client, user),
-            Err(GitHubError::Unauthorized) => {
-                // Token expired, clean up
-                let _ = keyring::delete_token(username);
-                return Err(SessionError::AccountNotFound(username.to_string()));
-            }
-            Err(e) => return Err(SessionError::GitHub(e)),
-        };
+        // Load proxy settings
+        let settings = crate::settings::AppSettings::load();
+        let proxy_settings = &settings.proxy;
+
+        // Validate the token using GitHubClient with proxy
+        let (client, user) =
+            match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
+                Ok((client, user)) => (client, user),
+                Err(GitHubError::Unauthorized) => {
+                    // Token expired/revoked from GitHub (401), clean up
+                    let _ = keyring::delete_token(username);
+                    return Err(SessionError::AccountNotFound(username.to_string()));
+                }
+                Err(GitHubError::Request(msg)) => {
+                    // Connection/network error - keep account, report network issue
+                    return Err(SessionError::NetworkError(msg));
+                }
+                Err(GitHubError::Api { status, message }) => {
+                    // API error that's NOT from GitHub auth:
+                    // - 407 = Proxy authentication required
+                    // - Other statuses could be proxy/network issues
+                    // Don't delete token for these
+                    return Err(SessionError::NetworkError(format!(
+                        "API error (status {}): {}",
+                        status, message
+                    )));
+                }
+                Err(GitHubError::RateLimited) => {
+                    // Rate limited - definitely keep account, just can't fetch now
+                    return Err(SessionError::NetworkError(
+                        "GitHub rate limit exceeded".to_string(),
+                    ));
+                }
+            };
 
         // Create session
         let session = Session {
@@ -130,6 +157,32 @@ impl SessionManager {
     #[allow(dead_code)]
     pub fn get(&self, username: &str) -> Option<&Session> {
         self.sessions.get(username)
+    }
+
+    /// Rebuild all clients with updated proxy settings.
+    /// Call this after proxy settings have changed to apply them to existing sessions.
+    pub fn rebuild_clients_with_proxy(
+        &mut self,
+        proxy_settings: &crate::settings::ProxySettings,
+    ) -> Result<(), GitHubError> {
+        for session in self.sessions.values_mut() {
+            // Load token from keyring for this user
+            let token = match super::keyring::load_token(&session.username) {
+                Ok(Some(t)) => t,
+                Ok(None) => continue, // Skip if no token found
+                Err(_) => continue,   // Skip on keyring error
+            };
+
+            // Rebuild client with new proxy settings
+            let new_client = GitHubClient::new_with_proxy(&token, proxy_settings)?;
+            session.client = new_client;
+
+            eprintln!(
+                "[PROXY] Rebuilt client for user '{}' with proxy enabled={}",
+                session.username, proxy_settings.enabled
+            );
+        }
+        Ok(())
     }
 
     /// Number of active sessions.
