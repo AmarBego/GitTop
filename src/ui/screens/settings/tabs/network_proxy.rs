@@ -3,7 +3,6 @@
 use iced::widget::{Space, button, column, container, row, text, text_input, toggler};
 use iced::{Alignment, Element, Fill, Length};
 
-use crate::settings::AppSettings;
 use crate::ui::{icons, theme};
 
 use super::super::components::{setting_card, tab_title};
@@ -20,7 +19,7 @@ pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        view_proxy_enabled(&screen.settings),
+        view_proxy_enabled(screen),
         Space::new().height(8),
         view_proxy_configuration(screen),
     ]
@@ -31,9 +30,9 @@ pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
 }
 
 /// Proxy enabled toggle card
-fn view_proxy_enabled(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_proxy_enabled(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
-    let enabled = settings.proxy.enabled;
+    let enabled = screen.proxy_enabled;
     let desc = if enabled {
         "Proxy will be used for all GitHub API requests"
     } else {

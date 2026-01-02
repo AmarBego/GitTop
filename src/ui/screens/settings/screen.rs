@@ -16,7 +16,8 @@ pub struct SettingsScreen {
     pub settings: AppSettings,
     pub selected_tab: SettingsTab,
     pub accounts_state: accounts::AccountsTabState,
-    // Temporary state for proxy settings
+    // Temporary state for proxy settings (synced to settings on Save)
+    pub proxy_enabled: bool,
     pub proxy_url: String,
     pub proxy_username: String,
     pub proxy_password: String,
@@ -24,7 +25,8 @@ pub struct SettingsScreen {
 
 impl SettingsScreen {
     pub fn new(settings: AppSettings) -> Self {
-        // Load proxy URL from settings
+        // Load proxy state from settings
+        let proxy_enabled = settings.proxy.enabled;
         let proxy_url = settings.proxy.url.clone();
 
         // Load proxy credentials from keyring if they exist
@@ -41,6 +43,7 @@ impl SettingsScreen {
             settings,
             selected_tab: SettingsTab::default(),
             accounts_state: accounts::AccountsTabState::default(),
+            proxy_enabled,
             proxy_url,
             proxy_username,
             proxy_password,
@@ -157,8 +160,7 @@ impl SettingsScreen {
                 Task::none()
             }
             SettingsMessage::ToggleProxyEnabled(enabled) => {
-                self.settings.proxy.enabled = enabled;
-                self.persist_settings();
+                self.proxy_enabled = enabled;
                 Task::none()
             }
             SettingsMessage::ProxyUrlChanged(url) => {
@@ -340,19 +342,21 @@ impl SettingsScreen {
 
     /// Check if proxy settings have unsaved changes
     pub fn has_unsaved_proxy_changes(&self) -> bool {
+        let enabled_changed = self.proxy_enabled != self.settings.proxy.enabled;
         let url_changed = self.proxy_url != self.settings.proxy.url;
         let old_has_creds = self.settings.proxy.has_credentials;
         let new_has_creds = !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
         let creds_changed = old_has_creds != new_has_creds;
 
-        url_changed || creds_changed
+        enabled_changed || url_changed || creds_changed
     }
 
     fn update_proxy_credentials(&mut self) {
         let old_url = self.settings.proxy.url.clone();
         let new_url = self.proxy_url.clone();
 
-        // Update proxy URL
+        // Sync all proxy settings from temp fields
+        self.settings.proxy.enabled = self.proxy_enabled;
         self.settings.proxy.url = new_url.clone();
 
         // Update has_credentials flag
@@ -361,23 +365,30 @@ impl SettingsScreen {
 
         // Case 1: URL changed - handle both old and new URLs
         if old_url != new_url {
+            eprintln!(
+                "[PROXY] URL changed: '{}' -> '{}' (enabled: {})",
+                old_url, new_url, self.proxy_enabled
+            );
+
             // Delete credentials for old URL to prevent orphaned data
             if !old_url.is_empty() {
+                eprintln!("[PROXY] Deleting credentials for old proxy URL");
                 let _ = proxy_keyring::delete_proxy_credentials(&old_url);
             }
 
             // Save credentials for new URL if provided
             if !self.proxy_username.is_empty() && !self.proxy_password.is_empty() {
+                eprintln!("[PROXY] Saving credentials for new proxy URL");
                 let username = self.proxy_username.as_str();
                 let password = self.proxy_password.as_str();
-                let _ =
-                    proxy_keyring::save_proxy_credentials(&new_url, username, password);
+                let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
             }
         }
         // Case 2: URL unchanged - only handle credential changes
         else {
             if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
                 // User cleared credentials - delete them
+                eprintln!("[PROXY] Credentials cleared, deleting from keyring");
                 let _ = proxy_keyring::delete_proxy_credentials(&old_url);
             } else {
                 // Check if credentials actually changed
@@ -391,13 +402,22 @@ impl SettingsScreen {
                 };
 
                 if should_save {
+                    eprintln!("[PROXY] Credentials changed, saving to keyring");
                     let username = self.proxy_username.as_str();
                     let password = self.proxy_password.as_str();
-                    let _ =
-                        proxy_keyring::save_proxy_credentials(&new_url, username, password);
+                    let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+                } else {
+                    eprintln!("[PROXY] Credentials unchanged, skipping keyring write");
                 }
             }
         }
+
+        eprintln!(
+            "[PROXY] Settings saved: enabled={}, url='{}', has_credentials={}",
+            self.settings.proxy.enabled,
+            self.settings.proxy.url,
+            self.settings.proxy.has_credentials
+        );
 
         // Persist settings
         self.persist_settings();

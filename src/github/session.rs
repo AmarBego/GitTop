@@ -51,17 +51,18 @@ impl SessionManager {
         // Load proxy settings
         let settings = crate::settings::AppSettings::load();
         let proxy_settings = &settings.proxy;
-        
+
         // Validate the token using GitHubClient with proxy
-        let (client, user) = match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
-            Ok((client, user)) => (client, user),
-            Err(GitHubError::Unauthorized) => {
-                // Token expired, clean up
-                let _ = keyring::delete_token(username);
-                return Err(SessionError::AccountNotFound(username.to_string()));
-            }
-            Err(e) => return Err(SessionError::GitHub(e)),
-        };
+        let (client, user) =
+            match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
+                Ok((client, user)) => (client, user),
+                Err(GitHubError::Unauthorized) => {
+                    // Token expired, clean up
+                    let _ = keyring::delete_token(username);
+                    return Err(SessionError::AccountNotFound(username.to_string()));
+                }
+                Err(e) => return Err(SessionError::GitHub(e)),
+            };
 
         // Create session
         let session = Session {
@@ -134,6 +135,32 @@ impl SessionManager {
     #[allow(dead_code)]
     pub fn get(&self, username: &str) -> Option<&Session> {
         self.sessions.get(username)
+    }
+
+    /// Rebuild all clients with updated proxy settings.
+    /// Call this after proxy settings have changed to apply them to existing sessions.
+    pub fn rebuild_clients_with_proxy(
+        &mut self,
+        proxy_settings: &crate::settings::ProxySettings,
+    ) -> Result<(), GitHubError> {
+        for session in self.sessions.values_mut() {
+            // Load token from keyring for this user
+            let token = match super::keyring::load_token(&session.username) {
+                Ok(Some(t)) => t,
+                Ok(None) => continue, // Skip if no token found
+                Err(_) => continue,   // Skip on keyring error
+            };
+
+            // Rebuild client with new proxy settings
+            let new_client = GitHubClient::new_with_proxy(&token, proxy_settings)?;
+            session.client = new_client;
+
+            eprintln!(
+                "[PROXY] Rebuilt client for user '{}' with proxy enabled={}",
+                session.username, proxy_settings.enabled
+            );
+        }
+        Ok(())
     }
 
     /// Number of active sessions.

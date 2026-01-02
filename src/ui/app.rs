@@ -689,14 +689,30 @@ impl App {
 
     /// Navigate to the notifications screen.
     fn go_to_notifications(&mut self) -> Task<Message> {
-        let settings = self
-            .current_settings()
-            .cloned()
-            .unwrap_or_else(AppSettings::load);
-
-        let App::Authenticated(_, ctx) = self else {
+        let App::Authenticated(boxed_screen, ctx) = self else {
             return Task::none();
         };
+
+        let settings = match &**boxed_screen {
+            Screen::Settings(s) => s.settings.clone(),
+            _ => ctx.settings.clone(),
+        };
+
+        // Check if proxy settings changed and rebuild clients if needed
+        let proxy_changed = settings.proxy.enabled != ctx.settings.proxy.enabled
+            || settings.proxy.url != ctx.settings.proxy.url
+            || settings.proxy.has_credentials != ctx.settings.proxy.has_credentials;
+
+        if proxy_changed {
+            eprintln!(
+                "[PROXY] Proxy settings changed, rebuilding clients (enabled: {} -> {})",
+                ctx.settings.proxy.enabled, settings.proxy.enabled
+            );
+
+            if let Err(e) = ctx.sessions.rebuild_clients_with_proxy(&settings.proxy) {
+                eprintln!("[PROXY] Failed to rebuild clients: {}", e);
+            }
+        }
 
         let Some(session) = ctx.sessions.primary() else {
             return Task::none();
