@@ -3,12 +3,12 @@
 use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Element, Fill, Length, Task};
 
-use crate::github::{GitHubClient, keyring};
+use crate::github::{GitHubClient, keyring, proxy_keyring};
 use crate::settings::{AppSettings, IconTheme};
 use crate::ui::{icons, theme};
 
 use super::messages::{SettingsMessage, SettingsTab};
-use super::tabs::{accounts, general, power_mode};
+use super::tabs::{accounts, general, network_proxy, power_mode};
 
 /// Settings screen state.
 #[derive(Debug, Clone)]
@@ -16,14 +16,40 @@ pub struct SettingsScreen {
     pub settings: AppSettings,
     pub selected_tab: SettingsTab,
     pub accounts_state: accounts::AccountsTabState,
+    pub proxy_enabled: bool,
+    pub proxy_url: String,
+    pub proxy_username: String,
+    pub proxy_password: String,
+    pub proxy_creds_dirty: bool,
+    pub proxy_needs_rebuild: bool,
 }
 
 impl SettingsScreen {
     pub fn new(settings: AppSettings) -> Self {
+        // Load proxy state from settings
+        let proxy_enabled = settings.proxy.enabled;
+        let proxy_url = settings.proxy.url.clone();
+
+        // Load proxy credentials from keyring if they exist
+        let (proxy_username, proxy_password) = if settings.proxy.has_credentials
+            && let Ok(Some((user, pass))) =
+                proxy_keyring::load_proxy_credentials(&settings.proxy.url)
+        {
+            (user, pass)
+        } else {
+            (String::new(), String::new())
+        };
+
         Self {
             settings,
             selected_tab: SettingsTab::default(),
             accounts_state: accounts::AccountsTabState::default(),
+            proxy_enabled,
+            proxy_url,
+            proxy_username,
+            proxy_password,
+            proxy_creds_dirty: false,
+            proxy_needs_rebuild: false,
         }
     }
 
@@ -136,6 +162,28 @@ impl SettingsScreen {
                 }
                 Task::none()
             }
+            SettingsMessage::ToggleProxyEnabled(enabled) => {
+                self.proxy_enabled = enabled;
+                Task::none()
+            }
+            SettingsMessage::ProxyUrlChanged(url) => {
+                self.proxy_url = url;
+                Task::none()
+            }
+            SettingsMessage::ProxyUsernameChanged(username) => {
+                self.proxy_username = username;
+                self.proxy_creds_dirty = true;
+                Task::none()
+            }
+            SettingsMessage::ProxyPasswordChanged(password) => {
+                self.proxy_password = password;
+                self.proxy_creds_dirty = true;
+                Task::none()
+            }
+            SettingsMessage::SaveProxySettings => {
+                self.update_proxy_credentials();
+                Task::none()
+            }
         }
     }
 
@@ -213,6 +261,11 @@ impl SettingsScreen {
                 SettingsTab::Accounts,
                 icons::icon_user(16.0, self.icon_color(SettingsTab::Accounts), icon_theme)
             ),
+            self.nav_item(
+                "Network Proxy",
+                SettingsTab::NetworkProxy,
+                icons::icon_wifi(16.0, self.icon_color(SettingsTab::NetworkProxy), icon_theme)
+            ),
         ]
         .spacing(4)
         .padding([16, 8]);
@@ -269,6 +322,7 @@ impl SettingsScreen {
             SettingsTab::PowerMode => power_mode::view(&self.settings),
             SettingsTab::General => general::view(&self.settings),
             SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
+            SettingsTab::NetworkProxy => network_proxy::view(self),
         };
 
         let scrollable_content = scrollable(content)
@@ -289,5 +343,89 @@ impl SettingsScreen {
     fn persist_settings(&mut self) {
         let _ = self.settings.save();
         crate::platform::trim_memory();
+    }
+
+    /// Check if proxy settings have unsaved changes
+    pub fn has_unsaved_proxy_changes(&self) -> bool {
+        let enabled_changed = self.proxy_enabled != self.settings.proxy.enabled;
+        let url_changed = self.proxy_url != self.settings.proxy.url;
+        let new_has_creds = !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
+        let creds_status_changed = new_has_creds != self.settings.proxy.has_credentials;
+
+        enabled_changed || url_changed || creds_status_changed || self.proxy_creds_dirty
+    }
+
+    fn update_proxy_credentials(&mut self) {
+        let old_url = self.settings.proxy.url.clone();
+        let new_url = self.proxy_url.clone();
+
+        // Sync all proxy settings from temp fields
+        self.settings.proxy.enabled = self.proxy_enabled;
+        self.settings.proxy.url = new_url.clone();
+
+        // Update has_credentials flag
+        self.settings.proxy.has_credentials =
+            !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
+
+        // Case 1: URL changed - handle both old and new URLs
+        if old_url != new_url {
+            eprintln!(
+                "[PROXY] URL changed: '{}' -> '{}' (enabled: {})",
+                old_url, new_url, self.proxy_enabled
+            );
+
+            // Delete credentials for old URL to prevent orphaned data
+            if !old_url.is_empty() {
+                eprintln!("[PROXY] Deleting credentials for old proxy URL");
+                let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+            }
+
+            // Save credentials for new URL if provided
+            if !self.proxy_username.is_empty() && !self.proxy_password.is_empty() {
+                eprintln!("[PROXY] Saving credentials for new proxy URL");
+                let username = self.proxy_username.as_str();
+                let password = self.proxy_password.as_str();
+                let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            }
+        }
+        // Case 2: URL unchanged - only handle credential changes
+        else if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
+            eprintln!("[PROXY] Credentials cleared, deleting from keyring");
+            let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+        } else {
+            // Check if credentials actually changed
+            let should_save = if let Ok(Some((saved_username, saved_password))) =
+                proxy_keyring::load_proxy_credentials(&old_url)
+            {
+                saved_username != self.proxy_username || saved_password != self.proxy_password
+            } else {
+                // No existing credentials, so save the new ones
+                true
+            };
+
+            if should_save {
+                eprintln!("[PROXY] Credentials changed, saving to keyring");
+                let username = self.proxy_username.as_str();
+                let password = self.proxy_password.as_str();
+                let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            } else {
+                eprintln!("[PROXY] Credentials unchanged, skipping keyring write");
+            }
+        }
+
+        eprintln!(
+            "[PROXY] Settings saved: enabled={}, url='{}', has_credentials={}",
+            self.settings.proxy.enabled,
+            self.settings.proxy.url,
+            self.settings.proxy.has_credentials
+        );
+
+        // Signal that clients need rebuild when leaving settings
+        self.proxy_needs_rebuild = true;
+        // Reset dirty flag since we just saved
+        self.proxy_creds_dirty = false;
+
+        // Persist settings
+        self.persist_settings();
     }
 }
