@@ -132,3 +132,149 @@ pub fn run_app() -> iced::Result {
     #[cfg(target_os = "freebsd")]
     return freebsd::run_app();
 }
+
+/// On-boot/autostart functionality.
+///
+/// Allows the application to start automatically when the user logs in.
+///
+/// Platform support:
+/// - Linux: systemd user services (implemented), OpenRC (TODO)
+/// - Windows: Registry (TODO)
+/// - macOS: LaunchAgents (TODO)
+/// - FreeBSD: (TODO)
+pub mod on_boot {
+    use std::fmt;
+    use std::io;
+
+    /// Error type for on_boot operations.
+    #[derive(Debug)]
+    pub enum OnBootError {
+        /// The operation is not supported on this platform/init system.
+        NotSupported,
+        /// An I/O error occurred.
+        Io(io::Error),
+        /// A command failed to execute.
+        CommandFailed(String),
+    }
+
+    impl fmt::Display for OnBootError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                OnBootError::NotSupported => write!(f, "on-boot is not supported on this system"),
+                OnBootError::Io(e) => write!(f, "I/O error: {}", e),
+                OnBootError::CommandFailed(msg) => write!(f, "command failed: {}", msg),
+            }
+        }
+    }
+
+    impl std::error::Error for OnBootError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                OnBootError::Io(e) => Some(e),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<io::Error> for OnBootError {
+        fn from(e: io::Error) -> Self {
+            OnBootError::Io(e)
+        }
+    }
+
+    /// Check if autostart is currently enabled.
+    ///
+    /// Returns `true` if the application will start automatically on user login.
+    pub fn is_enabled() -> bool {
+        #[cfg(windows)]
+        return super::windows::on_boot::is_enabled();
+
+        #[cfg(target_os = "macos")]
+        return super::macos::on_boot::is_enabled();
+
+        #[cfg(target_os = "linux")]
+        return super::linux::on_boot::is_enabled();
+
+        #[cfg(target_os = "freebsd")]
+        return super::freebsd::on_boot::is_enabled();
+    }
+
+    /// Enable autostart.
+    ///
+    /// Configures the system to start the application automatically on user login.
+    pub fn enable() -> Result<(), OnBootError> {
+        #[cfg(windows)]
+        return super::windows::on_boot::enable().map_err(convert_error);
+
+        #[cfg(target_os = "macos")]
+        return super::macos::on_boot::enable().map_err(convert_error);
+
+        #[cfg(target_os = "linux")]
+        return super::linux::on_boot::enable().map_err(convert_error);
+
+        #[cfg(target_os = "freebsd")]
+        return super::freebsd::on_boot::enable().map_err(convert_error);
+    }
+
+    /// Disable autostart.
+    ///
+    /// Removes the autostart configuration so the application no longer starts on login.
+    pub fn disable() -> Result<(), OnBootError> {
+        #[cfg(windows)]
+        return super::windows::on_boot::disable().map_err(convert_error);
+
+        #[cfg(target_os = "macos")]
+        return super::macos::on_boot::disable().map_err(convert_error);
+
+        #[cfg(target_os = "linux")]
+        return super::linux::on_boot::disable().map_err(convert_error);
+
+        #[cfg(target_os = "freebsd")]
+        return super::freebsd::on_boot::disable().map_err(convert_error);
+    }
+
+    // Helper to convert platform-specific error to unified error
+    #[cfg(windows)]
+    fn convert_error(e: super::windows::on_boot::OnBootError) -> OnBootError {
+        match e {
+            super::windows::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
+            super::windows::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
+            super::windows::on_boot::OnBootError::CommandFailed(msg) => {
+                OnBootError::CommandFailed(msg)
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn convert_error(e: super::macos::on_boot::OnBootError) -> OnBootError {
+        match e {
+            super::macos::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
+            super::macos::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
+            super::macos::on_boot::OnBootError::CommandFailed(msg) => {
+                OnBootError::CommandFailed(msg)
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn convert_error(e: super::linux::on_boot::OnBootError) -> OnBootError {
+        match e {
+            super::linux::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
+            super::linux::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
+            super::linux::on_boot::OnBootError::CommandFailed(msg) => {
+                OnBootError::CommandFailed(msg)
+            }
+        }
+    }
+
+    #[cfg(target_os = "freebsd")]
+    fn convert_error(e: super::freebsd::on_boot::OnBootError) -> OnBootError {
+        match e {
+            super::freebsd::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
+            super::freebsd::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
+            super::freebsd::on_boot::OnBootError::CommandFailed(msg) => {
+                OnBootError::CommandFailed(msg)
+            }
+        }
+    }
+}

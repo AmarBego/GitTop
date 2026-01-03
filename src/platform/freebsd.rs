@@ -69,3 +69,68 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_r
         notification.show().map(|_| ())
     }
 }
+
+/// On-boot/autostart functionality for FreeBSD.
+///
+/// TODO: Investigate rc.d or user-level autostart mechanism.
+pub mod on_boot {
+    use std::fmt;
+    use std::io;
+
+    /// Error type for on_boot operations.
+    #[derive(Debug)]
+    pub enum OnBootError {
+        /// The operation is not supported on this platform.
+        NotSupported,
+        /// An I/O error occurred.
+        Io(io::Error),
+        /// A command failed to execute.
+        CommandFailed(String),
+    }
+
+    impl fmt::Display for OnBootError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                OnBootError::NotSupported => write!(f, "on-boot is not supported on this system"),
+                OnBootError::Io(e) => write!(f, "I/O error: {}", e),
+                OnBootError::CommandFailed(msg) => write!(f, "command failed: {}", msg),
+            }
+        }
+    }
+
+    impl std::error::Error for OnBootError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                OnBootError::Io(e) => Some(e),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<io::Error> for OnBootError {
+        fn from(e: io::Error) -> Self {
+            OnBootError::Io(e)
+        }
+    }
+
+    /// Check if autostart is currently enabled.
+    ///
+    /// TODO: Investigate FreeBSD autostart mechanism
+    pub fn is_enabled() -> bool {
+        false
+    }
+
+    /// Enable autostart.
+    ///
+    /// TODO: Implement FreeBSD autostart
+    pub fn enable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+
+    /// Disable autostart.
+    ///
+    /// TODO: Implement FreeBSD autostart
+    pub fn disable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+}

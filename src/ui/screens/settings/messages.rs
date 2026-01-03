@@ -30,4 +30,5 @@ pub enum SettingsMessage {
     ProxyUsernameChanged(String),
     ProxyPasswordChanged(String),
     SaveProxySettings,
+    ToggleStartOnBoot(bool),
 }

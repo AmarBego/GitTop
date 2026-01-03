@@ -184,6 +184,16 @@ impl SettingsScreen {
                 self.update_proxy_credentials();
                 Task::none()
             }
+            SettingsMessage::ToggleStartOnBoot(enabled) => {
+                if enabled {
+                    if let Err(e) = crate::platform::on_boot::enable() {
+                        eprintln!("[START_ON_BOOT] Failed to enable: {}", e);
+                    }
+                } else if let Err(e) = crate::platform::on_boot::disable() {
+                    eprintln!("[START_ON_BOOT] Failed to disable: {}", e);
+                }
+                Task::none()
+            }
         }
     }
 

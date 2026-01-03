@@ -61,24 +61,14 @@ pub fn build_initial_window_settings() -> (window::Id, iced::Task<crate::ui::app
 /// Note: This is different from iced's `window::gain_focus()` used in app.rs,
 /// which works within the same process for tray "Show" functionality.
 pub fn focus_existing_window() {
-    // On Linux, this requires display server IPC:
-    // - X11: Could use xdotool or libX11 to find and activate window
-    // - Wayland: Requires compositor-specific protocols (mostly unsupported)
-    // For now, this is a no-op - users can click the tray icon instead.
+    // Wayland doesn't support focusing windows from other processes.
 }
 
-/// Enable dark mode for system UI elements.
 /// Linux context menus follow GTK/Qt theme settings.
-pub fn enable_dark_mode() {
-    // Linux context menus use GTK theming.
-    // The theme is controlled by GTK_THEME or gsettings.
-    // tray-icon/muda should respect the system theme.
-}
+pub fn enable_dark_mode() {}
 
-/// Initialize the tray subsystem.
-/// On Linux, tray-icon uses GTK which must be initialized before use.
+/// GTK must be initialized before tray-icon can create menus.
 pub fn init_tray() {
-    // GTK must be initialized before tray-icon can create menus
     match gtk::init() {
         Ok(()) => {}
         Err(e) => {
@@ -88,14 +78,10 @@ pub fn init_tray() {
     }
 }
 
-/// Reduce memory footprint.
-/// Uses malloc_trim on glibc systems.
+/// Release memory back to the OS (glibc only).
 pub fn trim_memory() {
-    // On Linux with glibc, we can call malloc_trim to release memory
-    // back to the OS. This is similar to EmptyWorkingSet on Windows.
     #[cfg(target_env = "gnu")]
     {
-        // malloc_trim returns 1 if memory was released, 0 otherwise
         unsafe extern "C" {
             safe fn malloc_trim(pad: usize) -> i32;
         }
@@ -104,15 +90,6 @@ pub fn trim_memory() {
 }
 
 /// Send a native Linux notification via DBus.
-///
-/// Uses notify-rust which:
-/// - Talks to the system notification daemon via DBus
-/// - No polling required
-/// - No background threads once fired
-/// - Zero persistent memory cost
-///
-/// If `url` is provided, adds an "Open" action that opens the URL.
-/// Works with: notify-osd, dunst, xfce4-notifyd, KDE, GNOME, etc.
 pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_rust::error::Error> {
     use notify_rust::Notification;
 
@@ -121,20 +98,17 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_r
         .summary(title)
         .body(body)
         .appname("GitTop")
-        .icon("gittop") // Uses icon from /usr/share/icons or ~/.local/share/icons
-        .timeout(5000); // 5 seconds
+        .icon("gittop")
+        .timeout(5000);
 
-    // Add action if URL provided
     if let Some(url) = url {
         notification.action("open", "Open");
         notification.hint(notify_rust::Hint::ActionIcons(true));
 
-        // Show and handle action
         let handle = notification.show()?;
-
-        // Clone URL for the closure
         let url_owned = url.to_string();
-        // Spawn a thread to wait for action (non-blocking)
+
+        // Thread required because wait_for_action blocks.
         std::thread::spawn(move || {
             handle.wait_for_action(|action| {
                 if action == "open" || action == "default" {
@@ -144,7 +118,165 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_r
         });
         Ok(())
     } else {
-        // Simple fire and forget
         notification.show().map(|_| ())
+    }
+}
+
+pub mod on_boot {
+    use std::fmt;
+    use std::fs;
+    use std::io;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    /// Error type for on_boot operations.
+    #[derive(Debug)]
+    pub enum OnBootError {
+        /// The operation is not supported on this platform/init system.
+        NotSupported,
+        /// An I/O error occurred.
+        Io(io::Error),
+        /// A command failed to execute.
+        CommandFailed(String),
+    }
+
+    impl fmt::Display for OnBootError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                OnBootError::NotSupported => write!(f, "on-boot is not supported on this system"),
+                OnBootError::Io(e) => write!(f, "I/O error: {}", e),
+                OnBootError::CommandFailed(msg) => write!(f, "command failed: {}", msg),
+            }
+        }
+    }
+
+    impl std::error::Error for OnBootError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            match self {
+                OnBootError::Io(e) => Some(e),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<io::Error> for OnBootError {
+        fn from(e: io::Error) -> Self {
+            OnBootError::Io(e)
+        }
+    }
+
+    /// The systemd user service unit file content.
+    const SYSTEMD_SERVICE_TEMPLATE: &str = r#"[Unit]
+Description=GitTop - GitHub Notifications Manager
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart={EXEC_PATH}
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+"#;
+
+    fn systemd_user_dir() -> Option<PathBuf> {
+        dirs::config_dir().map(|p| p.join("systemd/user"))
+    }
+
+    fn systemd_service_path() -> Option<PathBuf> {
+        systemd_user_dir().map(|p| p.join("gittop.service"))
+    }
+
+    fn has_systemd() -> bool {
+        Command::new("systemctl")
+            .arg("--user")
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    pub fn is_enabled() -> bool {
+        if !has_systemd() {
+            return false;
+        }
+
+        Command::new("systemctl")
+            .args(["--user", "is-enabled", "gittop.service"])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+    }
+
+    pub fn enable() -> Result<(), OnBootError> {
+        if !has_systemd() {
+            return Err(OnBootError::NotSupported);
+        }
+
+        let exec_path = std::env::current_exe()
+            .map_err(OnBootError::Io)?
+            .to_string_lossy()
+            .to_string();
+
+        let service_content = SYSTEMD_SERVICE_TEMPLATE.replace("{EXEC_PATH}", &exec_path);
+
+        let service_dir = systemd_user_dir().ok_or(OnBootError::NotSupported)?;
+        fs::create_dir_all(&service_dir)?;
+
+        let service_path = systemd_service_path().ok_or(OnBootError::NotSupported)?;
+        fs::write(&service_path, service_content)?;
+
+        let reload = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .output()?;
+
+        if !reload.status.success() {
+            return Err(OnBootError::CommandFailed(
+                String::from_utf8_lossy(&reload.stderr).to_string(),
+            ));
+        }
+
+        let enable = Command::new("systemctl")
+            .args(["--user", "enable", "gittop.service"])
+            .output()?;
+
+        if !enable.status.success() {
+            return Err(OnBootError::CommandFailed(
+                String::from_utf8_lossy(&enable.stderr).to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
+    pub fn disable() -> Result<(), OnBootError> {
+        if !has_systemd() {
+            return Err(OnBootError::NotSupported);
+        }
+
+        let disable = Command::new("systemctl")
+            .args(["--user", "disable", "gittop.service"])
+            .output()?;
+
+        // Ignore "not found" errors - service may not exist yet.
+        if !disable.status.success() {
+            let stderr = String::from_utf8_lossy(&disable.stderr);
+            if !stderr.contains("not found") && !stderr.contains("No such file") {
+                eprintln!("Warning: systemctl disable failed: {}", stderr);
+            }
+        }
+
+        if let Some(service_path) = systemd_service_path() {
+            if service_path.exists() {
+                fs::remove_file(&service_path)?;
+            }
+        }
+
+        let _ = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .output();
+
+        Ok(())
     }
 }
