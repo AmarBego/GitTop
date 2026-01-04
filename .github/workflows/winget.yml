@@ -40,13 +40,17 @@ jobs:
         run: |
           echo "::notice::Skipping Winget update for prerelease: ${{ steps.release.outputs.tag }}"
 
+      - name: Install wingetcreate
+        if: steps.release.outputs.is_prerelease != 'true'
+        run: |
+          curl -L https://aka.ms/wingetcreate/latest -o wingetcreate.exe
+          chmod +x wingetcreate.exe
+
       - name: Update Winget package
         if: steps.release.outputs.is_prerelease != 'true'
-        uses: vedantmgoyal9/winget-releaser@v2
-        with:
-          identifier: AmarBego.GitTop
-          version: ${{ steps.release.outputs.version }}
-          release-tag: ${{ steps.release.outputs.tag }}
-          installers-regex: '\.exe$'
-          max-versions-to-keep: 5
-          token: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          ./wingetcreate.exe update AmarBego.GitTop \
+            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ steps.release.outputs.tag }}/gittop-${{ steps.release.outputs.version }}-setup.exe|x64" \
+            --version ${{ steps.release.outputs.version }} \
+            --submit \
+            --token ${{ secrets.WINGET_TOKEN }}
