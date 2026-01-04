@@ -114,10 +114,6 @@ impl<'a> DesktopNotificationBatch<'a> {
     pub fn is_empty(&self) -> bool {
         self.priority.is_empty() && self.regular.is_empty()
     }
-
-    pub fn total_count(&self) -> usize {
-        self.priority.len() + self.regular.len()
-    }
 }
 
 #[cfg(test)]

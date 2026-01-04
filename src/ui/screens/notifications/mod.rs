@@ -1,8 +1,10 @@
+pub mod components;
+pub mod desktop_notify;
 mod engine;
 pub mod helper;
 pub mod messages;
+pub mod processing;
 mod screen;
-mod view;
 
 // Public API exports for external consumers
 #[allow(unused_imports)]

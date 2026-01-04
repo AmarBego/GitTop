@@ -1,16 +1,13 @@
-//! Shared components for settings tabs.
-
 use iced::Element;
 use iced::widget::{container, text};
 
 use crate::ui::theme;
 
-use super::messages::SettingsMessage;
-
 /// A styled card container for settings items.
-pub fn setting_card<'a>(
-    content: impl Into<Element<'a, SettingsMessage>>,
-) -> Element<'a, SettingsMessage> {
+pub fn setting_card<'a, Message>(content: impl Into<Element<'a, Message>>) -> Element<'a, Message>
+where
+    Message: 'a + Clone,
+{
     let p = theme::palette();
 
     container(container(content).padding(14))
@@ -26,7 +23,10 @@ pub fn setting_card<'a>(
 }
 
 /// Styled title for settings tabs.
-pub fn tab_title(title: &'static str) -> Element<'static, SettingsMessage> {
+pub fn tab_title<'a, Message>(title: &'static str) -> Element<'a, Message>
+where
+    Message: 'a + Clone,
+{
     text(title)
         .size(20)
         .color(theme::palette().text_primary)

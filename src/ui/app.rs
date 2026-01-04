@@ -8,6 +8,11 @@ use iced::{Element, Event, Subscription, Task, Theme, event, exit, time, window}
 use crate::github::{SessionManager, auth};
 use crate::settings::AppSettings;
 use crate::tray::{TrayCommand, TrayManager};
+use crate::ui::features::power_mode::widgets::{details_panel, status_bar, top_bar};
+use crate::ui::features::{
+    account_management::{self, AccountMessage},
+    power_mode::PowerModeMessage,
+};
 use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::screens::{
     login::{LoginMessage, LoginScreen},
@@ -18,7 +23,6 @@ use crate::ui::screens::{
         rule_engine::{RuleEngineMessage, RuleEngineScreen},
     },
 };
-use crate::ui::widgets::power::{details_panel, status_bar, top_bar};
 use crate::ui::window_state;
 
 // ============================================================================
@@ -69,7 +73,12 @@ impl Screen {
     fn title(&self) -> String {
         match self {
             Screen::Notifications(screen) => {
-                let unread = screen.all_notifications.iter().filter(|n| n.unread).count();
+                let unread = screen
+                    .processing
+                    .all_notifications
+                    .iter()
+                    .filter(|n| n.unread)
+                    .count();
                 if unread > 0 {
                     format!("GitTop ({unread} unread)")
                 } else {
@@ -431,10 +440,9 @@ impl App {
                 }
                 Err(e) => {
                     eprintln!("Failed to restore session: {}", e);
-                    screen.accounts_state.status =
-                        crate::ui::screens::settings::tabs::accounts::SubmissionStatus::Error(
-                            format!("Failed to restore session: {}", e),
-                        );
+                    screen.accounts.status = account_management::state::SubmissionStatus::Error(
+                        format!("Failed to restore session: {}", e),
+                    );
                 }
             }
             return Task::none();
@@ -453,7 +461,7 @@ impl App {
                 return self.go_to_rule_engine(RuleEngineOrigin::Settings);
             }
 
-            SettingsMessage::TogglePowerMode(enabled) => {
+            SettingsMessage::PowerMode(PowerModeMessage::Toggle(enabled)) => {
                 let enabling = *enabled;
                 let settings_task = screen.update(settings_msg).map(Message::Settings);
                 if enabling {
@@ -462,7 +470,7 @@ impl App {
                 return settings_task;
             }
 
-            SettingsMessage::RemoveAccount(username) => {
+            SettingsMessage::Account(AccountMessage::RemoveAccount(username)) => {
                 // Remove from active sessions
                 let _ = ctx.sessions.remove_account(username);
                 // Also remove from ctx.settings to keep them in sync
@@ -486,7 +494,7 @@ impl App {
                 return Task::none();
             }
 
-            SettingsMessage::TokenValidated(Ok(username)) => {
+            SettingsMessage::Account(AccountMessage::TokenValidated(Ok(username))) => {
                 let username = username.clone();
                 // First update the screen to show success status
                 let screen_task = screen.update(settings_msg).map(Message::Settings);
@@ -738,7 +746,7 @@ impl App {
             || settings.proxy.has_credentials != ctx.settings.proxy.has_credentials;
 
         let needs_rebuild = if let Screen::Settings(s) = &**boxed_screen {
-            s.proxy_needs_rebuild
+            s.proxy.needs_rebuild
         } else {
             false
         };
@@ -919,7 +927,7 @@ impl App {
                 details_panel::view_details_panel(
                     screen.selected_notification(),
                     screen.selected_details(),
-                    screen.is_loading_details,
+                    screen.notification_details.is_loading,
                     settings.icon_theme
                 )
             ]
@@ -938,6 +946,7 @@ impl App {
             .collect();
 
         let unread_count = screen
+            .processing
             .filtered_notifications
             .iter()
             .filter(|n| n.unread)
@@ -950,7 +959,7 @@ impl App {
                 screen.is_loading,
                 unread_count,
                 screen.filters.show_all,
-                screen.bulk_mode,
+                screen.bulk_actions.bulk_mode,
                 settings.icon_theme
             ),
             main_area,

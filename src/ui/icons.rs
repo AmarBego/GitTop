@@ -113,15 +113,12 @@ impl_icons! {
     fn icon_trash(icondata_lu::LuTrash2, "🗑");
     fn icon_filter(icondata_lu::LuSlidersHorizontal, "⚙");
     fn icon_external_link(icondata_lu::LuExternalLink, "↗");
-    fn icon_building(icondata_lu::LuBuilding, "🏢");
-    fn icon_tag(icondata_lu::LuTag, "🏷");
-    fn icon_chart(icondata_lu::LuLayoutDashboard, "📊");
-    fn icon_inbox_empty(icondata_lu::LuArchive, "📭");
+    fn icon_wifi(icondata_lu::LuWifi, "📶");
     fn icon_plus(icondata_lu::LuPlus, "+");
     fn icon_x(icondata_lu::LuX, "✕");
     fn icon_zap(icondata_lu::LuZap, "⚡");
     fn icon_eye_off(icondata_lu::LuEyeOff, "👁‍🗨");
     fn icon_at(icondata_lu::LuAtSign, "@");
-    fn icon_info(icondata_lu::LuInfo, "i");
-    fn icon_wifi(icondata_lu::LuWifi, "📶");
+    fn icon_chart(icondata_lu::LuLayoutDashboard, "📊");
+    fn icon_inbox_empty(icondata_lu::LuArchive, "📭");
 }

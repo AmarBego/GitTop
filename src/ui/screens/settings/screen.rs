@@ -3,58 +3,37 @@
 use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Element, Fill, Length, Task};
 
-use crate::github::{GitHubClient, keyring, proxy_keyring};
-use crate::settings::{AppSettings, IconTheme};
+use crate::settings::AppSettings;
+use crate::ui::features::{account_management, general_settings, network_proxy, power_mode};
 use crate::ui::{icons, theme};
 
 use super::messages::{SettingsMessage, SettingsTab};
-use super::tabs::{accounts, general, network_proxy, power_mode};
 
 /// Settings screen state.
 #[derive(Debug, Clone)]
 pub struct SettingsScreen {
     pub settings: AppSettings,
     pub selected_tab: SettingsTab,
-    pub accounts_state: accounts::AccountsTabState,
-    pub proxy_enabled: bool,
-    pub proxy_url: String,
-    pub proxy_username: String,
-    pub proxy_password: String,
-    pub proxy_creds_dirty: bool,
-    pub proxy_needs_rebuild: bool,
-    pub start_on_boot_enabled: bool,
+    pub accounts: account_management::AccountManagementState,
+    pub proxy: network_proxy::NetworkProxyState,
+    pub general: general_settings::GeneralSettingsState,
+    pub power_mode: power_mode::PowerModeState,
 }
 
 impl SettingsScreen {
     pub fn new(settings: AppSettings) -> Self {
-        // Load proxy state from settings
-        let proxy_enabled = settings.proxy.enabled;
-        let proxy_url = settings.proxy.url.clone();
-
-        // Load proxy credentials from keyring if they exist
-        let (proxy_username, proxy_password) = if settings.proxy.has_credentials
-            && let Ok(Some((user, pass))) =
-                proxy_keyring::load_proxy_credentials(&settings.proxy.url)
-        {
-            (user, pass)
-        } else {
-            (String::new(), String::new())
-        };
-
-        // Cache start-on-boot state to avoid querying systemctl on every render
-        let start_on_boot_enabled = crate::platform::on_boot::is_enabled();
+        let proxy = network_proxy::NetworkProxyState::new(&settings);
+        let general = general_settings::GeneralSettingsState::new();
+        let power_mode = power_mode::PowerModeState::new();
+        let accounts = account_management::AccountManagementState::default();
 
         Self {
             settings,
             selected_tab: SettingsTab::default(),
-            accounts_state: accounts::AccountsTabState::default(),
-            proxy_enabled,
-            proxy_url,
-            proxy_username,
-            proxy_password,
-            proxy_creds_dirty: false,
-            proxy_needs_rebuild: false,
-            start_on_boot_enabled,
+            accounts,
+            proxy,
+            general,
+            power_mode,
         }
     }
 
@@ -63,158 +42,31 @@ impl SettingsScreen {
             SettingsMessage::Back => Task::none(),
             SettingsMessage::SelectTab(tab) => {
                 self.selected_tab = tab;
-                self.accounts_state.status = accounts::SubmissionStatus::Idle;
-                Task::none()
-            }
-            SettingsMessage::ChangeTheme(new_theme) => {
-                self.settings.theme = new_theme;
-                theme::set_theme(new_theme);
-                self.persist_settings();
-                Task::none()
-            }
-            SettingsMessage::ToggleIconTheme(use_svg) => {
-                self.settings.icon_theme = if use_svg {
-                    IconTheme::Svg
-                } else {
-                    IconTheme::Emoji
-                };
-                self.persist_settings();
-                Task::none()
-            }
-            SettingsMessage::ToggleMinimizeToTray(enabled) => {
-                self.settings.minimize_to_tray = enabled;
-                let _ = self.settings.save();
-                Task::none()
-            }
-            SettingsMessage::RemoveAccount(username) => {
-                self.settings.remove_account(&username);
-                let _ = self.settings.save();
-                let _ = keyring::delete_token(&username);
-                Task::none()
-            }
-            SettingsMessage::SetNotificationFontScale(scale) => {
-                let clamped = scale.clamp(0.8, 1.5);
-                self.settings.notification_font_scale = clamped;
-                theme::set_notification_font_scale(clamped);
-                self.persist_settings();
-                Task::none()
-            }
-            SettingsMessage::SetSidebarFontScale(scale) => {
-                let clamped = scale.clamp(0.8, 1.5);
-                self.settings.sidebar_font_scale = clamped;
-                theme::set_sidebar_font_scale(clamped);
-                self.persist_settings();
-                Task::none()
-            }
-            SettingsMessage::SetSidebarWidth(width) => {
-                let clamped = width.clamp(180.0, 400.0);
-                self.settings.sidebar_width = clamped;
-                self.persist_settings();
-                Task::none()
-            }
-            SettingsMessage::TogglePowerMode(enabled) => {
-                self.settings.power_mode = enabled;
-                let _ = self.settings.save();
+                // Reset states if needed when switching tabs
+                self.accounts.status = account_management::state::SubmissionStatus::Idle;
                 Task::none()
             }
             SettingsMessage::OpenRuleEngine => Task::none(),
-            SettingsMessage::TokenInputChanged(token) => {
-                self.accounts_state.token_input = token;
-                self.accounts_state.status = accounts::SubmissionStatus::Idle;
-                Task::none()
+            SettingsMessage::Account(msg) => {
+                account_management::update(&mut self.accounts, msg, &mut self.settings)
+                    .map(SettingsMessage::Account)
             }
-            SettingsMessage::SubmitToken => {
-                let token = self.accounts_state.token_input.clone();
-                if let Err(e) = crate::github::auth::validate_token_format(&token) {
-                    self.accounts_state.status = accounts::SubmissionStatus::Error(e.to_string());
-                    return Task::none();
+            SettingsMessage::General(msg) => {
+                general_settings::update(&mut self.general, msg, &mut self.settings)
+                    .map(SettingsMessage::General)
+            }
+            SettingsMessage::Proxy(msg) => {
+                network_proxy::update(&mut self.proxy, msg, &mut self.settings)
+                    .map(SettingsMessage::Proxy)
+            }
+            SettingsMessage::PowerMode(msg) => {
+                // Intercept OpenRuleEngine from PowerMode if needed, or let it propagate via update return
+                if let power_mode::PowerModeMessage::OpenRuleEngine = msg {
+                    return Task::done(SettingsMessage::OpenRuleEngine);
                 }
 
-                self.accounts_state.status = accounts::SubmissionStatus::Validating;
-
-                Task::perform(
-                    async move {
-                        let client = GitHubClient::new(&token)
-                            .map_err(|e| format!("Invalid token: {}", e))?;
-
-                        let user = client
-                            .get_authenticated_user()
-                            .await
-                            .map_err(|e| format!("Validation failed: {}", e))?;
-
-                        keyring::save_token(&user.login, &token)
-                            .map_err(|e| format!("Failed to save token: {}", e))?;
-
-                        Ok(user.login)
-                    },
-                    SettingsMessage::TokenValidated,
-                )
-            }
-            SettingsMessage::TokenValidated(result) => {
-                match result {
-                    Ok(username) => {
-                        self.settings.set_active_account(&username);
-                        let _ = self.settings.save();
-                        self.accounts_state.token_input.clear();
-                        self.accounts_state.status = accounts::SubmissionStatus::Success(format!(
-                            "Account '{}' added successfully!",
-                            username
-                        ));
-                    }
-                    Err(error) => {
-                        self.accounts_state.status = accounts::SubmissionStatus::Error(error);
-                    }
-                }
-                Task::none()
-            }
-            SettingsMessage::ToggleProxyEnabled(enabled) => {
-                self.proxy_enabled = enabled;
-                Task::none()
-            }
-            SettingsMessage::ProxyUrlChanged(url) => {
-                self.proxy_url = url;
-                Task::none()
-            }
-            SettingsMessage::ProxyUsernameChanged(username) => {
-                self.proxy_username = username;
-                self.proxy_creds_dirty = true;
-                Task::none()
-            }
-            SettingsMessage::ProxyPasswordChanged(password) => {
-                self.proxy_password = password;
-                self.proxy_creds_dirty = true;
-                Task::none()
-            }
-            SettingsMessage::SaveProxySettings => {
-                self.update_proxy_credentials();
-                Task::none()
-            }
-            SettingsMessage::ToggleStartOnBoot(enabled) => {
-                // Perform the operation asynchronously and report result
-                Task::perform(
-                    async move {
-                        let result = if enabled {
-                            crate::platform::on_boot::enable()
-                        } else {
-                            crate::platform::on_boot::disable()
-                        };
-                        result.map(|()| enabled).map_err(|e| e.to_string())
-                    },
-                    SettingsMessage::StartOnBootResult,
-                )
-            }
-            SettingsMessage::StartOnBootResult(result) => {
-                match result {
-                    Ok(new_state) => {
-                        self.start_on_boot_enabled = new_state;
-                    }
-                    Err(e) => {
-                        eprintln!("[START_ON_BOOT] Failed: {}", e);
-                        // Re-query actual state to ensure UI reflects reality
-                        self.start_on_boot_enabled = crate::platform::on_boot::is_enabled();
-                    }
-                }
-                Task::none()
+                power_mode::update(&mut self.power_mode, msg, &mut self.settings)
+                    .map(SettingsMessage::PowerMode)
             }
         }
     }
@@ -350,11 +202,20 @@ impl SettingsScreen {
     fn view_content(&self) -> Element<'_, SettingsMessage> {
         let p = theme::palette();
 
-        let content = match self.selected_tab {
-            SettingsTab::PowerMode => power_mode::view(&self.settings),
-            SettingsTab::General => general::view(&self.settings, self.start_on_boot_enabled),
-            SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
-            SettingsTab::NetworkProxy => network_proxy::view(self),
+        // Each feature view returns its own Message type.
+        // We map them to SettingsMessage wrapper using .map()
+        let content: Element<'_, SettingsMessage> = match self.selected_tab {
+            SettingsTab::PowerMode => {
+                power_mode::view(&self.settings).map(SettingsMessage::PowerMode)
+            }
+            SettingsTab::General => {
+                general_settings::view(&self.settings, &self.general).map(SettingsMessage::General)
+            }
+            SettingsTab::Accounts => account_management::view(&self.accounts, &self.settings)
+                .map(SettingsMessage::Account),
+            SettingsTab::NetworkProxy => {
+                network_proxy::view(&self.proxy, &self.settings).map(SettingsMessage::Proxy)
+            }
         };
 
         let scrollable_content = scrollable(content)
@@ -370,94 +231,5 @@ impl SettingsScreen {
                 ..Default::default()
             })
             .into()
-    }
-
-    fn persist_settings(&mut self) {
-        let _ = self.settings.save();
-        crate::platform::trim_memory();
-    }
-
-    /// Check if proxy settings have unsaved changes
-    pub fn has_unsaved_proxy_changes(&self) -> bool {
-        let enabled_changed = self.proxy_enabled != self.settings.proxy.enabled;
-        let url_changed = self.proxy_url != self.settings.proxy.url;
-        let new_has_creds = !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
-        let creds_status_changed = new_has_creds != self.settings.proxy.has_credentials;
-
-        enabled_changed || url_changed || creds_status_changed || self.proxy_creds_dirty
-    }
-
-    fn update_proxy_credentials(&mut self) {
-        let old_url = self.settings.proxy.url.clone();
-        let new_url = self.proxy_url.clone();
-
-        // Sync all proxy settings from temp fields
-        self.settings.proxy.enabled = self.proxy_enabled;
-        self.settings.proxy.url = new_url.clone();
-
-        // Update has_credentials flag
-        self.settings.proxy.has_credentials =
-            !self.proxy_username.is_empty() || !self.proxy_password.is_empty();
-
-        // Case 1: URL changed - handle both old and new URLs
-        if old_url != new_url {
-            eprintln!(
-                "[PROXY] URL changed: '{}' -> '{}' (enabled: {})",
-                old_url, new_url, self.proxy_enabled
-            );
-
-            // Delete credentials for old URL to prevent orphaned data
-            if !old_url.is_empty() {
-                eprintln!("[PROXY] Deleting credentials for old proxy URL");
-                let _ = proxy_keyring::delete_proxy_credentials(&old_url);
-            }
-
-            // Save credentials for new URL if provided
-            if !self.proxy_username.is_empty() && !self.proxy_password.is_empty() {
-                eprintln!("[PROXY] Saving credentials for new proxy URL");
-                let username = self.proxy_username.as_str();
-                let password = self.proxy_password.as_str();
-                let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
-            }
-        }
-        // Case 2: URL unchanged - only handle credential changes
-        else if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
-            eprintln!("[PROXY] Credentials cleared, deleting from keyring");
-            let _ = proxy_keyring::delete_proxy_credentials(&old_url);
-        } else {
-            // Check if credentials actually changed
-            let should_save = if let Ok(Some((saved_username, saved_password))) =
-                proxy_keyring::load_proxy_credentials(&old_url)
-            {
-                saved_username != self.proxy_username || saved_password != self.proxy_password
-            } else {
-                // No existing credentials, so save the new ones
-                true
-            };
-
-            if should_save {
-                eprintln!("[PROXY] Credentials changed, saving to keyring");
-                let username = self.proxy_username.as_str();
-                let password = self.proxy_password.as_str();
-                let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
-            } else {
-                eprintln!("[PROXY] Credentials unchanged, skipping keyring write");
-            }
-        }
-
-        eprintln!(
-            "[PROXY] Settings saved: enabled={}, url='{}', has_credentials={}",
-            self.settings.proxy.enabled,
-            self.settings.proxy.url,
-            self.settings.proxy.has_credentials
-        );
-
-        // Signal that clients need rebuild when leaving settings
-        self.proxy_needs_rebuild = true;
-        // Reset dirty flag since we just saved
-        self.proxy_creds_dirty = false;
-
-        // Persist settings
-        self.persist_settings();
     }
 }

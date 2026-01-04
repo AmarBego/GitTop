@@ -1,4 +1,5 @@
 pub(crate) mod app;
+pub mod features;
 pub mod icons;
 mod screens;
 pub mod theme;

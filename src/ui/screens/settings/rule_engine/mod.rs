@@ -1,9 +1,8 @@
-mod components;
-mod explain_decision;
+pub mod components;
 mod inspector;
-mod messages;
+pub mod messages;
 mod screen;
-mod tabs;
+// mod tabs; // Removed
 
 pub mod rules;
 

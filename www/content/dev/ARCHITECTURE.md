@@ -28,100 +28,109 @@ The UI is built with [Iced](https://github.com/iced-rs/iced). Everything here is
 *   **`icons.rs`**: Icon primitives and glyph helpers.
 *   **`theme.rs`**: Color palette and styling constants.
 *   **`window_state.rs`**: Window visibility/focus state tracking.
-*   **`screens/`**: User-facing views.
+*   **`features/`**: **Business Logic & Feature UI**. Independent modules implementing specific capabilities.
+    *   `account_management`: Account list and auth state.
+    *   `account_rules`: Scheduling and availability rules.
+    *   `bulk_actions`: Multi-select operations (read, done, archive).
+    *   `general_settings`: Theme and app preferences.
+    *   `network_proxy`: Proxy configuration.
+    *   `notification_details`: Loading and viewing thread details.
+    *   `org_rules`: Organization-specific rule management.
+    *   `power_mode`: Keyboard-centric power tools.
+    *   `rule_overview`: Rule engine dashboard and health metrics.
+    *   `thread_actions`: Single-thread operations (snooze, mute, unsubscribe).
+    *   `type_rules`: Notification type classification rules.
+*   **`screens/`**: **Routing Shells**. Top-level views that compose features.
     *   **`login/`**: OAuth login flow.
-    *   **`notifications/`**: The Inbox. This is where users spend 90% of their time.
+    *   **`notifications/`**: The Inbox.
         *   `engine.rs`: **The Executor**. Applies rules to incoming notifications.
-        *   `helper.rs`: Utility functions for notification operations.
-        *   `messages.rs`: All message types for the notifications screen.
-        *   `screen.rs`: Main screen state and update logic.
-        *   `view/`: Rendering modules.
-            *   `sidebar`/`sidebar_state`: Navigation and filters.
-            *   `content`: The main notification list.
-            *   `header`: Content header with title, sync status, filters.
-            *   `bulk`: Bulk action bar (Power Mode).
-            *   `group`: Collapsible headers.
-            *   `states`: Loading, error, and empty state views.
+        *   `screen.rs`: Main screen shell.
+        *   `view/`: Layout composition (sidebar, header, content).
     *   **`settings/`**: Configuration screens.
-        *   `tabs/`: `accounts`, `general`, `power_mode`.
-        *   `rule_engine/`: **The Rule Editor**. Logic for the visual Rule Editor.
-            *   `rules.rs`: Core rule types and evaluation engine.
-            *   `tabs/`: `overview`, `type_rules`, `account_rules`, `org`.
-            *   `inspector.rs`: Tool that explains *why* a notification was treated a certain way.
-            *   `explain_decision.rs`: Test lab for simulating rule outcomes.
-            *   `components.rs`: Shared UI components (rule cards, empty states).
-*   **`widgets/`**: Reusable components.
-    *   `notification_item.rs`: The card view for a single notification.
-    *   **`power/`**: "Power Mode" widgets.
-        *   `top_bar.rs`: Command center header bar.
-        *   `details_panel.rs`: Notification detail view.
-        *   `status_bar.rs`: Bottom status indicators.
+        *   `screen.rs`: Settings shell (routes to General, Account, Proxy, Rules).
+        *   `rule_engine/`: **The Rule Editor**.
+            *   `screen.rs`: Editor shell (routes to Overview, Org, Type, Account rules).
+            *   `rules.rs`: Core rule types (serialization/evaluation).
+            *   `inspector.rs`: Split-view tool to explain rule application.
 
 #### How We Write UI Code
 
 Every screen follows the same shape. Once you've seen one, you've seen them all.
 
-**The core idea: Screens own state. Views just render it.**
+**The core idea: Screens are routing shells. Features own behavior.**
 
-A "screen" is a top-level page (Notifications, Settings, Login). Each screen lives in its own folder under `screens/` and has a predictable structure:
-
-| File | What It Does |
-|------|--------------|
-| `screen.rs` | Owns the state, handles messages, orchestrates the layout |
-| `messages.rs` | Defines all the things a user can do on this screen |
-| `view/` | Pure rendering functions no state mutation, just turning data into pixels |
+> [!IMPORTANT]
+> **Architecture Standard**: "Screens are Shells". Screens hold state and route messages but delegate almost all logic and rendering to separate modules.
+>
+> 1.  **Behavior Logic** -> `ui/features/<feature>/`
+> 2.  **View Logic** -> `ui/features/<feature>/view.rs`
+> 3.  **Composed Layout** -> `screen.rs` (using `container().style(theme::app_container)`)
+>
+> Do not write complex logic or long view functions directly in `screen.rs`.
 
 **The `screen.rs` file always has three things:**
 
-1.  A struct holding all the screen's state
-2.  An `update()` method that handles incoming messages
-3.  A `view()` method that renders the UI
+1.  **State Aggregation**: Holds instances of Feature State structs (e.g., `AccountRulesState`).
+2.  **Update Routing**: Delegates specific message variants to feature update functions.
+3.  **View Composition**: Calls feature functions (e.g., `org_rules::view()`) and wraps them in a consistent layout.
 
-The `view()` method doesn't do much itself it calls into smaller view helpers to build the layout. Think of it as the conductor.
+**Feature-Based Architecture (`ui/features/`):**
 
-**Two ways to write view code:**
+When a screen accumulates too much behavior, we extract independent behaviors into feature modules:
 
-When the view needs access to everything on the screen, we use an `impl` block that extends the screen struct:
+```
+src/ui/features/
+├── mod.rs
+├── org_rules/          # Example Feature
+│   ├── state.rs        # Struct holding data (e.g. OrgRulesState)
+│   ├── message.rs      # Enum of actions (e.g. OrgMessage)
+│   ├── update.rs       # fn update(state, msg, ...) -> Task
+│   ├── view.rs         # fn view(state, ...) -> Element
+│   └── widgets/        # (optional) Feature-specific components
+│       ├── mod.rs
+│       └── rule_card.rs
+└── ...
+```
+
+**Feature Isolation Rule:**
+
+A feature may not directly mutate state it does not own. Screen-owned collections (like the global `NotificationRuleSet`) may only be modified by passing them as mutable references to the feature's `update` function.
+
+**Message Routing Pattern:**
+
+Screen-level messages are routing wrappers that delegate to feature messages. This keeps the top-level match block clean.
 
 ```rust
-// view/content.rs
-impl NotificationsScreen {
-    pub fn view_content(&self) -> Element<'_, NotificationMessage> {
-        // Can access all of self.* here
+enum RuleEngineMessage {
+    // Navigation / Lifecycle
+    Back,
+    SelectTab(RuleTab),
+
+    // Feature Delegation
+    Org(OrgMessage),
+    Account(AccountRuleMessage),
+}
+```
+
+The `update()` function explicitly delegates:
+
+```rust
+fn update(&mut self, msg: RuleEngineMessage) -> Task<RuleEngineMessage> {
+    match msg {
+        RuleEngineMessage::Org(inner_msg) => {
+            org_rules::update(&mut self.org_rules, inner_msg, &mut self.rules)
+                .map(RuleEngineMessage::Org)
+        }
+        // ...
     }
 }
 ```
 
-When the view only needs a few pieces of data, we use a free function with a small state struct:
+**UI Components & Theming:**
 
-```rust
-// view/sidebar.rs
-pub fn view_sidebar(state: SidebarState) -> Element<'_, NotificationMessage> {
-    // Only sees what's in SidebarState
-}
-```
-
-The second approach makes dependencies explicit and keeps views focused.
-
-**Messages are grouped, not flat:**
-
-Instead of one giant enum with 50 variants, we nest related messages:
-
-```rust
-enum NotificationMessage {
-    Filter(FilterMessage),   // Type/repo selection
-    Thread(ThreadMessage),   // Open, mark read, mark done
-    Bulk(BulkMessage),       // Multi-select actions
-    View(ViewMessage),       // Scroll, expand, select
-    Navigation(NavigationMessage), // Logout, settings, switch account
-}
-```
-
-The `update()` function matches on the outer enum and delegates to private handlers. This keeps each handler small and focused.
-
-**Tabs get their own folder:**
-
-Screens with tabs (like Settings or Rule Engine) put each tab in a `tabs/` subdirectory. Each tab is a free function returning an `Element`. The main `screen.rs` calls the right one based on which tab is selected.
+1.  **Generics**: specialized components (like list items) should be generic over the `Message` type where possible to allow reuse across features.
+2.  **Theming**: Always use `ui/theme.rs` and `ui/icons.rs`. Never hardcode colors.
+3.  **Containers**: The main view of every screen MUST be wrapped in `container().style(theme::app_container)` to ensure the correct background color (e.g., dark grey instead of default blue).
 
 ### Backend Architecture (`src/github`)
 
