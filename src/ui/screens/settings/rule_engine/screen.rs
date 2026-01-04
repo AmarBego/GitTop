@@ -4,15 +4,17 @@ use iced::widget::{Space, button, column, container, row, scrollable, text, togg
 use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::settings::{AppSettings, IconTheme};
-use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, RuleAction, TypeRule};
+use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::{icons, theme};
-use chrono::NaiveTime;
 
-use super::messages::{
-    AccountMessage, ExplainMessage, InspectorMessage, OrgMessage, RuleEngineMessage, RuleTab,
-    TypeMessage,
+use super::messages::{ExplainMessage, InspectorMessage, OrgMessage, RuleEngineMessage, RuleTab};
+// use super::tabs; // Removed
+use super::view;
+
+use crate::ui::features::account_rules::{
+    AccountRulesState, update_account_rule, view_account_rules_tab,
 };
-use super::tabs;
+use crate::ui::features::type_rules::{TypeRuleFormState, update_type_rule, view_type_rules_tab};
 
 /// Rule Engine screen state.
 #[derive(Debug, Clone)]
@@ -24,17 +26,9 @@ pub struct RuleEngineScreen {
     pub sidebar_font_scale: f32,
     pub accounts: Vec<String>,
 
-    pub selected_account_id: Option<String>,
-    pub expanded_account_time_windows: std::collections::HashSet<String>,
-
-    // Type Rule Creation State
-    pub new_type_rule_type: crate::github::types::NotificationReason,
-    pub new_type_rule_account: Option<String>,
-    pub new_type_rule_priority: i32,
-    pub new_type_rule_action: RuleAction,
-
-    // Type Rules Grouping State
-    pub expanded_type_groups: std::collections::HashSet<String>,
+    // Feature States
+    pub account_rules: AccountRulesState,
+    pub type_rules: TypeRuleFormState,
 
     // Rule Inspector State
     pub selected_rule_id: Option<String>,
@@ -74,16 +68,11 @@ impl RuleEngineScreen {
             sidebar_font_scale: settings.sidebar_font_scale,
             accounts,
 
-            selected_account_id: None,
-            expanded_account_time_windows: std::collections::HashSet::new(),
+            // Feature States
+            account_rules: AccountRulesState::new(),
+            type_rules: TypeRuleFormState::new(),
 
-            new_type_rule_type: crate::github::types::NotificationReason::Mention,
-            new_type_rule_account: None,
-            new_type_rule_priority: 0,
-            new_type_rule_action: RuleAction::Show,
-            expanded_type_groups: std::collections::HashSet::new(),
             selected_rule_id: None,
-
             explain_test_type: "Mentioned".to_string(),
             show_handbook: false,
         }
@@ -106,59 +95,18 @@ impl RuleEngineScreen {
                 self.show_handbook = !self.show_handbook;
                 Task::none()
             }
-            RuleEngineMessage::Account(msg) => self.update_account(msg),
+            RuleEngineMessage::Account(msg) => {
+                update_account_rule(&mut self.account_rules, msg, &mut self.rules)
+                    .map(RuleEngineMessage::Account)
+            }
             RuleEngineMessage::Org(msg) => self.update_org(msg),
-            RuleEngineMessage::Type(msg) => self.update_type(msg),
+            RuleEngineMessage::Type(msg) => {
+                update_type_rule(&mut self.type_rules, msg, &mut self.rules)
+                    .map(RuleEngineMessage::Type)
+            }
             RuleEngineMessage::Inspector(msg) => self.update_inspector(msg),
             RuleEngineMessage::Explain(msg) => self.update_explain(msg),
         }
-    }
-
-    fn update_account(&mut self, message: AccountMessage) -> Task<RuleEngineMessage> {
-        match message {
-            AccountMessage::Select(id) => {
-                self.selected_account_id = Some(id);
-            }
-            AccountMessage::ToggleEnabled(id, enabled) => {
-                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
-                    rule.enabled = enabled;
-                    let _ = self.rules.save();
-                }
-            }
-            AccountMessage::ToggleDay(id, day) => {
-                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
-                    if rule.active_days.contains(&day) {
-                        rule.active_days.remove(&day);
-                    } else {
-                        rule.active_days.insert(day);
-                    }
-                    let _ = self.rules.save();
-                }
-            }
-            AccountMessage::SetTimeWindow(id, start_str, end_str) => {
-                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
-                    let start = start_str.and_then(|s| NaiveTime::parse_from_str(&s, "%H:%M").ok());
-                    let end = end_str.and_then(|s| NaiveTime::parse_from_str(&s, "%H:%M").ok());
-                    rule.start_time = start;
-                    rule.end_time = end;
-                    let _ = self.rules.save();
-                }
-            }
-            AccountMessage::SetTimeWindowExpanded(id, expanded) => {
-                if expanded {
-                    self.expanded_account_time_windows.insert(id);
-                } else {
-                    self.expanded_account_time_windows.remove(&id);
-                }
-            }
-            AccountMessage::SetOutsideBehavior(id, behavior) => {
-                if let Some(rule) = self.rules.account_rules.iter_mut().find(|r| r.id == id) {
-                    rule.outside_behavior = behavior;
-                    let _ = self.rules.save();
-                }
-            }
-        }
-        Task::none()
     }
 
     fn update_org(&mut self, message: OrgMessage) -> Task<RuleEngineMessage> {
@@ -180,68 +128,6 @@ impl RuleEngineScreen {
                     self.rules.org_rules.push(new_rule);
                     let _ = self.rules.save();
                 }
-            }
-        }
-        Task::none()
-    }
-
-    fn update_type(&mut self, message: TypeMessage) -> Task<RuleEngineMessage> {
-        match message {
-            TypeMessage::Toggle(id, enabled) => {
-                if let Some(rule) = self.rules.type_rules.iter_mut().find(|r| r.id == id) {
-                    rule.enabled = enabled;
-                }
-                let _ = self.rules.save();
-            }
-            TypeMessage::Delete(id) => {
-                self.rules.type_rules.retain(|r| r.id != id);
-                let _ = self.rules.save();
-            }
-            TypeMessage::Duplicate(id) => {
-                if let Some(rule) = self.rules.type_rules.iter().find(|r| r.id == id).cloned() {
-                    let mut new_rule = rule;
-                    new_rule.id = uuid::Uuid::new_v4().to_string();
-                    self.rules.type_rules.push(new_rule);
-                    let _ = self.rules.save();
-                }
-            }
-            TypeMessage::ToggleGroup(group_name) => {
-                if self.expanded_type_groups.contains(&group_name) {
-                    self.expanded_type_groups.remove(&group_name);
-                } else {
-                    self.expanded_type_groups.insert(group_name);
-                }
-            }
-            TypeMessage::FormTypeChanged(s) => {
-                self.new_type_rule_type = s;
-            }
-            TypeMessage::FormAccountChanged(s) => {
-                self.new_type_rule_account = if s == "Global" || s.trim().is_empty() {
-                    None
-                } else {
-                    Some(s)
-                };
-            }
-            TypeMessage::FormPriorityChanged(p) => {
-                self.new_type_rule_priority = p;
-            }
-            TypeMessage::FormActionChanged(a) => {
-                self.new_type_rule_action = a;
-            }
-            TypeMessage::Add => {
-                let priority = self.new_type_rule_priority;
-                let account = self.new_type_rule_account.clone();
-
-                let mut rule = TypeRule::new(self.new_type_rule_type.label(), account, priority);
-                rule.action = self.new_type_rule_action;
-
-                self.rules.type_rules.push(rule);
-                let _ = self.rules.save();
-
-                // Reset form
-                self.new_type_rule_account = None;
-                self.new_type_rule_priority = 0;
-                self.new_type_rule_action = RuleAction::Show;
             }
         }
         Task::none()
@@ -293,7 +179,7 @@ impl RuleEngineScreen {
 
         // Overlay handbook modal if visible
         if self.show_handbook {
-            let handbook = self.view_handbook_modal();
+            let handbook = view::view_handbook_modal(self.icon_theme);
             iced::widget::stack![base_layout, handbook]
                 .width(Fill)
                 .height(Fill)
@@ -301,167 +187,6 @@ impl RuleEngineScreen {
         } else {
             base_layout
         }
-    }
-
-    fn view_handbook_modal(&self) -> Element<'_, RuleEngineMessage> {
-        let p = theme::palette();
-
-        // Backdrop (clickable to close)
-        let backdrop_btn = button(Space::new().width(Fill).height(Fill))
-            .width(Fill)
-            .height(Fill)
-            .style(|_, _| button::Style {
-                background: Some(iced::Background::Color(iced::Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 0.6,
-                })),
-                ..Default::default()
-            })
-            .on_press(RuleEngineMessage::ToggleHandbook);
-
-        // Handbook content
-        let content = column![
-            // Header
-            row![
-                text("Rule Engine Handbook")
-                    .size(18)
-                    .color(p.text_primary)
-                    .font(iced::Font {
-                        weight: iced::font::Weight::Bold,
-                        ..Default::default()
-                    }),
-                Space::new().width(Fill),
-                button(icons::icon_x(16.0, p.text_secondary, self.icon_theme))
-                    .style(theme::ghost_button)
-                    .padding(4)
-                    .on_press(RuleEngineMessage::ToggleHandbook),
-            ]
-            .align_y(Alignment::Center),
-            Space::new().height(16),
-            // Core Principle
-            text("Core Principle")
-                .size(14)
-                .color(p.accent)
-                .font(iced::Font {
-                    weight: iced::font::Weight::Bold,
-                    ..Default::default()
-                }),
-            text(
-                "Notifications are SHOWN by default. \
-Rules only exist to restrict, silence, hide, or elevate notifications."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            Space::new().height(12),
-            // Actions
-            text("Actions").size(14).color(p.accent).font(iced::Font {
-                weight: iced::font::Weight::Bold,
-                ..Default::default()
-            }),
-            text(
-                "• Show - Visible in the in-app list and triggers a desktop notification. \
-This is the default behavior when no rules apply."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            text(
-                "• Silent - Visible in the in-app list but does NOT trigger a desktop notification."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            text(
-                "• Hide - Completely hidden. The notification does NOT appear in the list \
-and does NOT trigger a desktop notification."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            text(
-                "• Important - Always visible and always triggers a desktop notification. \
-Important notifications bypass account rules, schedules, Hide, and Silent actions, \
-and are shown across ALL configured accounts. Important notifications are pinned \
-at the top of every notification list."
-            )
-            .size(13)
-            .color(p.accent),
-            Space::new().height(12),
-            // Priority Value
-            text("Priority Value (−100 to +100)")
-                .size(14)
-                .color(p.accent)
-                .font(iced::Font {
-                    weight: iced::font::Weight::Bold,
-                    ..Default::default()
-                }),
-            text(
-                "The priority value ONLY affects the sort order of notifications \
-within the in-app list. Higher values appear first."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            text(
-                "Priority does NOT affect desktop notifications and does NOT override \
-Hide or Silent actions. Only the Important action can override suppression."
-            )
-            .size(13)
-            .color(p.text_muted),
-            Space::new().height(12),
-            // Resolution Order
-            text("Rule Resolution Order")
-                .size(14)
-                .color(p.accent)
-                .font(iced::Font {
-                    weight: iced::font::Weight::Bold,
-                    ..Default::default()
-                }),
-            text(
-                "1. Important always wins. \
-If ANY matching rule marks a notification as Important, \
-it is treated as Important regardless of other rules."
-            )
-            .size(13)
-            .color(p.text_secondary),
-            text("2. If no Important rule applies, the rule with the highest priority value wins.")
-                .size(13)
-                .color(p.text_secondary),
-            text(
-                "3. If priority values are equal, the most restrictive action wins \
-(Hide > Silent > Show)."
-            )
-            .size(13)
-            .color(p.text_secondary),
-        ]
-        .spacing(4)
-        .padding(24)
-        .width(450);
-
-        let scrollable_content = scrollable(content)
-            .style(theme::scrollbar)
-            .height(Length::Shrink);
-
-        let modal_card = container(scrollable_content)
-            .style(theme::card)
-            .max_width(500)
-            .max_height(600); // Fixed max height to allow scrolling
-
-        // Wrap modal in mouse_area to prevent clicks from bubbling to backdrop
-        let modal_with_blocker =
-            iced::widget::mouse_area(modal_card).on_press(RuleEngineMessage::NoOp);
-
-        // Center the modal
-        let centered = container(modal_with_blocker)
-            .width(Fill)
-            .height(Fill)
-            .padding(40)
-            .center_x(Fill)
-            .center_y(Fill);
-
-        // Stack backdrop + modal
-        iced::widget::stack![backdrop_btn, centered]
-            .width(Fill)
-            .height(Fill)
-            .into()
     }
 
     fn view_header(&self) -> Element<'_, RuleEngineMessage> {
@@ -630,7 +355,8 @@ it is treated as Important regardless of other rules."
 
         match self.selected_tab {
             RuleTab::Overview => {
-                let content = tabs::view_overview_tab(&self.rules, t, &self.explain_test_type);
+                let content =
+                    view::overview::view_overview_tab(&self.rules, t, &self.explain_test_type);
                 container(
                     scrollable(content)
                         .width(Fill)
@@ -647,11 +373,11 @@ it is treated as Important regardless of other rules."
             }
             RuleTab::AccountRules => {
                 // Account rules tab handles its own scrolling internally (3-pane layout)
-                let content = tabs::view_account_rules_tab(
+                let content = view_account_rules_tab(
                     &self.rules,
                     t,
-                    &self.selected_account_id,
-                    &self.expanded_account_time_windows,
+                    &self.account_rules.selected_account_id,
+                    &self.account_rules.expanded_time_windows,
                     &self.accounts,
                 );
                 container(content)
@@ -664,7 +390,7 @@ it is treated as Important regardless of other rules."
                     .into()
             }
             RuleTab::OrgRules => {
-                let content = tabs::view_org_rules_tab(&self.rules, t);
+                let content = view::org::view_org_rules_tab(&self.rules, t);
                 container(
                     scrollable(content)
                         .width(Fill)
@@ -680,17 +406,12 @@ it is treated as Important regardless of other rules."
                 .into()
             }
             RuleTab::TypeRules => {
-                let content = tabs::view_type_rules_tab(
+                let content = view_type_rules_tab(
                     &self.rules,
                     t,
-                    &tabs::TypeRuleFormState {
-                        notification_type: self.new_type_rule_type,
-                        account: self.new_type_rule_account.clone(),
-                        priority: self.new_type_rule_priority,
-                        action: self.new_type_rule_action,
-                    },
+                    &self.type_rules, // Pass the whole state struct
                     &self.accounts,
-                    &self.expanded_type_groups,
+                    &self.type_rules.expanded_groups,
                 );
                 container(
                     scrollable(content)

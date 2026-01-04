@@ -1,4 +1,4 @@
-//! Account Rules tab - New 3-pane design for schedule management.
+//! Account Rules view.
 
 use chrono::{Local, Weekday};
 use iced::widget::{
@@ -14,7 +14,7 @@ use crate::ui::screens::settings::rule_engine::rules::{
 };
 use crate::ui::theme;
 
-use super::super::messages::{AccountMessage, RuleEngineMessage};
+use crate::ui::screens::settings::rule_engine::messages::{AccountMessage, RuleEngineMessage};
 
 pub fn view_account_rules_tab<'a>(
     rules: &'a NotificationRuleSet,
@@ -353,7 +353,7 @@ fn view_schedule_config<'a>(
             text("Notifications outside this range will be handled according to Behavior setting.")
                 .size(12)
                 .color(p.text_muted)
-        ]
+            ]
             .padding([0, 24])
         } else {
             column![]

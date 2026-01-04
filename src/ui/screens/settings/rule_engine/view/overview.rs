@@ -1,4 +1,4 @@
-//! Overview tab for Rule Engine - System health and high-impact rules.
+//! Overview tab - System health and high-impact rules.
 
 use iced::widget::{Space, button, column, container, row, text};
 use iced::{Element, Fill, Length};
@@ -8,7 +8,7 @@ use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::theme;
 
-use super::super::messages::{ExplainMessage, RuleEngineMessage};
+use crate::ui::screens::settings::rule_engine::messages::{ExplainMessage, RuleEngineMessage};
 
 pub fn view_overview_tab(
     rules: &NotificationRuleSet,
@@ -191,7 +191,12 @@ pub fn view_overview_tab(
     }
 
     let explain_panel =
-        super::super::explain_decision::view_explain_panel(rules, &type_owned, None, icon_theme);
+        crate::ui::screens::settings::rule_engine::explain_decision::view_explain_panel(
+            rules,
+            &type_owned,
+            None,
+            icon_theme,
+        );
 
     let test_lab = container(
         column![

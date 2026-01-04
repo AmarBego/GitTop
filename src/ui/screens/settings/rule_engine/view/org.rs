@@ -1,4 +1,4 @@
-//! Organization Rules tab for Rule Engine.
+//! Organization Rules view.
 
 use iced::widget::{Space, column, text};
 use iced::{Element, Fill};
@@ -7,8 +7,8 @@ use crate::settings::IconTheme;
 use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::theme;
 
-use super::super::components::{view_empty_state, view_org_rule_card};
-use super::super::messages::RuleEngineMessage;
+use crate::ui::screens::settings::rule_engine::components::{view_empty_state, view_org_rule_card};
+use crate::ui::screens::settings::rule_engine::messages::RuleEngineMessage;
 
 pub fn view_org_rules_tab(
     rules: &NotificationRuleSet,

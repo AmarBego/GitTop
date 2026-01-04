@@ -1,6 +1,5 @@
-use crate::github::types::NotificationReason;
-use crate::ui::screens::settings::rule_engine::rules::{OutsideScheduleBehavior, RuleAction};
-use chrono::Weekday;
+use crate::ui::features::account_rules::AccountRuleMessage;
+use crate::ui::features::type_rules::TypeRuleMessage;
 
 #[derive(Debug, Clone)]
 pub enum RuleEngineMessage {
@@ -9,42 +8,22 @@ pub enum RuleEngineMessage {
     ToggleEnabled(bool),
     ToggleHandbook,
     NoOp,
-    Account(AccountMessage),
+    Account(AccountRuleMessage),
     Org(OrgMessage),
-    Type(TypeMessage),
+    Type(TypeRuleMessage),
     Inspector(InspectorMessage),
     Explain(ExplainMessage),
 }
 
-#[derive(Debug, Clone)]
-pub enum AccountMessage {
-    Select(String),
-    ToggleEnabled(String, bool),
-    ToggleDay(String, Weekday),
-    SetTimeWindow(String, Option<String>, Option<String>),
-    SetTimeWindowExpanded(String, bool),
-    SetOutsideBehavior(String, OutsideScheduleBehavior),
-}
+// Re-export feature messages for convenience
+pub use crate::ui::features::account_rules::AccountRuleMessage as AccountMessage;
+pub use crate::ui::features::type_rules::TypeRuleMessage as TypeMessage;
 
 #[derive(Debug, Clone)]
 pub enum OrgMessage {
     Toggle(String, bool),
     Delete(String),
     Duplicate(String),
-}
-
-/// Type rule messages.
-#[derive(Debug, Clone)]
-pub enum TypeMessage {
-    Toggle(String, bool),
-    Delete(String),
-    Duplicate(String),
-    ToggleGroup(String),
-    FormTypeChanged(NotificationReason),
-    FormAccountChanged(String),
-    FormPriorityChanged(i32),
-    FormActionChanged(RuleAction),
-    Add,
 }
 
 #[derive(Debug, Clone)]

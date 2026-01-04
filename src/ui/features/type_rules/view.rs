@@ -1,4 +1,4 @@
-//! Type Rules tab for Rule Engine - with grouped collapsible sections.
+//! Type Rules view.
 
 use std::collections::HashSet;
 
@@ -10,28 +10,11 @@ use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, RuleAction, TypeRule};
 use crate::ui::theme;
 
-use super::super::components::{view_empty_state, view_type_rule_card};
-use super::super::messages::{RuleEngineMessage, TypeMessage};
-
-/// State for the "New Rule" form.
-#[derive(Debug, Clone)]
-pub struct TypeRuleFormState {
-    pub notification_type: crate::github::types::NotificationReason,
-    pub account: Option<String>,
-    pub priority: i32,
-    pub action: RuleAction,
-}
-
-impl Default for TypeRuleFormState {
-    fn default() -> Self {
-        Self {
-            notification_type: crate::github::types::NotificationReason::Mention,
-            account: None,
-            priority: 0,
-            action: RuleAction::Show,
-        }
-    }
-}
+use super::TypeRuleFormState;
+use crate::ui::screens::settings::rule_engine::components::{
+    view_empty_state, view_type_rule_card,
+};
+use crate::ui::screens::settings::rule_engine::messages::{RuleEngineMessage, TypeMessage};
 
 /// Groups type rules by notification_type using BTreeMap to avoid allocations and sorting.
 fn view_grouped_rules<'a>(
