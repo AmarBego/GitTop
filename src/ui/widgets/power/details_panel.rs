@@ -11,9 +11,9 @@ use crate::github::subject_details::{
     CommentDetails, DiscussionDetails, IssueDetails, NotificationSubjectDetail, PullRequestDetails,
 };
 use crate::settings::IconTheme;
-use crate::ui::screens::notifications::messages::{
-    NotificationMessage, ThreadMessage, ViewMessage,
-};
+use crate::ui::features::notification_details::NotificationDetailsMessage;
+use crate::ui::features::thread_actions::ThreadActionMessage;
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
 /// View the details panel for a selected notification.
@@ -565,7 +565,7 @@ fn view_action_buttons(
             "Mark as Read",
             p.accent_success,
             icons::icon_check(12.0, p.accent_success, icon_theme),
-            NotificationMessage::Thread(ThreadMessage::MarkAsRead(id.clone())),
+            NotificationMessage::Thread(ThreadActionMessage::MarkAsRead(id.clone())),
         ));
     }
 
@@ -574,7 +574,7 @@ fn view_action_buttons(
         "Delete",
         p.accent_danger,
         icons::icon_trash(12.0, p.accent_danger, icon_theme),
-        NotificationMessage::Thread(ThreadMessage::MarkAsDone(id_for_done)),
+        NotificationMessage::Thread(ThreadActionMessage::MarkAsDone(id_for_done)),
     ));
 
     // Open in GitHub button
@@ -657,7 +657,9 @@ fn view_open_in_github_button(icon_theme: IconTheme) -> Element<'static, Notific
         }
     })
     .padding([8, 12])
-    .on_press(NotificationMessage::View(ViewMessage::OpenInBrowser))
+    .on_press(NotificationMessage::Details(
+        NotificationDetailsMessage::OpenInBrowser,
+    ))
     .into()
 }
 

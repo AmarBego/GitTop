@@ -919,7 +919,7 @@ impl App {
                 details_panel::view_details_panel(
                     screen.selected_notification(),
                     screen.selected_details(),
-                    screen.is_loading_details,
+                    screen.notification_details.is_loading,
                     settings.icon_theme
                 )
             ]
@@ -950,7 +950,7 @@ impl App {
                 screen.is_loading,
                 unread_count,
                 screen.filters.show_all,
-                screen.bulk_mode,
+                screen.bulk_actions.bulk_mode,
                 settings.icon_theme
             ),
             main_area,

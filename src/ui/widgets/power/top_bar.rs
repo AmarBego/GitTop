@@ -5,8 +5,10 @@ use iced::{Alignment, Element, Fill};
 
 use crate::github::UserInfo;
 use crate::settings::IconTheme;
+use crate::ui::features::bulk_actions::BulkActionMessage;
+use crate::ui::features::thread_actions::ThreadActionMessage;
 use crate::ui::screens::notifications::messages::{
-    BulkMessage, FilterMessage, NavigationMessage, NotificationMessage, ThreadMessage,
+    FilterMessage, NavigationMessage, NotificationMessage,
 };
 use crate::ui::{icons, theme};
 
@@ -124,7 +126,9 @@ pub fn view_top_bar<'a>(
         )
         .style(theme::ghost_button)
         .padding([4, 8])
-        .on_press(NotificationMessage::Thread(ThreadMessage::MarkAllAsRead))
+        .on_press(NotificationMessage::Thread(
+            ThreadActionMessage::MarkAllAsRead,
+        ))
         .into()
     } else {
         Space::new().width(0).into()
@@ -185,7 +189,7 @@ pub fn view_top_bar<'a>(
         }
     })
     .padding([4, 8])
-    .on_press(NotificationMessage::Bulk(BulkMessage::ToggleMode));
+    .on_press(NotificationMessage::Bulk(BulkActionMessage::ToggleMode));
 
     // Middle container
     let middle_controls = row![

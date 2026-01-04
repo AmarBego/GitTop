@@ -13,10 +13,10 @@ use iced::{Alignment, Color, Element, Fill};
 
 use crate::github::types::{self, SubjectType};
 use crate::settings::IconTheme;
+use crate::ui::features::notification_details::NotificationDetailsMessage;
+use crate::ui::features::thread_actions::ThreadActionMessage;
 use crate::ui::screens::notifications::helper::ProcessedNotification;
-use crate::ui::screens::notifications::messages::{
-    NotificationMessage, ThreadMessage, ViewMessage,
-};
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::screens::settings::rule_engine::RuleAction;
 use crate::ui::{icons, theme};
 
@@ -266,9 +266,9 @@ pub fn notification_item(
         // - Dense (power mode): Select for details panel view
         // - Standard: Open in browser
         let click_message = if dense {
-            NotificationMessage::View(ViewMessage::SelectNotification(notif.id.clone()))
+            NotificationMessage::Details(NotificationDetailsMessage::Select(notif.id.clone()))
         } else {
-            NotificationMessage::Thread(ThreadMessage::Open(notif.id.clone()))
+            NotificationMessage::Thread(ThreadActionMessage::Open(notif.id.clone()))
         };
 
         button(content)

@@ -10,7 +10,8 @@ use crate::ui::{icons, theme};
 use super::group::view_group_header;
 use super::states::{view_empty, view_error, view_loading};
 
-use crate::ui::screens::notifications::messages::{BulkMessage, NotificationMessage, ViewMessage};
+use crate::ui::features::bulk_actions::BulkActionMessage;
+use crate::ui::screens::notifications::messages::{NotificationMessage, ViewMessage};
 use crate::ui::screens::notifications::screen::NotificationsScreen;
 
 impl NotificationsScreen {
@@ -64,7 +65,7 @@ impl NotificationsScreen {
             return view_empty(empty_state, icon_theme);
         }
 
-        let in_bulk_mode = self.bulk_mode && power_mode;
+        let in_bulk_mode = self.bulk_actions.bulk_mode && power_mode;
         let pp = theme::palette();
 
         // === HEIGHT ESTIMATES FOR VIRTUAL SCROLLING ===
@@ -132,7 +133,7 @@ impl NotificationsScreen {
                             let item =
                                 notification_item(p, icon_theme, power_mode, is_priority, false);
                             let id = p.notification.id.clone();
-                            let is_selected = self.selected_ids.contains(&id);
+                            let is_selected = self.bulk_actions.is_selected(&id);
 
                             let checkbox_icon: Element<'_, NotificationMessage> = if is_selected {
                                 container(icons::icon_check(12.0, iced::Color::WHITE, icon_theme))
@@ -182,7 +183,9 @@ impl NotificationsScreen {
                                 }
                             })
                             .padding(0)
-                            .on_press(NotificationMessage::Bulk(BulkMessage::ToggleSelect(id)))
+                            .on_press(NotificationMessage::Bulk(BulkActionMessage::ToggleSelect(
+                                id,
+                            )))
                             .width(Fill)
                             .into()
                         } else {
@@ -234,7 +237,7 @@ impl NotificationsScreen {
         let column_spacing: f32 = 8.0;
         let content_padding: f32 = 8.0;
         let pp = theme::palette();
-        let in_bulk_mode = self.bulk_mode && power_mode;
+        let in_bulk_mode = self.bulk_actions.bulk_mode && power_mode;
 
         let mut content = column![]
             .spacing(column_spacing)
@@ -254,7 +257,7 @@ impl NotificationsScreen {
                     let item_element: Element<'_, NotificationMessage> = if in_bulk_mode {
                         let item = notification_item(p, icon_theme, power_mode, is_priority, false);
                         let id = p.notification.id.clone();
-                        let is_selected = self.selected_ids.contains(&id);
+                        let is_selected = self.bulk_actions.is_selected(&id);
 
                         let checkbox_icon: Element<'_, NotificationMessage> = if is_selected {
                             container(icons::icon_check(12.0, iced::Color::WHITE, icon_theme))
@@ -304,7 +307,9 @@ impl NotificationsScreen {
                             }
                         })
                         .padding(0)
-                        .on_press(NotificationMessage::Bulk(BulkMessage::ToggleSelect(id)))
+                        .on_press(NotificationMessage::Bulk(BulkActionMessage::ToggleSelect(
+                            id,
+                        )))
                         .width(Fill)
                         .into()
                     } else {

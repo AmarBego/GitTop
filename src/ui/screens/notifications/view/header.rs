@@ -6,9 +6,8 @@ use iced::{Alignment, Color, Element, Fill};
 use crate::settings::IconTheme;
 use crate::ui::{icons, theme};
 
-use crate::ui::screens::notifications::messages::{
-    FilterMessage, NotificationMessage, ThreadMessage,
-};
+use crate::ui::features::thread_actions::ThreadActionMessage;
+use crate::ui::screens::notifications::messages::{FilterMessage, NotificationMessage};
 use crate::ui::screens::notifications::screen::NotificationsScreen;
 
 impl NotificationsScreen {
@@ -82,9 +81,9 @@ impl NotificationsScreen {
             }
         })
         .padding([6, 10])
-        .on_press_maybe(
-            has_unread.then_some(NotificationMessage::Thread(ThreadMessage::MarkAllAsRead)),
-        );
+        .on_press_maybe(has_unread.then_some(NotificationMessage::Thread(
+            ThreadActionMessage::MarkAllAsRead,
+        )));
 
         let refresh_btn = button(icons::icon_refresh(14.0, p.text_secondary, icon_theme))
             .style(theme::ghost_button)
