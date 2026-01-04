@@ -15,38 +15,58 @@ pub(crate) mod linux;
 #[cfg(target_os = "freebsd")]
 pub(crate) mod freebsd;
 
-// Re-export platform functions with unified API
+// ============================================================================
+// Platform dispatch macros
+// ============================================================================
+
+/// Dispatch a no-op function call to the correct platform module.
+macro_rules! platform_call {
+    ($fn:ident) => {{
+        #[cfg(windows)]
+        windows::$fn();
+
+        #[cfg(target_os = "macos")]
+        macos::$fn();
+
+        #[cfg(target_os = "linux")]
+        linux::$fn();
+
+        #[cfg(target_os = "freebsd")]
+        freebsd::$fn();
+    }};
+}
+
+/// Dispatch a function call with a return value to the correct platform module.
+macro_rules! platform_return {
+    ($fn:ident $(, $arg:expr)*) => {{
+        #[cfg(windows)]
+        return windows::$fn($($arg),*);
+
+        #[cfg(target_os = "macos")]
+        return macos::$fn($($arg),*);
+
+        #[cfg(target_os = "linux")]
+        return linux::$fn($($arg),*);
+
+        #[cfg(target_os = "freebsd")]
+        return freebsd::$fn($($arg),*);
+    }};
+}
+
+// ============================================================================
+// Public platform API
+// ============================================================================
 
 /// Focus an existing application window (for single-instance support).
 /// Called when a second instance tries to launch.
 pub fn focus_existing_window() {
-    #[cfg(windows)]
-    windows::focus_existing_window();
-
-    #[cfg(target_os = "macos")]
-    macos::focus_existing_window();
-
-    #[cfg(target_os = "linux")]
-    linux::focus_existing_window();
-
-    #[cfg(target_os = "freebsd")]
-    freebsd::focus_existing_window();
+    platform_call!(focus_existing_window);
 }
 
 /// Enable dark mode for system UI elements (context menus, etc.).
 /// Should be called early in app initialization.
 pub fn enable_dark_mode() {
-    #[cfg(windows)]
-    windows::enable_dark_mode();
-
-    #[cfg(target_os = "macos")]
-    macos::enable_dark_mode();
-
-    #[cfg(target_os = "linux")]
-    linux::enable_dark_mode();
-
-    #[cfg(target_os = "freebsd")]
-    freebsd::enable_dark_mode();
+    platform_call!(enable_dark_mode);
 }
 
 /// Aggressively reduce memory footprint.
@@ -70,17 +90,7 @@ pub fn trim_memory() {
 /// Must be called before creating TrayManager.
 /// On Linux/FreeBSD, this initializes GTK which tray-icon requires.
 pub fn init_tray() {
-    #[cfg(windows)]
-    windows::init_tray();
-
-    #[cfg(target_os = "macos")]
-    macos::init_tray();
-
-    #[cfg(target_os = "linux")]
-    linux::init_tray();
-
-    #[cfg(target_os = "freebsd")]
-    freebsd::init_tray();
+    platform_call!(init_tray);
 }
 
 /// Send a native desktop notification.
@@ -120,18 +130,12 @@ pub fn notify(
 /// On Linux/FreeBSD, uses daemon mode to stay alive when window closes.
 /// On Windows/macOS, uses normal application mode.
 pub fn run_app() -> iced::Result {
-    #[cfg(windows)]
-    return windows::run_app();
-
-    #[cfg(target_os = "macos")]
-    return macos::run_app();
-
-    #[cfg(target_os = "linux")]
-    return linux::run_app();
-
-    #[cfg(target_os = "freebsd")]
-    return freebsd::run_app();
+    platform_return!(run_app);
 }
+
+// ============================================================================
+// On-boot/autostart functionality
+// ============================================================================
 
 /// On-boot/autostart functionality.
 ///
@@ -146,8 +150,9 @@ pub mod on_boot {
     use std::fmt;
     use std::io;
 
-    /// Error type for on_boot operations.
+    /// Error type for on_boot operations (shared across all platforms).
     #[derive(Debug)]
+    #[allow(dead_code)] // Variants used on different platforms (e.g., CommandFailed on Linux)
     pub enum OnBootError {
         /// The operation is not supported on this platform/init system.
         NotSupported,
@@ -197,6 +202,14 @@ pub mod on_boot {
 
         #[cfg(target_os = "freebsd")]
         return super::freebsd::on_boot::is_enabled();
+
+        #[cfg(not(any(
+            windows,
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "freebsd"
+        )))]
+        return false;
     }
 
     /// Enable autostart.
@@ -204,16 +217,24 @@ pub mod on_boot {
     /// Configures the system to start the application automatically on user login.
     pub fn enable() -> Result<(), OnBootError> {
         #[cfg(windows)]
-        return super::windows::on_boot::enable().map_err(convert_error);
+        return super::windows::on_boot::enable();
 
         #[cfg(target_os = "macos")]
-        return super::macos::on_boot::enable().map_err(convert_error);
+        return super::macos::on_boot::enable();
 
         #[cfg(target_os = "linux")]
-        return super::linux::on_boot::enable().map_err(convert_error);
+        return super::linux::on_boot::enable();
 
         #[cfg(target_os = "freebsd")]
-        return super::freebsd::on_boot::enable().map_err(convert_error);
+        return super::freebsd::on_boot::enable();
+
+        #[cfg(not(any(
+            windows,
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "freebsd"
+        )))]
+        return Err(OnBootError::NotSupported);
     }
 
     /// Disable autostart.
@@ -221,60 +242,23 @@ pub mod on_boot {
     /// Removes the autostart configuration so the application no longer starts on login.
     pub fn disable() -> Result<(), OnBootError> {
         #[cfg(windows)]
-        return super::windows::on_boot::disable().map_err(convert_error);
+        return super::windows::on_boot::disable();
 
         #[cfg(target_os = "macos")]
-        return super::macos::on_boot::disable().map_err(convert_error);
+        return super::macos::on_boot::disable();
 
         #[cfg(target_os = "linux")]
-        return super::linux::on_boot::disable().map_err(convert_error);
+        return super::linux::on_boot::disable();
 
         #[cfg(target_os = "freebsd")]
-        return super::freebsd::on_boot::disable().map_err(convert_error);
-    }
+        return super::freebsd::on_boot::disable();
 
-    // Helper to convert platform-specific error to unified error
-    #[cfg(windows)]
-    fn convert_error(e: super::windows::on_boot::OnBootError) -> OnBootError {
-        match e {
-            super::windows::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
-            super::windows::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
-            super::windows::on_boot::OnBootError::CommandFailed(msg) => {
-                OnBootError::CommandFailed(msg)
-            }
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    fn convert_error(e: super::macos::on_boot::OnBootError) -> OnBootError {
-        match e {
-            super::macos::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
-            super::macos::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
-            super::macos::on_boot::OnBootError::CommandFailed(msg) => {
-                OnBootError::CommandFailed(msg)
-            }
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn convert_error(e: super::linux::on_boot::OnBootError) -> OnBootError {
-        match e {
-            super::linux::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
-            super::linux::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
-            super::linux::on_boot::OnBootError::CommandFailed(msg) => {
-                OnBootError::CommandFailed(msg)
-            }
-        }
-    }
-
-    #[cfg(target_os = "freebsd")]
-    fn convert_error(e: super::freebsd::on_boot::OnBootError) -> OnBootError {
-        match e {
-            super::freebsd::on_boot::OnBootError::NotSupported => OnBootError::NotSupported,
-            super::freebsd::on_boot::OnBootError::Io(io_err) => OnBootError::Io(io_err),
-            super::freebsd::on_boot::OnBootError::CommandFailed(msg) => {
-                OnBootError::CommandFailed(msg)
-            }
-        }
+        #[cfg(not(any(
+            windows,
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "freebsd"
+        )))]
+        return Err(OnBootError::NotSupported);
     }
 }

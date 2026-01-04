@@ -123,49 +123,17 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_r
 }
 
 pub mod on_boot {
-    use std::fmt;
     use std::fs;
-    use std::io;
     use std::path::PathBuf;
     use std::process::Command;
 
-    /// Error type for on_boot operations.
-    #[derive(Debug)]
-    pub enum OnBootError {
-        /// The operation is not supported on this platform/init system.
-        NotSupported,
-        /// An I/O error occurred.
-        Io(io::Error),
-        /// A command failed to execute.
-        CommandFailed(String),
-    }
-
-    impl fmt::Display for OnBootError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                OnBootError::NotSupported => write!(f, "on-boot is not supported on this system"),
-                OnBootError::Io(e) => write!(f, "I/O error: {}", e),
-                OnBootError::CommandFailed(msg) => write!(f, "command failed: {}", msg),
-            }
-        }
-    }
-
-    impl std::error::Error for OnBootError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                OnBootError::Io(e) => Some(e),
-                _ => None,
-            }
-        }
-    }
-
-    impl From<io::Error> for OnBootError {
-        fn from(e: io::Error) -> Self {
-            OnBootError::Io(e)
-        }
-    }
+    // Re-export the shared error type from the parent module
+    pub use crate::platform::on_boot::OnBootError;
 
     /// The systemd user service unit file content.
+    ///
+    /// PassEnvironment inherits display variables from the user session,
+    /// which are required for GUI applications to connect to the display server.
     const SYSTEMD_SERVICE_TEMPLATE: &str = r#"[Unit]
 Description=GitTop - GitHub Notifications Manager
 After=graphical-session.target
@@ -173,6 +141,7 @@ After=graphical-session.target
 [Service]
 Type=simple
 ExecStart={EXEC_PATH}
+PassEnvironment=DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR
 Restart=on-failure
 RestartSec=5
 
@@ -261,9 +230,9 @@ WantedBy=default.target
 
         // Ignore "not found" errors - service may not exist yet.
         if !disable.status.success() {
-            let stderr = String::from_utf8_lossy(&disable.stderr);
+            let stderr = String::from_utf8_lossy(&disable.stderr).to_string();
             if !stderr.contains("not found") && !stderr.contains("No such file") {
-                eprintln!("Warning: systemctl disable failed: {}", stderr);
+                return Err(OnBootError::CommandFailed(stderr));
             }
         }
 

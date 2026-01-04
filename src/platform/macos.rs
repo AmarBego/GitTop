@@ -70,44 +70,8 @@ pub fn notify(
 /// TODO: Implement using LaunchAgents.
 /// - Create plist at ~/Library/LaunchAgents/com.gittop.plist
 pub mod on_boot {
-    use std::fmt;
-    use std::io;
-
-    /// Error type for on_boot operations.
-    #[derive(Debug)]
-    pub enum OnBootError {
-        /// The operation is not supported on this platform.
-        NotSupported,
-        /// An I/O error occurred.
-        Io(io::Error),
-        /// A command failed to execute.
-        CommandFailed(String),
-    }
-
-    impl fmt::Display for OnBootError {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            match self {
-                OnBootError::NotSupported => write!(f, "on-boot is not supported on this system"),
-                OnBootError::Io(e) => write!(f, "I/O error: {}", e),
-                OnBootError::CommandFailed(msg) => write!(f, "command failed: {}", msg),
-            }
-        }
-    }
-
-    impl std::error::Error for OnBootError {
-        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-            match self {
-                OnBootError::Io(e) => Some(e),
-                _ => None,
-            }
-        }
-    }
-
-    impl From<io::Error> for OnBootError {
-        fn from(e: io::Error) -> Self {
-            OnBootError::Io(e)
-        }
-    }
+    // Re-export the shared error type from the parent module
+    pub use crate::platform::on_boot::OnBootError;
 
     /// Check if autostart is currently enabled.
     ///

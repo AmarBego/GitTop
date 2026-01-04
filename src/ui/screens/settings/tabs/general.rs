@@ -9,7 +9,7 @@ use crate::ui::theme;
 use super::super::components::{setting_card, tab_title};
 use super::super::messages::SettingsMessage;
 
-pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
 
     column![
@@ -24,7 +24,7 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         Space::new().height(8),
         view_minimize_to_tray(settings),
         Space::new().height(8),
-        view_start_on_boot(),
+        view_start_on_boot(start_on_boot_enabled),
         Space::new().height(24),
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
@@ -103,11 +103,8 @@ fn view_minimize_to_tray(settings: &AppSettings) -> Element<'_, SettingsMessage>
     )
 }
 
-fn view_start_on_boot() -> Element<'static, SettingsMessage> {
-    use crate::platform::on_boot;
-
-    let enabled = on_boot::is_enabled();
-    let desc = if enabled {
+fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, SettingsMessage> {
+    let desc = if start_on_boot_enabled {
         "GitTop starts when you log in"
     } else {
         "GitTop does not start automatically"
@@ -116,7 +113,7 @@ fn view_start_on_boot() -> Element<'static, SettingsMessage> {
     toggle_card(
         "Start on Boot",
         desc,
-        enabled,
+        start_on_boot_enabled,
         SettingsMessage::ToggleStartOnBoot,
     )
 }
