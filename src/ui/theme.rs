@@ -653,24 +653,6 @@ pub fn context_menu_container() -> container::Style {
     }
 }
 
-/// Card container style (for modals, popups)
-pub fn card(_: &Theme) -> container::Style {
-    with_palette(|p| container::Style {
-        background: Some(Background::Color(p.bg_card)),
-        border: Border {
-            radius: 12.0.into(),
-            color: p.border_subtle,
-            width: 1.0,
-        },
-        shadow: iced::Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.4),
-            offset: iced::Vector::new(0.0, 4.0),
-            blur_radius: 16.0,
-        },
-        ..Default::default()
-    })
-}
-
 /// Rule card container style
 pub fn rule_card_container() -> container::Style {
     let p = palette();

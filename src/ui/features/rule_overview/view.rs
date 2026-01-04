@@ -1,21 +1,22 @@
-//! Overview tab - System health and high-impact rules.
-
 use iced::widget::{Space, button, column, container, row, text};
 use iced::{Element, Fill, Length};
 
+use crate::github::types::NotificationReason;
 use crate::settings::IconTheme;
 use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::NotificationRuleSet;
 use crate::ui::theme;
 
-use crate::ui::screens::settings::rule_engine::messages::{ExplainMessage, RuleEngineMessage};
+use super::message::OverviewMessage;
+use super::state::RuleOverviewState;
 
-pub fn view_overview_tab(
+pub fn view(
     rules: &NotificationRuleSet,
     icon_theme: IconTheme,
-    explain_test_type: &str,
-) -> Element<'static, RuleEngineMessage> {
+    state: &RuleOverviewState,
+) -> Element<'static, OverviewMessage> {
     let p = theme::palette();
+    let explain_test_type = &state.explain_test_type;
 
     // System health stats
     let active_count = rules.active_rule_count();
@@ -40,7 +41,7 @@ pub fn view_overview_tab(
     // Helper for status items
     let status_item = |label: &'static str,
                        value: String,
-                       icon: Element<'static, RuleEngineMessage>,
+                       icon: Element<'static, OverviewMessage>,
                        color: iced::Color| {
         row![
             icon,
@@ -65,7 +66,7 @@ pub fn view_overview_tab(
         status_item(
             "Active",
             active_count.to_string(),
-            icons::icon_check(16.0, p.accent_success, icon_theme),
+            icons::icon_check::<OverviewMessage>(16.0, p.accent_success, icon_theme),
             p.text_primary
         ),
         Space::new().width(16),
@@ -76,9 +77,9 @@ pub fn view_overview_tab(
             "Hidden",
             hidden_count.to_string(),
             if hidden_count > 0 {
-                icons::icon_eye_off(16.0, p.accent_warning, icon_theme)
+                icons::icon_eye_off::<OverviewMessage>(16.0, p.accent_warning, icon_theme)
             } else {
-                icons::icon_check(16.0, p.text_muted, icon_theme)
+                icons::icon_check::<OverviewMessage>(16.0, p.text_muted, icon_theme)
             },
             if hidden_count > 0 {
                 p.accent_warning
@@ -94,9 +95,9 @@ pub fn view_overview_tab(
             "Important",
             important_count.to_string(),
             if important_count > 0 {
-                icons::icon_zap(16.0, p.accent, icon_theme)
+                icons::icon_zap::<OverviewMessage>(16.0, p.accent, icon_theme)
             } else {
-                icons::icon_check(16.0, p.text_muted, icon_theme)
+                icons::icon_check::<OverviewMessage>(16.0, p.text_muted, icon_theme)
             },
             p.text_primary
         ),
@@ -152,8 +153,6 @@ pub fn view_overview_tab(
     // 3. Test Lab (Primary Action Surface)
     // ========================================================================
 
-    // Keep the existing selector logic, just restyle container
-    use crate::github::types::NotificationReason;
     let type_options: Vec<(&'static str, &'static str)> = vec![
         (NotificationReason::Mention.label(), "Mention"),
         (NotificationReason::ReviewRequested.label(), "Review"),
@@ -183,25 +182,24 @@ pub fn view_overview_tab(
             theme::ghost_button
         })
         .padding([6, 12])
-        .on_press(RuleEngineMessage::Explain(ExplainMessage::SetTestType(
-            value_owned,
-        )));
+        .on_press(OverviewMessage::SetTestType(value_owned));
 
         type_buttons = type_buttons.push(btn);
     }
 
-    let explain_panel =
-        crate::ui::screens::settings::rule_engine::explain_decision::view_explain_panel(
-            rules,
-            &type_owned,
-            None,
-            icon_theme,
-        );
+    // Explain panel
+    // Explain panel
+    let explain_panel = super::widgets::explain_panel::view_explain_panel::<OverviewMessage>(
+        rules,
+        &type_owned,
+        None,
+        icon_theme,
+    );
 
     let test_lab = container(
         column![
             row![
-                icons::icon_filter(16.0, p.accent, icon_theme),
+                icons::icon_filter::<OverviewMessage>(16.0, p.accent, icon_theme),
                 Space::new().width(8),
                 text("Test Lab")
                     .size(16)
@@ -240,7 +238,7 @@ pub fn view_overview_tab(
 
     let high_impact_rules = rules.get_high_impact_rules();
 
-    let list_content: Element<'static, RuleEngineMessage> = if high_impact_rules.is_empty() {
+    let list_content: Element<'static, OverviewMessage> = if high_impact_rules.is_empty() {
         column![
             text("No high-impact rules active.")
                 .size(12)
@@ -271,7 +269,7 @@ pub fn view_overview_tab(
                     // Future: .on_press(NavigateToRule(id))
                     .into()
                 })
-                .collect::<Vec<Element<'_, RuleEngineMessage>>>(),
+                .collect::<Vec<Element<'_, OverviewMessage>>>(),
         )
         .spacing(8)
         .into()

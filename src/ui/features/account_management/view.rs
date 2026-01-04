@@ -1,36 +1,18 @@
-//! Accounts tab - GitHub account management.
-
 use iced::widget::{Space, button, column, container, row, text, text_input};
 use iced::{Alignment, Element, Fill};
 
 use crate::settings::{AppSettings, StoredAccount};
+use crate::ui::screens::settings::components::{setting_card, tab_title};
 use crate::ui::{icons, theme};
 
-use super::super::components::{setting_card, tab_title};
-use super::super::messages::SettingsMessage;
-
-/// Status of the token submission process.
-#[derive(Debug, Clone, Default)]
-pub enum SubmissionStatus {
-    #[default]
-    Idle,
-    Validating,
-    Success(String),
-    Error(String),
-}
-
-/// State for the accounts tab (token input, validation status).
-#[derive(Debug, Clone, Default)]
-pub struct AccountsTabState {
-    pub token_input: String,
-    pub status: SubmissionStatus,
-}
+use super::message::AccountMessage;
+use super::state::{AccountManagementState, SubmissionStatus};
 
 /// Render the accounts tab content.
 pub fn view<'a>(
+    state: &'a AccountManagementState,
     settings: &'a AppSettings,
-    state: &'a AccountsTabState,
-) -> Element<'a, SettingsMessage> {
+) -> Element<'a, AccountMessage> {
     let p = theme::palette();
 
     column![
@@ -39,7 +21,7 @@ pub fn view<'a>(
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        view_add_account_section(settings, state),
+        view_add_account_section(state, settings),
         Space::new().height(16),
         view_accounts_list(settings),
     ]
@@ -50,9 +32,9 @@ pub fn view<'a>(
 }
 
 fn view_add_account_section<'a>(
+    state: &'a AccountManagementState,
     settings: &'a AppSettings,
-    state: &'a AccountsTabState,
-) -> Element<'a, SettingsMessage> {
+) -> Element<'a, AccountMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
 
@@ -72,7 +54,7 @@ fn view_add_account_section<'a>(
         Space::new().height(12),
         row![
             text_input("ghp_xxxxxxxxxxxx", &state.token_input)
-                .on_input(SettingsMessage::TokenInputChanged)
+                .on_input(AccountMessage::TokenInputChanged)
                 .padding([8, 12])
                 .size(13)
                 .width(Fill)
@@ -88,7 +70,7 @@ fn view_add_account_section<'a>(
             .on_press_maybe(if is_validating || state.token_input.is_empty() {
                 None
             } else {
-                Some(SettingsMessage::SubmitToken)
+                Some(AccountMessage::SubmitToken)
             }),
         ]
         .align_y(Alignment::Center),
@@ -111,7 +93,7 @@ fn view_add_account_section<'a>(
     setting_card(content)
 }
 
-fn view_accounts_list(settings: &AppSettings) -> Element<'static, SettingsMessage> {
+fn view_accounts_list(settings: &AppSettings) -> Element<'static, AccountMessage> {
     let p = theme::palette();
 
     if settings.accounts.is_empty() {
@@ -137,7 +119,7 @@ fn view_accounts_list(settings: &AppSettings) -> Element<'static, SettingsMessag
 fn view_account_item(
     account: &StoredAccount,
     settings: &AppSettings,
-) -> Element<'static, SettingsMessage> {
+) -> Element<'static, AccountMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
 
@@ -155,7 +137,7 @@ fn view_account_item(
             button(icons::icon_trash(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
                 .padding(6)
-                .on_press(SettingsMessage::RemoveAccount(username_msg)),
+                .on_press(AccountMessage::RemoveAccount(username_msg)),
         ]
         .align_y(Alignment::Center)
         .padding(14),

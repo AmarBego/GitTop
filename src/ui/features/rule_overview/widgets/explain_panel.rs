@@ -1,7 +1,4 @@
-//! Explain Decision component - shows why notifications are handled a certain way.
-//!
-//! This component allows users to test their rules by simulating a notification
-//! and seeing which rules would match and in what priority order.
+//! Explain Decision component - logic moved to rule_overview feature.
 
 use iced::widget::{Space, column, container, row, text};
 use iced::{Alignment, Element, Fill};
@@ -11,19 +8,18 @@ use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::{NotificationRuleSet, RuleAction};
 use crate::ui::theme;
 
-use super::messages::RuleEngineMessage;
-
 use chrono::Local;
 
-// MatchedRule and simulate_matching_rules removed in favor of rules.trace()
-
 /// View the explanation panel.
-pub fn view_explain_panel(
+pub fn view_explain_panel<'a, Message>(
     rules: &NotificationRuleSet,
     test_type: &str,
     test_account: Option<&str>,
     icon_theme: IconTheme,
-) -> Element<'static, RuleEngineMessage> {
+) -> Element<'a, Message>
+where
+    Message: 'a + Clone + 'static,
+{
     let p = theme::palette();
 
     let header = row![

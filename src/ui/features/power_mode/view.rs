@@ -1,15 +1,13 @@
-//! Power Mode tab - enterprise features and Rule Engine.
-
 use iced::widget::{Space, button, column, container, row, text, toggler};
 use iced::{Alignment, Element, Fill};
 
 use crate::settings::AppSettings;
+use crate::ui::screens::settings::components::tab_title;
 use crate::ui::{icons, theme};
 
-use super::super::components::tab_title;
-use super::super::messages::SettingsMessage;
+use super::message::PowerModeMessage;
 
-pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+pub fn view(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let enabled = settings.power_mode;
 
@@ -39,7 +37,7 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 }
 
 /// Hero card with prominent Power Mode toggle.
-fn view_hero(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_hero(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let enabled = settings.power_mode;
     let icon_theme = settings.icon_theme;
@@ -100,7 +98,7 @@ fn view_hero(settings: &AppSettings) -> Element<'_, SettingsMessage> {
             Space::new().width(Fill),
             // Right: Toggle
             toggler(enabled)
-                .on_toggle(SettingsMessage::TogglePowerMode)
+                .on_toggle(PowerModeMessage::Toggle)
                 .size(24),
         ]
         .align_y(Alignment::Center)
@@ -127,7 +125,7 @@ fn view_hero(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 }
 
 /// Feature cards shown when Power Mode is enabled.
-fn view_features(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_features(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
 
@@ -162,9 +160,9 @@ fn view_features(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 fn feature_card<'a>(
     title: &'static str,
     description: &'static str,
-    icon: Element<'a, SettingsMessage>,
+    icon: Element<'a, PowerModeMessage>,
     p: theme::ThemePalette,
-) -> Element<'a, SettingsMessage> {
+) -> Element<'a, PowerModeMessage> {
     container(
         row![
             container(icon).padding(8).style(move |_| container::Style {
@@ -200,7 +198,7 @@ fn feature_card<'a>(
 }
 
 /// Disabled feature preview (grayed out).
-fn view_disabled_features(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_disabled_features(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
 
@@ -239,7 +237,7 @@ fn view_disabled_features(settings: &AppSettings) -> Element<'_, SettingsMessage
 fn disabled_feature_row(
     label: &'static str,
     p: theme::ThemePalette,
-) -> Element<'static, SettingsMessage> {
+) -> Element<'static, PowerModeMessage> {
     row![
         container(Space::new().width(6).height(6)).style(move |_| container::Style {
             background: Some(iced::Background::Color(p.text_muted.scale_alpha(0.5))),
@@ -257,7 +255,7 @@ fn disabled_feature_row(
 }
 
 /// Rule Engine section with prominent action button.
-fn view_rule_engine(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_rule_engine(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let icon_theme = settings.icon_theme;
 
@@ -303,7 +301,7 @@ fn view_rule_engine(settings: &AppSettings) -> Element<'_, SettingsMessage> {
             )
             .style(theme::primary_button)
             .padding([12, 24])
-            .on_press(SettingsMessage::OpenRuleEngine),
+            .on_press(PowerModeMessage::OpenRuleEngine),
         ]
         .padding(20),
     )

@@ -1,16 +1,28 @@
-//! Network proxy settings tab.
-
 use iced::widget::{Space, button, column, container, row, text, text_input, toggler};
 use iced::{Alignment, Element, Fill, Length};
 
+use crate::settings::AppSettings;
+use crate::ui::screens::settings::components::{setting_card, tab_title};
 use crate::ui::{icons, theme};
 
-use super::super::components::{setting_card, tab_title};
-use super::super::messages::SettingsMessage;
-use super::super::screen::SettingsScreen;
+use super::message::ProxyMessage;
+use super::state::NetworkProxyState;
+
+/// Check if proxy settings have unsaved changes
+fn has_unsaved_changes(state: &NetworkProxyState, settings: &AppSettings) -> bool {
+    let enabled_changed = state.enabled != settings.proxy.enabled;
+    let url_changed = state.url != settings.proxy.url;
+    let new_has_creds = !state.username.is_empty() || !state.password.is_empty();
+    let creds_status_changed = new_has_creds != settings.proxy.has_credentials;
+
+    enabled_changed || url_changed || creds_status_changed || state.creds_dirty
+}
 
 /// View for network proxy settings
-pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
+pub fn view<'a>(
+    state: &'a NetworkProxyState,
+    settings: &'a AppSettings,
+) -> Element<'a, ProxyMessage> {
     let p = theme::palette();
 
     column![
@@ -19,9 +31,9 @@ pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        view_proxy_enabled(screen),
+        view_proxy_enabled(state),
         Space::new().height(8),
-        view_proxy_configuration(screen),
+        view_proxy_configuration(state, settings),
     ]
     .spacing(4)
     .padding(24)
@@ -30,9 +42,9 @@ pub fn view(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
 }
 
 /// Proxy enabled toggle card
-fn view_proxy_enabled(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
+fn view_proxy_enabled(state: &NetworkProxyState) -> Element<'_, ProxyMessage> {
     let p = theme::palette();
-    let enabled = screen.proxy_enabled;
+    let enabled = state.enabled;
     let desc = if enabled {
         "Proxy will be used for all GitHub API requests"
     } else {
@@ -48,7 +60,7 @@ fn view_proxy_enabled(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
             ]
             .width(Fill),
             toggler(enabled)
-                .on_toggle(SettingsMessage::ToggleProxyEnabled)
+                .on_toggle(ProxyMessage::ToggleEnabled)
                 .size(24),
         ]
         .align_y(Alignment::Center),
@@ -56,11 +68,14 @@ fn view_proxy_enabled(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
 }
 
 /// Proxy configuration card (URL and authentication combined)
-fn view_proxy_configuration(screen: &SettingsScreen) -> Element<'_, SettingsMessage> {
+fn view_proxy_configuration<'a>(
+    state: &'a NetworkProxyState,
+    settings: &'a AppSettings,
+) -> Element<'a, ProxyMessage> {
     let p = theme::palette();
 
-    let has_auth = screen.settings.proxy.has_credentials;
-    let has_unsaved = screen.has_unsaved_proxy_changes();
+    let has_auth = settings.proxy.has_credentials;
+    let has_unsaved = has_unsaved_changes(state, settings);
 
     setting_card(
         column![
@@ -71,8 +86,8 @@ fn view_proxy_configuration(screen: &SettingsScreen) -> Element<'_, SettingsMess
             ]
             .align_y(Alignment::Center),
             Space::new().height(12),
-            text_input("http://proxy.company.com:8080", &screen.proxy_url)
-                .on_input(SettingsMessage::ProxyUrlChanged)
+            text_input("http://proxy.company.com:8080", &state.url)
+                .on_input(ProxyMessage::UrlChanged)
                 .padding([8, 12])
                 .size(13)
                 .width(Fill)
@@ -82,7 +97,7 @@ fn view_proxy_configuration(screen: &SettingsScreen) -> Element<'_, SettingsMess
             container(Space::new().height(1))
                 .width(Fill)
                 .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(theme::palette().border_subtle,)),
+                    background: Some(iced::Background::Color(p.border_subtle)),
                     ..Default::default()
                 }),
             Space::new().height(10),
@@ -101,24 +116,24 @@ fn view_proxy_configuration(screen: &SettingsScreen) -> Element<'_, SettingsMess
                 ]
                 .width(Fill),
                 if has_auth {
-                    icons::icon_check(16.0, p.accent_success, screen.settings.icon_theme)
+                    icons::icon_check(16.0, p.accent_success, settings.icon_theme)
                 } else {
-                    icons::icon_at(16.0, p.text_muted, screen.settings.icon_theme)
+                    icons::icon_at(16.0, p.text_muted, settings.icon_theme)
                 },
             ]
             .align_y(Alignment::Center),
             Space::new().height(16),
             row![
-                text_input("Username", &screen.proxy_username)
-                    .on_input(SettingsMessage::ProxyUsernameChanged)
+                text_input("Username", &state.username)
+                    .on_input(ProxyMessage::UsernameChanged)
                     .padding([8, 12])
                     .size(13)
                     .width(Fill)
                     .style(theme::text_input_style),
                 Space::new().width(8),
-                text_input("Password", &screen.proxy_password)
+                text_input("Password", &state.password)
                     .secure(true)
-                    .on_input(SettingsMessage::ProxyPasswordChanged)
+                    .on_input(ProxyMessage::PasswordChanged)
                     .padding([8, 12])
                     .size(13)
                     .width(Fill)
@@ -135,7 +150,7 @@ fn view_proxy_configuration(screen: &SettingsScreen) -> Element<'_, SettingsMess
                     } else {
                         theme::ghost_button
                     })
-                    .on_press(SettingsMessage::SaveProxySettings)
+                    .on_press(ProxyMessage::Save)
                     .width(Length::Fixed(60.0))
                     .padding(6),
             ]

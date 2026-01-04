@@ -1,15 +1,17 @@
-//! General tab - consolidated appearance and behavior settings.
-
 use iced::widget::{Space, column, pick_list, row, slider, text, toggler};
 use iced::{Alignment, Element, Fill};
 
 use crate::settings::{AppSettings, AppTheme, IconTheme};
+use crate::ui::screens::settings::components::{setting_card, tab_title};
 use crate::ui::theme;
 
-use super::super::components::{setting_card, tab_title};
-use super::super::messages::SettingsMessage;
+use super::message::GeneralMessage;
+use super::state::GeneralSettingsState;
 
-pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, SettingsMessage> {
+pub fn view(
+    settings: &AppSettings,
+    state: &GeneralSettingsState,
+) -> Element<'static, GeneralMessage> {
     let p = theme::palette();
 
     column![
@@ -24,7 +26,7 @@ pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, 
         Space::new().height(8),
         view_minimize_to_tray(settings),
         Space::new().height(8),
-        view_start_on_boot(start_on_boot_enabled),
+        view_start_on_boot(state.start_on_boot_enabled),
         Space::new().height(24),
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
@@ -40,7 +42,7 @@ pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, 
     .into()
 }
 
-fn view_theme(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_theme(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let p = theme::palette();
     let themes = [
         AppTheme::Light,
@@ -61,7 +63,7 @@ fn view_theme(settings: &AppSettings) -> Element<'_, SettingsMessage> {
                     .color(p.text_secondary),
             ]
             .width(Fill),
-            pick_list(themes, Some(settings.theme), SettingsMessage::ChangeTheme)
+            pick_list(themes, Some(settings.theme), GeneralMessage::ChangeTheme)
                 .text_size(13)
                 .padding([8, 12])
                 .style(theme::pick_list_style)
@@ -71,7 +73,7 @@ fn view_theme(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     )
 }
 
-fn view_icons(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_icons(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let use_svg = settings.icon_theme == IconTheme::Svg;
     let desc = if use_svg {
         "High quality SVG icons"
@@ -79,15 +81,10 @@ fn view_icons(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         "Emoji icons (minimal memory)"
     };
 
-    toggle_card(
-        "Icon Style",
-        desc,
-        use_svg,
-        SettingsMessage::ToggleIconTheme,
-    )
+    toggle_card("Icon Style", desc, use_svg, GeneralMessage::ToggleIconTheme)
 }
 
-fn view_minimize_to_tray(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_minimize_to_tray(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let enabled = settings.minimize_to_tray;
     let desc = if enabled {
         "App stays in system tray when closed"
@@ -99,11 +96,11 @@ fn view_minimize_to_tray(settings: &AppSettings) -> Element<'_, SettingsMessage>
         "Minimize to Tray",
         desc,
         enabled,
-        SettingsMessage::ToggleMinimizeToTray,
+        GeneralMessage::ToggleMinimizeToTray,
     )
 }
 
-fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, SettingsMessage> {
+fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, GeneralMessage> {
     let desc = if start_on_boot_enabled {
         "GitTop starts when you log in"
     } else {
@@ -114,11 +111,11 @@ fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, SettingsM
         "Start on Boot",
         desc,
         start_on_boot_enabled,
-        SettingsMessage::ToggleStartOnBoot,
+        GeneralMessage::ToggleStartOnBoot,
     )
 }
 
-fn view_notification_scale(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_notification_scale(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let scale = settings.notification_font_scale;
     slider_card(
         "Notification Text Size",
@@ -126,11 +123,11 @@ fn view_notification_scale(settings: &AppSettings) -> Element<'_, SettingsMessag
         0.8..=1.5,
         scale,
         0.05,
-        SettingsMessage::SetNotificationFontScale,
+        GeneralMessage::SetNotificationFontScale,
     )
 }
 
-fn view_sidebar_scale(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_sidebar_scale(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let scale = settings.sidebar_font_scale;
     slider_card(
         "Sidebar Text Size",
@@ -138,11 +135,11 @@ fn view_sidebar_scale(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         0.8..=1.5,
         scale,
         0.05,
-        SettingsMessage::SetSidebarFontScale,
+        GeneralMessage::SetSidebarFontScale,
     )
 }
 
-fn view_sidebar_width(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+fn view_sidebar_width(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let width = settings.sidebar_width;
     slider_card(
         "Sidebar Width",
@@ -150,7 +147,7 @@ fn view_sidebar_width(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         180.0..=400.0,
         width,
         10.0,
-        SettingsMessage::SetSidebarWidth,
+        GeneralMessage::SetSidebarWidth,
     )
 }
 
@@ -162,8 +159,8 @@ fn toggle_card<'a>(
     title: &'static str,
     description: &'a str,
     is_toggled: bool,
-    on_toggle: impl Fn(bool) -> SettingsMessage + 'a,
-) -> Element<'a, SettingsMessage> {
+    on_toggle: impl Fn(bool) -> GeneralMessage + 'a,
+) -> Element<'a, GeneralMessage> {
     let p = theme::palette();
 
     setting_card(
@@ -186,8 +183,8 @@ fn slider_card<'a>(
     range: std::ops::RangeInclusive<f32>,
     value: f32,
     step: f32,
-    on_change: impl Fn(f32) -> SettingsMessage + 'a,
-) -> Element<'a, SettingsMessage> {
+    on_change: impl Fn(f32) -> GeneralMessage + 'a,
+) -> Element<'a, GeneralMessage> {
     let p = theme::palette();
 
     setting_card(column![
