@@ -10,7 +10,7 @@ use crate::ui::screens::notifications::messages::{
 };
 use crate::ui::{icons, theme};
 
-use super::sidebar_state::SidebarState;
+use super::state::SidebarState;
 
 pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
     if state.power_mode {

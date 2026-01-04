@@ -4,8 +4,9 @@ use iced::widget::{Space, button, container, row, text};
 use iced::{Alignment, Element, Fill};
 
 use crate::settings::IconTheme;
+use crate::ui::features::notification_list::NotificationListMessage;
 use crate::ui::screens::notifications::helper::NotificationGroup;
-use crate::ui::screens::notifications::messages::{NotificationMessage, ViewMessage};
+use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
 pub fn view_group_header<'a>(
@@ -46,9 +47,10 @@ pub fn view_group_header<'a>(
             theme::ghost_button
         })
         .padding([6, 8])
-        .on_press(NotificationMessage::View(ViewMessage::ToggleGroup(
-            group_index,
-        )))
+        .padding([6, 8])
+        .on_press(NotificationMessage::List(
+            NotificationListMessage::ToggleGroup(group_index),
+        ))
         .width(Fill);
 
     // Wrap priority headers with subtle background from theme

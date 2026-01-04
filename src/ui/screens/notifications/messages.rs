@@ -6,6 +6,7 @@
 use crate::github::{GitHubError, NotificationView, SubjectType};
 use crate::ui::features::bulk_actions::BulkActionMessage;
 use crate::ui::features::notification_details::NotificationDetailsMessage;
+use crate::ui::features::notification_list::NotificationListMessage;
 use crate::ui::features::thread_actions::ThreadActionMessage;
 
 /// Top-level message for the notifications screen.
@@ -33,7 +34,7 @@ pub enum NotificationMessage {
     /// Filter messages for type/repo selection.
     Filter(FilterMessage),
     /// View messages for scroll/group toggle.
-    View(ViewMessage),
+    List(NotificationListMessage),
     /// Navigation messages (handled by parent App).
     Navigation(NavigationMessage),
 }
@@ -43,15 +44,6 @@ pub enum FilterMessage {
     ToggleShowAll,
     SelectType(Option<SubjectType>),
     SelectRepo(Option<String>),
-}
-
-/// View-related messages for UI state only.
-///
-/// Note: Selection and details loading moved to NotificationDetailsMessage.
-#[derive(Debug, Clone)]
-pub enum ViewMessage {
-    ToggleGroup(usize),
-    OnScroll(iced::widget::scrollable::Viewport),
 }
 
 #[derive(Debug, Clone)]

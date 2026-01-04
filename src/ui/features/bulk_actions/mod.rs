@@ -5,3 +5,5 @@ mod update;
 pub use message::BulkActionMessage;
 pub use state::BulkActionState;
 pub use update::update_bulk_action;
+pub mod view;
+pub use view::view;

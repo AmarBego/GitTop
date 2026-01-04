@@ -73,7 +73,12 @@ impl Screen {
     fn title(&self) -> String {
         match self {
             Screen::Notifications(screen) => {
-                let unread = screen.all_notifications.iter().filter(|n| n.unread).count();
+                let unread = screen
+                    .processing
+                    .all_notifications
+                    .iter()
+                    .filter(|n| n.unread)
+                    .count();
                 if unread > 0 {
                     format!("GitTop ({unread} unread)")
                 } else {
@@ -941,6 +946,7 @@ impl App {
             .collect();
 
         let unread_count = screen
+            .processing
             .filtered_notifications
             .iter()
             .filter(|n| n.unread)
