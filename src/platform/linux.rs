@@ -140,7 +140,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart={EXEC_PATH}
+ExecStart="{EXEC_PATH}"
 PassEnvironment=DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR
 Restart=on-failure
 RestartSec=5
@@ -225,15 +225,14 @@ WantedBy=default.target
         }
 
         let disable = Command::new("systemctl")
-            .args(["--user", "disable", "gittop.service"])
+            .args(["--user", "--quiet", "disable", "gittop.service"])
             .output()?;
 
-        // Ignore "not found" errors - service may not exist yet.
+        // With --quiet, systemctl returns success even if unit doesn't exist
         if !disable.status.success() {
-            let stderr = String::from_utf8_lossy(&disable.stderr).to_string();
-            if !stderr.contains("not found") && !stderr.contains("No such file") {
-                return Err(OnBootError::CommandFailed(stderr));
-            }
+            return Err(OnBootError::CommandFailed(
+                String::from_utf8_lossy(&disable.stderr).to_string(),
+            ));
         }
 
         if let Some(service_path) = systemd_service_path() {
