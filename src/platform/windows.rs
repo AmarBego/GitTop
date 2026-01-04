@@ -56,40 +56,37 @@ fn load_window_icon() -> Option<iced::window::Icon> {
     let (width, height) = img.dimensions();
     iced::window::icon::from_rgba(img.into_raw(), width, height).ok()
 }
+
+/// Focus existing GitTop window for single-instance support.
+/// Uses EnumWindows to find and restore minimized windows.
 pub fn focus_existing_window() {
     use windows::Win32::Foundation::{HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetWindowTextA, IsIconic, IsWindowVisible, SW_RESTORE, SW_SHOW,
+        EnumWindows, GetWindowTextW, IsIconic, IsWindowVisible, SW_RESTORE, SW_SHOW,
         SetForegroundWindow, ShowWindow,
     };
 
+    // SAFETY: Callback only reads window properties, HWNDs valid during enumeration.
     unsafe extern "system" fn enum_callback(hwnd: HWND, _lparam: LPARAM) -> windows::core::BOOL {
         unsafe {
-            // Skip invisible windows
             if !IsWindowVisible(hwnd).as_bool() {
                 return windows::core::BOOL::from(true);
             }
 
-            // Get window title
-            let mut title = [0u8; 256];
-            let len = GetWindowTextA(hwnd, &mut title);
+            // Use wide string API for proper Unicode support.
+            let mut title = [0u16; 256];
+            let len = GetWindowTextW(hwnd, &mut title);
 
             if len > 0 {
-                let title_str = std::str::from_utf8(&title[..len as usize]).unwrap_or("");
+                let title_str = String::from_utf16_lossy(&title[..len as usize]);
 
-                // Check if this is a GitTop window
                 if title_str.contains("GitTop") {
-                    // Restore if minimized
                     if IsIconic(hwnd).as_bool() {
                         let _ = ShowWindow(hwnd, SW_RESTORE);
                     } else {
                         let _ = ShowWindow(hwnd, SW_SHOW);
                     }
-
-                    // Bring to foreground
                     let _ = SetForegroundWindow(hwnd);
-
-                    // Stop enumeration
                     return windows::core::BOOL::from(false);
                 }
             }
@@ -98,32 +95,29 @@ pub fn focus_existing_window() {
         }
     }
 
+    // SAFETY: EnumWindows with valid callback.
     unsafe {
         let _ = EnumWindows(Some(enum_callback), LPARAM(0));
     }
 }
 
-/// Enable dark mode for Windows context menus (system tray).
-/// Uses undocumented Windows API SetPreferredAppMode from uxtheme.dll.
+/// Enable dark mode for context menus via undocumented SetPreferredAppMode.
+/// Widely used by Firefox/Chrome, degrades gracefully if API changes.
 pub fn enable_dark_mode() {
-    // SetPreferredAppMode ordinal 135 in uxtheme.dll
-    // 0 = Default, 1 = AllowDark, 2 = ForceDark, 3 = ForceLight, 4 = Max
-    const APPMODE_FORCEDARK: i32 = 2;
+    use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
+    use windows::core::PCSTR;
 
+    const APPMODE_FORCEDARK: i32 = 2;
     type SetPreferredAppModeFn = unsafe extern "system" fn(i32) -> i32;
 
+    // SAFETY: Load library, validate function pointer, call once.
     unsafe {
         let lib_name = CString::new("uxtheme.dll").unwrap();
-        let lib = windows::Win32::System::LibraryLoader::LoadLibraryA(
-            windows::core::PCSTR::from_raw(lib_name.as_ptr() as *const u8),
-        );
+        let lib = LoadLibraryA(PCSTR::from_raw(lib_name.as_ptr() as *const u8));
 
         if let Ok(handle) = lib {
-            // GetProcAddress with ordinal 135
-            let func = windows::Win32::System::LibraryLoader::GetProcAddress(
-                handle,
-                windows::core::PCSTR::from_raw(135 as *const u8),
-            );
+            // Ordinal 135 = SetPreferredAppMode
+            let func = GetProcAddress(handle, PCSTR::from_raw(135 as *const u8));
 
             if let Some(f) = func {
                 let set_preferred_app_mode: SetPreferredAppModeFn = std::mem::transmute(f);
@@ -139,25 +133,19 @@ pub fn init_tray() {
     // No-op on Windows - tray-icon works without GTK
 }
 
-/// Aggressively trim the process working set to reduce memory footprint.
-/// This moves pages to the page file, making the process appear to use less memory.
+/// Trim working set to reduce memory when minimized to tray.
 pub fn trim_working_set() {
     use windows::Win32::System::ProcessStatus::EmptyWorkingSet;
     use windows::Win32::System::Threading::GetCurrentProcess;
 
+    // SAFETY: GetCurrentProcess returns pseudo-handle, always valid.
     unsafe {
         let _ = EmptyWorkingSet(GetCurrentProcess());
     }
 }
 
 /// Send a native Windows toast notification.
-///
-/// Uses WinRT toast notifications which:
-/// - Don't require a background service
-/// - Don't keep anything resident
-/// - Fire and exit
-///
-/// If `url` is provided, clicking the notification opens that URL.
+/// Uses WinRT toasts - fire and forget, no resident memory.
 pub fn notify(
     title: &str,
     body: &str,
@@ -170,7 +158,6 @@ pub fn notify(
         .text1(body)
         .duration(Duration::Short);
 
-    // If URL provided, open it when notification is clicked
     if let Some(url) = url {
         let url_owned = url.to_string();
         toast = toast.on_activated(move |_action| {
@@ -179,37 +166,125 @@ pub fn notify(
         });
     }
 
-    // Fire and forget - no handles kept, no memory retained
     toast.show()
 }
 
-/// On-boot/autostart functionality for Windows.
-///
-/// TODO: Implement using Registry key or Startup folder.
-/// - Registry: HKCU\Software\Microsoft\Windows\CurrentVersion\Run
-/// - Startup folder: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+/// Autostart via HKCU\...\Run registry key. No elevated privileges needed.
 pub mod on_boot {
-    // Re-export the shared error type from the parent module
+    use windows::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE, REG_SZ, REG_VALUE_TYPE, RegCloseKey,
+        RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
+    };
+    use windows::core::HSTRING;
+
     pub use crate::platform::on_boot::OnBootError;
 
-    /// Check if autostart is currently enabled.
-    ///
-    /// TODO: Check Registry key HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+    const VALUE_NAME: &str = "GitTop";
+
+    /// RAII wrapper - auto-closes registry key on drop to prevent leaks.
+    struct RegKey(HKEY);
+
+    impl RegKey {
+        fn open(access: windows::Win32::System::Registry::REG_SAM_FLAGS) -> Option<Self> {
+            let mut hkey = HKEY::default();
+            let subkey = HSTRING::from(RUN_KEY_PATH);
+
+            // SAFETY: Valid hive, subkey, and output pointer.
+            let result =
+                unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, &subkey, Some(0), access, &mut hkey) };
+
+            result.is_ok().then_some(Self(hkey))
+        }
+    }
+
+    impl Drop for RegKey {
+        fn drop(&mut self) {
+            // SAFETY: Handle valid for struct lifetime, RegCloseKey infallible.
+            let _ = unsafe { RegCloseKey(self.0) };
+        }
+    }
+
     pub fn is_enabled() -> bool {
-        false
+        let Some(key) = RegKey::open(KEY_READ) else {
+            return false;
+        };
+
+        let value_name = HSTRING::from(VALUE_NAME);
+        let mut value_type = REG_VALUE_TYPE::default();
+        let mut data_size: u32 = 0;
+
+        // SAFETY: Query with null data buffer just checks existence.
+        let result = unsafe {
+            RegQueryValueExW(
+                key.0,
+                &value_name,
+                Some(std::ptr::null()),
+                Some(&mut value_type),
+                None,
+                Some(&mut data_size),
+            )
+        };
+
+        result.is_ok()
     }
 
-    /// Enable autostart.
-    ///
-    /// TODO: Add Registry key to HKCU\Software\Microsoft\Windows\CurrentVersion\Run
     pub fn enable() -> Result<(), OnBootError> {
-        Err(OnBootError::NotSupported)
+        let exec_path = std::env::current_exe()
+            .map_err(OnBootError::Io)?
+            .to_string_lossy()
+            .to_string();
+
+        let quoted_path = format!("\"{}\"", exec_path);
+
+        let key = RegKey::open(KEY_WRITE)
+            .ok_or_else(|| OnBootError::CommandFailed("Failed to open registry key".to_string()))?;
+
+        let value_name = HSTRING::from(VALUE_NAME);
+        let wide_path: Vec<u16> = quoted_path
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+
+        // SAFETY: Valid handle, null-terminated wide string, correct byte length.
+        let data_bytes: &[u8] = unsafe {
+            std::slice::from_raw_parts(wide_path.as_ptr() as *const u8, wide_path.len() * 2)
+        };
+
+        let result =
+            unsafe { RegSetValueExW(key.0, &value_name, Some(0), REG_SZ, Some(data_bytes)) };
+
+        if result.is_err() {
+            return Err(OnBootError::CommandFailed(format!(
+                "Failed to set registry value: {:?}",
+                result
+            )));
+        }
+
+        Ok(())
     }
 
-    /// Disable autostart.
-    ///
-    /// TODO: Remove Registry key from HKCU\Software\Microsoft\Windows\CurrentVersion\Run
     pub fn disable() -> Result<(), OnBootError> {
-        Err(OnBootError::NotSupported)
+        let Some(key) = RegKey::open(KEY_WRITE) else {
+            return Ok(()); // Key doesn't exist, nothing to disable
+        };
+
+        let value_name = HSTRING::from(VALUE_NAME);
+
+        // SAFETY: Valid handle and value name.
+        let result = unsafe { RegDeleteValueW(key.0, &value_name) };
+
+        if result.is_err() {
+            use windows::Win32::Foundation::ERROR_FILE_NOT_FOUND;
+            let err_code = result.0 as u32;
+            if err_code != ERROR_FILE_NOT_FOUND.0 {
+                return Err(OnBootError::CommandFailed(format!(
+                    "Failed to delete registry value: {:?}",
+                    result
+                )));
+            }
+        }
+
+        Ok(())
     }
 }
