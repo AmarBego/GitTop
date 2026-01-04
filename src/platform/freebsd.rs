@@ -69,3 +69,32 @@ pub fn notify(title: &str, body: &str, url: Option<&str>) -> Result<(), notify_r
         notification.show().map(|_| ())
     }
 }
+
+/// On-boot/autostart functionality for FreeBSD.
+///
+/// TODO: Investigate rc.d or user-level autostart mechanism.
+pub mod on_boot {
+    // Re-export the shared error type from the parent module
+    pub use crate::platform::on_boot::OnBootError;
+
+    /// Check if autostart is currently enabled.
+    ///
+    /// TODO: Investigate FreeBSD autostart mechanism
+    pub fn is_enabled() -> bool {
+        false
+    }
+
+    /// Enable autostart.
+    ///
+    /// TODO: Implement FreeBSD autostart
+    pub fn enable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+
+    /// Disable autostart.
+    ///
+    /// TODO: Implement FreeBSD autostart
+    pub fn disable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+}

@@ -30,4 +30,8 @@ pub enum SettingsMessage {
     ProxyUsernameChanged(String),
     ProxyPasswordChanged(String),
     SaveProxySettings,
+    ToggleStartOnBoot(bool),
+    /// Result of an async start-on-boot enable/disable operation.
+    /// Contains `Ok(new_state)` on success or `Err(error_message)` on failure.
+    StartOnBootResult(Result<bool, String>),
 }

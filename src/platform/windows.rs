@@ -182,3 +182,34 @@ pub fn notify(
     // Fire and forget - no handles kept, no memory retained
     toast.show()
 }
+
+/// On-boot/autostart functionality for Windows.
+///
+/// TODO: Implement using Registry key or Startup folder.
+/// - Registry: HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+/// - Startup folder: %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+pub mod on_boot {
+    // Re-export the shared error type from the parent module
+    pub use crate::platform::on_boot::OnBootError;
+
+    /// Check if autostart is currently enabled.
+    ///
+    /// TODO: Check Registry key HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    pub fn is_enabled() -> bool {
+        false
+    }
+
+    /// Enable autostart.
+    ///
+    /// TODO: Add Registry key to HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    pub fn enable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+
+    /// Disable autostart.
+    ///
+    /// TODO: Remove Registry key from HKCU\Software\Microsoft\Windows\CurrentVersion\Run
+    pub fn disable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+}

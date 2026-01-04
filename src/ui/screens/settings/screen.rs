@@ -22,6 +22,7 @@ pub struct SettingsScreen {
     pub proxy_password: String,
     pub proxy_creds_dirty: bool,
     pub proxy_needs_rebuild: bool,
+    pub start_on_boot_enabled: bool,
 }
 
 impl SettingsScreen {
@@ -40,6 +41,9 @@ impl SettingsScreen {
             (String::new(), String::new())
         };
 
+        // Cache start-on-boot state to avoid querying systemctl on every render
+        let start_on_boot_enabled = crate::platform::on_boot::is_enabled();
+
         Self {
             settings,
             selected_tab: SettingsTab::default(),
@@ -50,6 +54,7 @@ impl SettingsScreen {
             proxy_password,
             proxy_creds_dirty: false,
             proxy_needs_rebuild: false,
+            start_on_boot_enabled,
         }
     }
 
@@ -182,6 +187,33 @@ impl SettingsScreen {
             }
             SettingsMessage::SaveProxySettings => {
                 self.update_proxy_credentials();
+                Task::none()
+            }
+            SettingsMessage::ToggleStartOnBoot(enabled) => {
+                // Perform the operation asynchronously and report result
+                Task::perform(
+                    async move {
+                        let result = if enabled {
+                            crate::platform::on_boot::enable()
+                        } else {
+                            crate::platform::on_boot::disable()
+                        };
+                        result.map(|()| enabled).map_err(|e| e.to_string())
+                    },
+                    SettingsMessage::StartOnBootResult,
+                )
+            }
+            SettingsMessage::StartOnBootResult(result) => {
+                match result {
+                    Ok(new_state) => {
+                        self.start_on_boot_enabled = new_state;
+                    }
+                    Err(e) => {
+                        eprintln!("[START_ON_BOOT] Failed: {}", e);
+                        // Re-query actual state to ensure UI reflects reality
+                        self.start_on_boot_enabled = crate::platform::on_boot::is_enabled();
+                    }
+                }
                 Task::none()
             }
         }
@@ -320,7 +352,7 @@ impl SettingsScreen {
 
         let content = match self.selected_tab {
             SettingsTab::PowerMode => power_mode::view(&self.settings),
-            SettingsTab::General => general::view(&self.settings),
+            SettingsTab::General => general::view(&self.settings, self.start_on_boot_enabled),
             SettingsTab::Accounts => accounts::view(&self.settings, &self.accounts_state),
             SettingsTab::NetworkProxy => network_proxy::view(self),
         };

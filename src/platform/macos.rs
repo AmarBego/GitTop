@@ -64,3 +64,33 @@ pub fn notify(
     )
     .map(|_| ())
 }
+
+/// On-boot/autostart functionality for macOS.
+///
+/// TODO: Implement using LaunchAgents.
+/// - Create plist at ~/Library/LaunchAgents/com.gittop.plist
+pub mod on_boot {
+    // Re-export the shared error type from the parent module
+    pub use crate::platform::on_boot::OnBootError;
+
+    /// Check if autostart is currently enabled.
+    ///
+    /// TODO: Check if ~/Library/LaunchAgents/com.gittop.plist exists
+    pub fn is_enabled() -> bool {
+        false
+    }
+
+    /// Enable autostart.
+    ///
+    /// TODO: Create ~/Library/LaunchAgents/com.gittop.plist
+    pub fn enable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+
+    /// Disable autostart.
+    ///
+    /// TODO: Remove ~/Library/LaunchAgents/com.gittop.plist
+    pub fn disable() -> Result<(), OnBootError> {
+        Err(OnBootError::NotSupported)
+    }
+}

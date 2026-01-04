@@ -9,7 +9,7 @@ use crate::ui::theme;
 use super::super::components::{setting_card, tab_title};
 use super::super::messages::SettingsMessage;
 
-pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, SettingsMessage> {
     let p = theme::palette();
 
     column![
@@ -23,6 +23,8 @@ pub fn view(settings: &AppSettings) -> Element<'_, SettingsMessage> {
         view_icons(settings),
         Space::new().height(8),
         view_minimize_to_tray(settings),
+        Space::new().height(8),
+        view_start_on_boot(start_on_boot_enabled),
         Space::new().height(24),
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
@@ -98,6 +100,21 @@ fn view_minimize_to_tray(settings: &AppSettings) -> Element<'_, SettingsMessage>
         desc,
         enabled,
         SettingsMessage::ToggleMinimizeToTray,
+    )
+}
+
+fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, SettingsMessage> {
+    let desc = if start_on_boot_enabled {
+        "GitTop starts when you log in"
+    } else {
+        "GitTop does not start automatically"
+    };
+
+    toggle_card(
+        "Start on Boot",
+        desc,
+        start_on_boot_enabled,
+        SettingsMessage::ToggleStartOnBoot,
     )
 }
 
