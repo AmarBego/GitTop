@@ -76,7 +76,7 @@ fn view_theme(settings: &AppSettings) -> Element<'static, GeneralMessage> {
 fn view_icons(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let use_svg = settings.icon_theme == IconTheme::Svg;
     let desc = if use_svg {
-        "High quality SVG icons"
+        "High quality SVG icons (Default)"
     } else {
         "Emoji icons (minimal memory)"
     };
@@ -87,9 +87,9 @@ fn view_icons(settings: &AppSettings) -> Element<'static, GeneralMessage> {
 fn view_minimize_to_tray(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let enabled = settings.minimize_to_tray;
     let desc = if enabled {
-        "App stays in system tray when closed"
+        "App stays in system tray when closed (Default)"
     } else {
-        "App exits when closed"
+        "App exits when closed (Default: Tray)"
     };
 
     toggle_card(
@@ -118,7 +118,7 @@ fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, GeneralMe
 fn view_notification_scale(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let scale = settings.notification_font_scale;
     slider_card(
-        "Notification Text Size",
+        "Notification Text Size (Default: 100%)",
         format!("{}%", (scale * 100.0) as i32),
         0.8..=1.5,
         scale,
@@ -130,7 +130,7 @@ fn view_notification_scale(settings: &AppSettings) -> Element<'static, GeneralMe
 fn view_sidebar_scale(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let scale = settings.sidebar_font_scale;
     slider_card(
-        "Sidebar Text Size",
+        "Sidebar Text Size (Default: 100%)",
         format!("{}%", (scale * 100.0) as i32),
         0.8..=1.5,
         scale,
@@ -142,7 +142,7 @@ fn view_sidebar_scale(settings: &AppSettings) -> Element<'static, GeneralMessage
 fn view_sidebar_width(settings: &AppSettings) -> Element<'static, GeneralMessage> {
     let width = settings.sidebar_width;
     slider_card(
-        "Sidebar Width",
+        "Sidebar Width (Default: 220px)",
         format!("{}px", width as i32),
         180.0..=400.0,
         width,
