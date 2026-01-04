@@ -992,14 +992,19 @@ impl App {
             _ => None,
         });
 
+        // Get refresh interval from settings (or use default)
+        let refresh_secs = self
+            .current_settings()
+            .map(|s| s.refresh_interval_secs)
+            .unwrap_or(REFRESH_INTERVAL_SECS);
+
         let on_notifications = matches!(
             self,
             App::Authenticated(screen, _) if matches!(&**screen, Screen::Notifications(_))
         );
 
-        let tick_sub = on_notifications.then(|| {
-            time::every(Duration::from_secs(REFRESH_INTERVAL_SECS)).map(|_| Message::Tick)
-        });
+        let tick_sub = on_notifications
+            .then(|| time::every(Duration::from_secs(refresh_secs)).map(|_| Message::Tick));
 
         let subs: Vec<_> = tick_sub.into_iter().chain([tray_sub, window_sub]).collect();
         Subscription::batch(subs)

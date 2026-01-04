@@ -33,6 +33,10 @@ pub fn view(settings: &AppSettings, start_on_boot_enabled: bool) -> Element<'_, 
         view_sidebar_scale(settings),
         Space::new().height(8),
         view_sidebar_width(settings),
+        Space::new().height(24),
+        text("Behavior").size(13).color(p.text_muted),
+        Space::new().height(8),
+        view_refresh_interval(settings),
     ]
     .spacing(4)
     .padding(24)
@@ -54,7 +58,12 @@ fn view_theme(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     setting_card(
         row![
             column![
-                text("Theme").size(14).color(p.text_primary),
+                row![
+                    text("Theme").size(14).color(p.text_primary),
+                    text(format!(" (Default: {})", AppTheme::platform_default()))
+                        .size(11)
+                        .color(p.text_muted),
+                ],
                 Space::new().height(4),
                 text("Choose your preferred color scheme")
                     .size(11)
@@ -81,6 +90,7 @@ fn view_icons(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 
     toggle_card(
         "Icon Style",
+        true, // default: SVG icons enabled
         desc,
         use_svg,
         SettingsMessage::ToggleIconTheme,
@@ -97,6 +107,7 @@ fn view_minimize_to_tray(settings: &AppSettings) -> Element<'_, SettingsMessage>
 
     toggle_card(
         "Minimize to Tray",
+        true, // default: enabled
         desc,
         enabled,
         SettingsMessage::ToggleMinimizeToTray,
@@ -112,6 +123,7 @@ fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, SettingsM
 
     toggle_card(
         "Start on Boot",
+        false, // default: disabled
         desc,
         start_on_boot_enabled,
         SettingsMessage::ToggleStartOnBoot,
@@ -122,6 +134,7 @@ fn view_notification_scale(settings: &AppSettings) -> Element<'_, SettingsMessag
     let scale = settings.notification_font_scale;
     slider_card(
         "Notification Text Size",
+        "100%",
         format!("{}%", (scale * 100.0) as i32),
         0.8..=1.5,
         scale,
@@ -134,6 +147,7 @@ fn view_sidebar_scale(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     let scale = settings.sidebar_font_scale;
     slider_card(
         "Sidebar Text Size",
+        "100%",
         format!("{}%", (scale * 100.0) as i32),
         0.8..=1.5,
         scale,
@@ -146,6 +160,7 @@ fn view_sidebar_width(settings: &AppSettings) -> Element<'_, SettingsMessage> {
     let width = settings.sidebar_width;
     slider_card(
         "Sidebar Width",
+        "220px",
         format!("{}px", width as i32),
         180.0..=400.0,
         width,
@@ -160,16 +175,23 @@ fn view_sidebar_width(settings: &AppSettings) -> Element<'_, SettingsMessage> {
 
 fn toggle_card<'a>(
     title: &'static str,
+    default_on: bool,
     description: &'a str,
     is_toggled: bool,
     on_toggle: impl Fn(bool) -> SettingsMessage + 'a,
 ) -> Element<'a, SettingsMessage> {
     let p = theme::palette();
+    let default_text = if default_on { "On" } else { "Off" };
 
     setting_card(
         row![
             column![
-                text(title).size(14).color(p.text_primary),
+                row![
+                    text(title).size(14).color(p.text_primary),
+                    text(format!(" (Default: {})", default_text))
+                        .size(11)
+                        .color(p.text_muted),
+                ],
                 Space::new().height(4),
                 text(description).size(11).color(p.text_secondary),
             ]
@@ -182,6 +204,7 @@ fn toggle_card<'a>(
 
 fn slider_card<'a>(
     title: &'static str,
+    default_text: &'static str,
     value_text: String,
     range: std::ops::RangeInclusive<f32>,
     value: f32,
@@ -192,12 +215,45 @@ fn slider_card<'a>(
 
     setting_card(column![
         row![
-            text(title).size(14).color(p.text_primary),
+            row![
+                text(title).size(14).color(p.text_primary),
+                text(format!(" (Default: {})", default_text))
+                    .size(11)
+                    .color(p.text_muted),
+            ],
             Space::new().width(Fill),
             text(value_text).size(12).color(p.text_secondary),
         ]
         .align_y(Alignment::Center),
         Space::new().height(12),
         slider(range, value, on_change).step(step),
+    ])
+}
+
+fn view_refresh_interval(settings: &AppSettings) -> Element<'_, SettingsMessage> {
+    let secs = settings.refresh_interval_secs;
+    let p = theme::palette();
+
+    setting_card(column![
+        row![
+            column![
+                row![
+                    text("Refresh Interval").size(14).color(p.text_primary),
+                    text(" (Default: 60s)").size(11).color(p.text_muted),
+                ],
+                Space::new().height(4),
+                text("How often to check for new notifications")
+                    .size(11)
+                    .color(p.text_secondary),
+            ]
+            .width(Fill),
+            text(format!("{}s", secs)).size(12).color(p.text_secondary),
+        ]
+        .align_y(Alignment::Center),
+        Space::new().height(12),
+        slider(15.0..=300.0, secs as f32, |v| {
+            SettingsMessage::SetRefreshInterval(v as u64)
+        })
+        .step(15.0),
     ])
 }

@@ -112,6 +112,12 @@ impl SettingsScreen {
                 self.persist_settings();
                 Task::none()
             }
+            SettingsMessage::SetRefreshInterval(secs) => {
+                let clamped = secs.clamp(15, 300);
+                self.settings.refresh_interval_secs = clamped;
+                self.persist_settings();
+                Task::none()
+            }
             SettingsMessage::TogglePowerMode(enabled) => {
                 self.settings.power_mode = enabled;
                 let _ = self.settings.save();

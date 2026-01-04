@@ -19,6 +19,7 @@ pub enum SettingsMessage {
     SetNotificationFontScale(f32),
     SetSidebarFontScale(f32),
     SetSidebarWidth(f32),
+    SetRefreshInterval(u64),
     RemoveAccount(String),
     TogglePowerMode(bool),
     OpenRuleEngine,

@@ -134,6 +134,8 @@ pub struct AppSettings {
     pub show_details_panel: bool,
     #[serde(default)]
     pub proxy: ProxySettings,
+    #[serde(default = "default_refresh_interval")]
+    pub refresh_interval_secs: u64,
 }
 
 fn default_minimize_to_tray() -> bool {
@@ -164,6 +166,10 @@ fn default_show_details_panel() -> bool {
     true
 }
 
+fn default_refresh_interval() -> u64 {
+    60
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -181,6 +187,7 @@ impl Default for AppSettings {
             power_mode: false,
             show_details_panel: true,
             proxy: ProxySettings::default(),
+            refresh_interval_secs: 60,
         }
     }
 }
