@@ -17,7 +17,7 @@ use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
 /// View the details panel for a selected notification.
-pub fn view_details_panel<'a>(
+pub fn view<'a>(
     notification: Option<&'a NotificationView>,
     details: Option<&'a NotificationSubjectDetail>,
     is_loading: bool,

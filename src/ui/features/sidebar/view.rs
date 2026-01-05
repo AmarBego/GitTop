@@ -5,35 +5,33 @@ use iced::{Alignment, Element, Fill, Length, Padding};
 
 use crate::github::{SubjectType, UserInfo};
 use crate::settings::IconTheme;
-use crate::ui::screens::notifications::messages::{
-    FilterMessage, NavigationMessage, NotificationMessage,
-};
 use crate::ui::{icons, theme};
 
-use super::state::SidebarState;
+use super::messages::SidebarMessage;
+use super::state::SidebarViewArgs;
 
-pub fn view_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
-    if state.power_mode {
-        view_power_sidebar(state)
+pub fn view_sidebar<'a>(args: SidebarViewArgs<'a>) -> Element<'a, SidebarMessage> {
+    if args.power_mode {
+        view_power_sidebar(args)
     } else {
-        view_standard_sidebar(state)
+        view_standard_sidebar(args)
     }
 }
 
-fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
+fn view_standard_sidebar<'a>(args: SidebarViewArgs<'a>) -> Element<'a, SidebarMessage> {
     let scrollable_content = column![view_branding(), Space::new().height(16)]
         .push(view_types_section(
-            state.type_counts,
-            state.selected_type,
-            state.total_count,
-            state.icon_theme,
+            args.type_counts,
+            args.selected_type,
+            args.total_count,
+            args.icon_theme,
         ))
         .push(Space::new().height(16))
         .push(view_repos_section(
-            state.repo_counts,
-            state.selected_repo,
-            state.total_repo_count,
-            state.icon_theme,
+            args.repo_counts,
+            args.selected_repo,
+            args.total_repo_count,
+            args.icon_theme,
         ))
         .spacing(0)
         .padding([16, 12]);
@@ -44,9 +42,9 @@ fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, Notificatio
                 .height(Fill)
                 .style(theme::scrollbar),
             container(view_user_section(
-                state.user,
-                &state.accounts,
-                state.icon_theme,
+                args.user,
+                &args.accounts,
+                args.icon_theme,
             ))
             .padding(Padding {
                 top: 0.0,
@@ -57,28 +55,28 @@ fn view_standard_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, Notificatio
         ]
         .height(Fill),
     )
-    .width(Length::Fixed(state.width.clamp(180.0, 400.0)))
+    .width(Length::Fixed(args.width.clamp(180.0, 400.0)))
     .height(Fill)
     .style(theme::sidebar)
     .into()
 }
 
-fn view_power_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMessage> {
+fn view_power_sidebar<'a>(args: SidebarViewArgs<'a>) -> Element<'a, SidebarMessage> {
     // In power mode, branding and user info are in top bar
     // Just show scrollable navigation content
     let scrollable_content = column![
         view_types_section(
-            state.type_counts,
-            state.selected_type,
-            state.total_count,
-            state.icon_theme,
+            args.type_counts,
+            args.selected_type,
+            args.total_count,
+            args.icon_theme,
         ),
         Space::new().height(16),
         view_repos_section(
-            state.repo_counts,
-            state.selected_repo,
-            state.total_repo_count,
-            state.icon_theme,
+            args.repo_counts,
+            args.selected_repo,
+            args.total_repo_count,
+            args.icon_theme,
         )
     ]
     .spacing(0)
@@ -89,13 +87,13 @@ fn view_power_sidebar<'a>(state: SidebarState<'a>) -> Element<'a, NotificationMe
             .height(Fill)
             .style(theme::scrollbar),
     )
-    .width(Length::Fixed(state.width.clamp(180.0, 400.0)))
+    .width(Length::Fixed(args.width.clamp(180.0, 400.0)))
     .height(Fill)
     .style(theme::sidebar)
     .into()
 }
 
-fn view_branding<'a>() -> Element<'a, NotificationMessage> {
+fn view_branding<'a>() -> Element<'a, SidebarMessage> {
     let p = theme::palette();
     row![text("GitTop").size(18).color(p.text_primary),]
         .align_y(Alignment::Center)
@@ -107,7 +105,7 @@ fn view_types_section(
     selected_type: Option<SubjectType>,
     total_count: usize,
     icon_theme: IconTheme,
-) -> Element<'static, NotificationMessage> {
+) -> Element<'static, SidebarMessage> {
     let p = theme::palette();
 
     let all_item = sidebar_item(
@@ -115,7 +113,7 @@ fn view_types_section(
         "All".to_owned(),
         total_count,
         selected_type.is_none(),
-        NotificationMessage::Filter(FilterMessage::SelectType(None)),
+        SidebarMessage::SelectType(None),
     );
 
     let types_items = type_counts.iter().map(|(subject_type, count)| {
@@ -130,7 +128,7 @@ fn view_types_section(
             subject_type_label(*subject_type).to_owned(),
             *count,
             is_selected,
-            NotificationMessage::Filter(FilterMessage::SelectType(Some(*subject_type))),
+            SidebarMessage::SelectType(Some(*subject_type)),
         )
     });
 
@@ -151,7 +149,7 @@ fn view_repos_section(
     selected_repo: Option<&str>,
     total_repo_count: usize,
     icon_theme: IconTheme,
-) -> Element<'static, NotificationMessage> {
+) -> Element<'static, SidebarMessage> {
     let p = theme::palette();
 
     let all_item = sidebar_item(
@@ -159,7 +157,7 @@ fn view_repos_section(
         "All".to_owned(),
         total_repo_count,
         selected_repo.is_none(),
-        NotificationMessage::Filter(FilterMessage::SelectRepo(None)),
+        SidebarMessage::SelectRepo(None),
     );
 
     let repo_items = repo_counts.iter().take(10).map(|(repo, count)| {
@@ -177,7 +175,7 @@ fn view_repos_section(
             short_name,
             *count,
             is_selected,
-            NotificationMessage::Filter(FilterMessage::SelectRepo(Some(repo.clone()))),
+            SidebarMessage::SelectRepo(Some(repo.clone())),
         )
     });
 
@@ -202,13 +200,13 @@ fn view_user_section<'a>(
     user: &'a UserInfo,
     accounts: &[String],
     icon_theme: IconTheme,
-) -> Element<'a, NotificationMessage> {
+) -> Element<'a, SidebarMessage> {
     let p = theme::palette();
 
     // Account selector or just label
     let account_control: Element<'_, _, _, iced::Renderer> = if accounts.len() > 1 {
         iced::widget::pick_list(accounts.to_vec(), Some(user.login.clone()), |s| {
-            NotificationMessage::Navigation(NavigationMessage::SwitchAccount(s))
+            SidebarMessage::SwitchAccount(s)
         })
         .text_size(13)
         .padding([4, 8])
@@ -234,13 +232,11 @@ fn view_user_section<'a>(
             button(icons::icon_settings(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
                 .padding([6, 8])
-                .on_press(NotificationMessage::Navigation(
-                    NavigationMessage::OpenSettings
-                )),
+                .on_press(SidebarMessage::OpenSettings),
             button(icons::icon_power(14.0, p.text_muted, icon_theme))
                 .style(theme::ghost_button)
                 .padding([6, 8])
-                .on_press(NotificationMessage::Navigation(NavigationMessage::Logout)),
+                .on_press(SidebarMessage::Logout),
         ]
         .align_y(Alignment::Center),
     ]
@@ -252,7 +248,7 @@ fn subject_type_icon(
     t: SubjectType,
     color: iced::Color,
     icon_theme: IconTheme,
-) -> Element<'static, NotificationMessage> {
+) -> Element<'static, SidebarMessage> {
     match t {
         SubjectType::Issue => icons::icon_issue(14.0, color, icon_theme),
         SubjectType::PullRequest => icons::icon_pull_request(14.0, color, icon_theme),
@@ -267,12 +263,12 @@ fn subject_type_icon(
 
 /// Sidebar item with icon element, label, count, and selection state.
 fn sidebar_item<'a>(
-    icon: Element<'a, NotificationMessage>,
+    icon: Element<'a, SidebarMessage>,
     label: String,
     count: usize,
     is_selected: bool,
-    on_press: NotificationMessage,
-) -> Element<'a, NotificationMessage> {
+    on_press: SidebarMessage,
+) -> Element<'a, SidebarMessage> {
     let p = theme::palette();
     // Use primary text for all items - much more readable
     let text_color = p.text_primary;

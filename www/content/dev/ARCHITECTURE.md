@@ -24,10 +24,15 @@ A high-level overview of where things live.
 
 The UI is built with [Iced](https://github.com/iced-rs/iced). Everything here is about rendering frames and handling user messages.
 
-*   **`app.rs`**: The main entry point and global state manager.
-*   **`icons.rs`**: Icon primitives and glyph helpers.
+*   **`app.rs`**: The main entry point and global state orchestrator.
+*   **`context.rs`**: Shared read-only state (Settings, SessionManager) passed to all screens.
+*   **`effects.rs`**: The "Effect Pattern" definitions. Screens return `AppEffect` (Navigation, Session) instead of mutating state.
+*   **`routing.rs`**: Screen enum definitions and navigation targets.
 *   **`theme.rs`**: Color palette and styling constants.
 *   **`window_state.rs`**: Window visibility/focus state tracking.
+*   **`handlers/`**: **Logic Implementation**. `app.rs` delegates actual work here.
+    *   `navigation.rs`: Handles screen transitions and state rebuilding.
+    *   `platform.rs`: OS-specific events (tick, tray, window management).
 *   **`features/`**: **Business Logic & Feature UI**. Independent modules implementing specific capabilities.
     *   `account_management`: Account list and auth state.
     *   `account_rules`: Scheduling and availability rules.

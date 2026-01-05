@@ -6,6 +6,7 @@
 //! Note: For rule evaluation, check `engine.rs` instead.
 
 use crate::github::{NotificationView, SubjectType};
+use crate::ui::features::sidebar::SidebarState;
 use crate::ui::screens::settings::rule_engine::RuleAction;
 use chrono::Local;
 use std::collections::HashMap;
@@ -29,15 +30,6 @@ pub struct NotificationGroup {
     pub is_expanded: bool,
     /// We flag this so the UI knows to give it special styling and keep it at the top.
     pub is_priority: bool,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct FilterSettings {
-    pub show_all: bool,
-    /// None means "All Types"
-    pub selected_type: Option<SubjectType>,
-    /// None means "All Repos"
-    pub selected_repo: Option<String>,
 }
 
 pub fn group_processed_notifications(
@@ -110,7 +102,7 @@ pub fn group_processed_notifications(
 
 pub fn apply_filters(
     notifications: &[NotificationView],
-    filters: &FilterSettings,
+    filters: &SidebarState,
 ) -> Vec<NotificationView> {
     notifications
         .iter()

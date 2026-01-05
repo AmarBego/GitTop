@@ -4,6 +4,10 @@ use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::settings::AppSettings;
+use crate::ui::context::AppContext;
+use crate::ui::effects::{AppEffect, NavigateTo, SessionEffect};
+use crate::ui::features::account_management::AccountMessage;
+use crate::ui::features::power_mode::PowerModeMessage;
 use crate::ui::features::{account_management, general_settings, network_proxy, power_mode};
 use crate::ui::{icons, theme};
 
@@ -68,6 +72,48 @@ impl SettingsScreen {
                 power_mode::update(&mut self.power_mode, msg, &mut self.settings)
                     .map(SettingsMessage::PowerMode)
             }
+        }
+    }
+
+    /// Update with effect pattern - returns task and any app-level effect.
+    pub fn update_with_effect(
+        &mut self,
+        message: SettingsMessage,
+        _ctx: &mut AppContext,
+    ) -> (Task<SettingsMessage>, AppEffect) {
+        match &message {
+            // Navigation becomes effects
+            SettingsMessage::Back => (Task::none(), AppEffect::Navigate(NavigateTo::Back)),
+            SettingsMessage::OpenRuleEngine => (
+                Task::none(),
+                AppEffect::Navigate(NavigateTo::RuleEngine {
+                    from_settings: true,
+                }),
+            ),
+
+            // Account operations that affect session
+            SettingsMessage::Account(AccountMessage::RemoveAccount(username)) => {
+                let username = username.clone();
+                (
+                    Task::none(),
+                    AppEffect::Session(SessionEffect::RemoveAccount(username)),
+                )
+            }
+            SettingsMessage::Account(AccountMessage::TokenValidated(Ok(_username))) => {
+                // For token validation, we need to spawn the async restore task
+                // We handle this in the screen's normal update, not as an effect
+                let task = self.update(message);
+                (task, AppEffect::None)
+            }
+
+            // Power mode toggle with window resize - handled by app.rs effect executor
+            SettingsMessage::PowerMode(PowerModeMessage::Toggle(_)) => {
+                let task = self.update(message);
+                (task, AppEffect::None)
+            }
+
+            // Other messages handled normally
+            _ => (self.update(message), AppEffect::None),
         }
     }
 

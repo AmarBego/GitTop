@@ -4,6 +4,7 @@ use iced::widget::{Space, button, column, container, row, text, toggler};
 use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::settings::{AppSettings, IconTheme};
+use crate::ui::effects::{AppEffect, NavigateTo};
 use crate::ui::icons;
 use crate::ui::screens::settings::rule_engine::rules::{AccountRule, NotificationRuleSet};
 use crate::ui::theme;
@@ -114,6 +115,17 @@ impl RuleEngineScreen {
                     Task::none()
                 }
             },
+        }
+    }
+
+    /// Update with effect pattern - returns task and any app-level effect.
+    pub fn update_with_effect(
+        &mut self,
+        message: RuleEngineMessage,
+    ) -> (Task<RuleEngineMessage>, AppEffect) {
+        match message {
+            RuleEngineMessage::Back => (Task::none(), AppEffect::Navigate(NavigateTo::Back)),
+            other => (self.update(other), AppEffect::None),
         }
     }
 

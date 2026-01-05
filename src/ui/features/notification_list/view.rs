@@ -4,27 +4,26 @@ use iced::{Alignment, Element, Fill};
 use super::widgets::notification_item;
 use crate::settings::IconTheme;
 use crate::ui::features::bulk_actions::{BulkActionMessage, BulkActionState};
+use crate::ui::features::sidebar::SidebarState;
 use crate::ui::screens::notifications::components::group::view_group_header;
 use crate::ui::screens::notifications::components::states::{
     EmptyState, view_empty, view_error, view_loading,
 };
-use crate::ui::screens::notifications::helper::{
-    FilterSettings, NotificationGroup, ProcessedNotification,
-};
+use crate::ui::screens::notifications::helper::{NotificationGroup, ProcessedNotification};
 use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
 
-use super::NotificationListMessage;
+use super::{NotificationListMessage, NotificationListState};
 
 pub struct ListArgs<'a> {
     pub groups: &'a [NotificationGroup],
     pub is_loading: bool,
     pub has_notifications: bool, // or check groups.is_empty?
     pub error_message: Option<&'a String>,
-    pub filters: &'a FilterSettings,
+    pub filters: &'a SidebarState,
     pub bulk_actions: &'a BulkActionState,
-    pub scroll_offset: f32,
-    pub viewport_height: f32,
+
+    pub list_state: &'a NotificationListState,
     pub icon_theme: IconTheme,
     pub power_mode: bool,
 }
@@ -59,8 +58,8 @@ pub fn view<'a>(args: ListArgs<'a>) -> Element<'a, NotificationMessage> {
     let content_padding: f32 = 8.0;
     let buffer_items: usize = 10;
 
-    let first_visible_px = args.scroll_offset.max(0.0);
-    let last_visible_px = args.scroll_offset + args.viewport_height + 100.0;
+    let first_visible_px = args.list_state.scroll_offset.max(0.0);
+    let last_visible_px = args.list_state.scroll_offset + args.list_state.viewport_height + 100.0;
 
     let mut content = column![]
         .spacing(column_spacing)
@@ -86,22 +85,13 @@ pub fn view<'a>(args: ListArgs<'a>) -> Element<'a, NotificationMessage> {
             let items_end_y = items_start_y + total_items_height;
 
             if items_end_y >= first_visible_px && items_start_y <= last_visible_px {
-                let first_visible_idx = if first_visible_px > items_start_y {
-                    ((first_visible_px - items_start_y) / (item_height + column_spacing)) as usize
-                } else {
-                    0
-                };
-
-                let last_visible_idx = if last_visible_px < items_end_y {
-                    ((last_visible_px - items_start_y) / (item_height + column_spacing)).ceil()
-                        as usize
-                        + 1
-                } else {
-                    items_count
-                };
-
-                let render_start = first_visible_idx.saturating_sub(buffer_items);
-                let render_end = (last_visible_idx + buffer_items).min(items_count);
+                let (render_start, render_end) = args.list_state.calculate_visible_range(
+                    item_height,
+                    column_spacing,
+                    buffer_items,
+                    items_start_y,
+                    items_count,
+                );
 
                 if render_start > 0 {
                     let top_spacer_height = render_start as f32 * (item_height + column_spacing);

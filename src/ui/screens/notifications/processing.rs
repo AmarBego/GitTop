@@ -3,9 +3,10 @@ use crate::ui::screens::settings::rule_engine::{NotificationRuleSet, RuleAction}
 
 use super::engine::NotificationEngine;
 use super::helper::{
-    FilterSettings, NotificationGroup, ProcessedNotification, apply_filters, count_by_repo,
-    count_by_type, group_processed_notifications,
+    NotificationGroup, ProcessedNotification, apply_filters, count_by_repo, count_by_type,
+    group_processed_notifications,
 };
+use crate::ui::features::sidebar::SidebarState;
 
 use std::collections::HashMap;
 
@@ -45,7 +46,7 @@ impl ProcessingState {
         self.cross_account_priority = Vec::new();
     }
 
-    pub fn rebuild_groups(&mut self, filters: &mut FilterSettings, current_account: &str) {
+    pub fn rebuild_groups(&mut self, filters: &mut SidebarState, current_account: &str) {
         let notifications_for_types: Vec<_> = if let Some(ref repo) = filters.selected_repo {
             self.all_notifications
                 .iter()
@@ -130,7 +131,7 @@ impl ProcessingState {
         }
     }
 
-    fn process_notifications(&mut self, filters: &FilterSettings) {
+    fn process_notifications(&mut self, filters: &SidebarState) {
         let engine = NotificationEngine::new(self.rules.clone());
         self.filtered_notifications = apply_filters(&self.all_notifications, filters);
         self.processed_notifications = engine.process_all(&self.filtered_notifications);

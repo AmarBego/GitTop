@@ -6,6 +6,5 @@ mod screen;
 
 pub mod rules;
 
-pub use messages::RuleEngineMessage;
 pub use rules::{NotificationRuleSet, RuleAction, RuleEngine};
 pub use screen::RuleEngineScreen;

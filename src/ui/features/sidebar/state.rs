@@ -3,7 +3,18 @@
 use crate::github::{SubjectType, UserInfo};
 use crate::settings::IconTheme;
 
-pub struct SidebarState<'a> {
+/// Persistent state for the sidebar (filters, selections).
+#[derive(Debug, Clone, Default)]
+pub struct SidebarState {
+    pub show_all: bool,
+    /// None means "All Types"
+    pub selected_type: Option<SubjectType>,
+    /// None means "All Repos"
+    pub selected_repo: Option<String>,
+}
+
+/// View arguments for rendering the sidebar.
+pub struct SidebarViewArgs<'a> {
     pub user: &'a UserInfo,
     pub accounts: Vec<String>,
     pub type_counts: &'a [(SubjectType, usize)],

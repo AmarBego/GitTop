@@ -7,6 +7,69 @@ use crate::ui::{icons, theme};
 
 use super::message::PowerModeMessage;
 
+use crate::ui::features::notification_details;
+use crate::ui::features::power_mode::widgets::{status_bar, top_bar};
+use crate::ui::screens::notifications::NotificationsScreen;
+use crate::ui::screens::notifications::messages::NotificationMessage;
+
+pub fn app_layout<'a>(
+    screen: &'a NotificationsScreen,
+    settings: &AppSettings,
+    accounts: Vec<String>,
+) -> Element<'a, NotificationMessage> {
+    let content = screen.view(
+        accounts.clone(),
+        settings.icon_theme,
+        settings.sidebar_width,
+        true,
+    );
+
+    let main_area: Element<NotificationMessage> = if settings.show_details_panel {
+        row![
+            content,
+            notification_details::view(
+                screen.selected_notification(),
+                screen.selected_details(),
+                screen.notification_details.is_loading,
+                settings.icon_theme
+            )
+        ]
+        .height(Fill)
+        .into()
+    } else {
+        row![content].height(Fill).into()
+    };
+
+    let account_infos: Vec<top_bar::AccountInfo> = accounts
+        .iter()
+        .map(|username| top_bar::AccountInfo {
+            username: username.clone(),
+        })
+        .collect();
+
+    let unread_count = screen
+        .processing
+        .filtered_notifications
+        .iter()
+        .filter(|n| n.unread)
+        .count();
+
+    column![
+        top_bar::view_top_bar(
+            &screen.user,
+            account_infos,
+            screen.is_loading,
+            unread_count,
+            screen.sidebar_state.show_all,
+            screen.bulk_actions.bulk_mode,
+            settings.icon_theme
+        ),
+        main_area,
+        status_bar::view_status_bar(settings.icon_theme)
+    ]
+    .into()
+}
+
 pub fn view(settings: &AppSettings) -> Element<'_, PowerModeMessage> {
     let p = theme::palette();
     let enabled = settings.power_mode;

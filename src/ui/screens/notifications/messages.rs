@@ -3,10 +3,11 @@
 //! This module defines the top-level message enum for the notifications screen.
 //! Screen-level messages are routing wrappers only - actual behavior is handled by features.
 
-use crate::github::{GitHubError, NotificationView, SubjectType};
+use crate::github::{GitHubError, NotificationView};
 use crate::ui::features::bulk_actions::BulkActionMessage;
 use crate::ui::features::notification_details::NotificationDetailsMessage;
 use crate::ui::features::notification_list::NotificationListMessage;
+use crate::ui::features::sidebar::{SidebarAction, SidebarMessage};
 use crate::ui::features::thread_actions::ThreadActionMessage;
 
 /// Top-level message for the notifications screen.
@@ -29,6 +30,10 @@ pub enum NotificationMessage {
     Bulk(BulkActionMessage),
     /// Notification details (selection, details loading).
     Details(NotificationDetailsMessage),
+    /// Sidebar messages (navigation, filters).
+    Sidebar(SidebarMessage),
+    /// Sidebar actions (results of updates).
+    SidebarAction(SidebarAction),
 
     // === UI State Messages ===
     /// Filter messages for type/repo selection.
@@ -42,8 +47,6 @@ pub enum NotificationMessage {
 #[derive(Debug, Clone)]
 pub enum FilterMessage {
     ToggleShowAll,
-    SelectType(Option<SubjectType>),
-    SelectRepo(Option<String>),
 }
 
 #[derive(Debug, Clone)]
