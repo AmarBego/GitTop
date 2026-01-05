@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.github.AmarBego.GitTop</id>
+  <id>io.github.AmarBego.GitTop</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-only</project_license>
   <name>GitTop</name>
@@ -20,7 +20,7 @@
     </ul>
   </description>
   
-  <launchable type="desktop-id">com.github.AmarBego.GitTop.desktop</launchable>
+  <launchable type="desktop-id">io.github.AmarBego.GitTop.desktop</launchable>
   
   <screenshots>
     <screenshot type="default">
@@ -34,7 +34,7 @@
   <url type="help">https://amarbego.github.io/GitTop/</url>
   <url type="vcs-browser">https://github.com/AmarBego/GitTop</url>
   
-  <developer id="com.github.AmarBego">
+  <developer id="io.github.AmarBego">
     <name>AmarBego</name>
   </developer>
   

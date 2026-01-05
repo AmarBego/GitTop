@@ -102,7 +102,7 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: gittop-${{ steps.release.outputs.version }}.flatpak
-          manifest-path: packaging/flatpak/com.github.AmarBego.GitTop.yml
+          manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
       
