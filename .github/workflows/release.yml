@@ -153,29 +153,31 @@ jobs:
           # Ensure binary is in the expected location for packaging tools
           mkdir -p target/release
           cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} target/release/
-          
+
           # Generate .deb
           cargo deb --no-build --target ${{ env.TARGET_LINUX }}
-          
+
           # Generate .rpm
           cargo generate-rpm
-          
+
           # Move packages to a staging area
           mkdir -p dist
-          
+
           # Name format: gittop-{version}-linux-x86_64.{deb,rpm}
-          
+
           # Handle .deb
           for file in target/${{ env.TARGET_LINUX }}/debian/*.deb target/debian/*.deb; do
             [ -e "$file" ] || continue
             # Standardize name
             mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.deb"
+            break
           done
-          
+
           # Handle .rpm
           for file in target/generate-rpm/*.rpm; do
             [ -e "$file" ] || continue
              mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.rpm"
+             break
           done
 
       - name: Package Linux release
