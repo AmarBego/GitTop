@@ -23,6 +23,16 @@ build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
 
 modules:
+  - name: libayatana-appindicator
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DENABLE_BINDINGS_MONO=NO
+      - -DENABLE_BINDINGS_VALA=NO
+    sources:
+      - type: git
+        url: https://github.com/AyatanaIndicators/libayatana-appindicator.git
+        tag: 0.5.93
+
   - name: gittop
     buildsystem: simple
     build-commands:
