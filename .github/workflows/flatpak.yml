@@ -18,17 +18,17 @@ on:
         default: false
 
 jobs:
-  flatpak:
-    name: Build Flatpak Bundle
+  check:
+    name: Check Release Status
     runs-on: ubuntu-latest
-    # Use privileged container with Flatpak pre-installed
-    container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
-      options: --privileged
     permissions:
       actions: read
-      contents: write
+      contents: read
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
     
     steps:
       - name: Download release metadata
@@ -44,14 +44,12 @@ jobs:
         id: release
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            # Manual dispatch - use inputs
             TAG="${{ inputs.tag }}"
             IS_PRERELEASE="false"
             if [ "${{ inputs.skip_prerelease_check }}" == "true" ]; then
               IS_PRERELEASE="false"
             fi
           else
-            # Automatic workflow_run - use metadata
             TAG=$(cat release-meta/tag)
             IS_PRERELEASE=$(cat release-meta/is_prerelease)
           fi
@@ -63,64 +61,110 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
 
-      - name: Skip prerelease
-        if: steps.release.outputs.is_prerelease == 'true'
+      - name: Determine if should build
+        id: check
         run: |
-          echo "::notice::Skipping Flatpak build for prerelease: ${{ steps.release.outputs.tag }}"
-          exit 0
+          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping Flatpak build for prerelease: ${{ steps.release.outputs.tag }}"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
 
+  flatpak:
+    name: Build Flatpak Bundle
+    needs: check
+    runs-on: ubuntu-latest
+    # Use privileged container with Flatpak pre-installed
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
+      options: --privileged
+    permissions:
+      contents: write
+    if: ${{ needs.check.outputs.should_build == 'true' }}
+    
+    steps:
       - uses: actions/checkout@v4
-        if: steps.release.outputs.is_prerelease != 'true'
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ needs.check.outputs.tag }}
       
-      - name: Download Linux tarball
-        if: steps.release.outputs.is_prerelease != 'true'
+      - name: Install Rust
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
-          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-linux-x86_64.tar.gz"
-          
-          curl -L -o gittop-linux-x86_64.tar.gz "$URL"
-          tar -xzf gittop-linux-x86_64.tar.gz
-          
-          echo "Downloaded and extracted Linux tarball for v${VERSION}"
-          ls -la gittop-linux-x86_64/
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          source "$HOME/.cargo/env"
+          rustc --version
       
-      - name: Verify files before build
-        if: steps.release.outputs.is_prerelease != 'true'
+      - name: Generate Cargo vendor sources
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Checking for manifest file:"
-          ls -la packaging/flatpak/
-          echo "Checking for extracted tarball:"
-          ls -la gittop-linux-x86_64/ || echo "Tarball directory not found!"
-          echo "Full directory structure:"
-          find . -name "*.yml" -o -name "gittop" -type f 2>/dev/null | head -20
+          source "$HOME/.cargo/env"
+          
+          # Generate cargo vendor
+          cargo vendor packaging/flatpak/vendor
+          
+          # Create cargo config
+          mkdir -p packaging/flatpak/.cargo
+          cat > packaging/flatpak/.cargo/config.toml << 'EOF'
+          [source.crates-io]
+          replace-with = "vendored-sources"
+          
+          [source.vendored-sources]
+          directory = "vendor"
+          EOF
+          
+          # Create generated-sources.json
+          cat > packaging/flatpak/generated-sources.json << 'EOF'
+          [
+            {
+              "type": "dir",
+              "path": "vendor",
+              "dest": "cargo/vendor"
+            },
+            {
+              "type": "file",
+              "path": ".cargo/config.toml",
+              "dest": "cargo"
+            }
+          ]
+          EOF
+          
+          echo "Generated Cargo vendor sources"
+      
+      - name: Update manifest tag and commit
+        run: |
+          TAG="${{ needs.check.outputs.tag }}"
+          VERSION="${{ needs.check.outputs.version }}"
+          
+          # Get the actual commit hash for the tag
+          COMMIT_HASH=$(git rev-parse ${TAG}^{commit})
+          
+          # Update the manifest with both tag and commit
+          sed -i "s/tag: .*/tag: ${TAG}/" packaging/flatpak/io.github.AmarBego.GitTop.yml
+          sed -i "s/commit: .*/commit: ${COMMIT_HASH}/" packaging/flatpak/io.github.AmarBego.GitTop.yml
+          
+          echo "Updated manifest to ${TAG} (commit: ${COMMIT_HASH})"
       
       - name: Build Flatpak
-        if: steps.release.outputs.is_prerelease != 'true'
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: gittop-${{ steps.release.outputs.version }}.flatpak
+          bundle: gittop-${{ needs.check.outputs.version }}.flatpak
           manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
       
       - name: Upload Flatpak to Release
-        if: steps.release.outputs.is_prerelease != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
+          VERSION="${{ needs.check.outputs.version }}"
           
-          gh release upload ${{ steps.release.outputs.tag }} \
+          gh release upload ${{ needs.check.outputs.tag }} \
             gittop-${VERSION}.flatpak \
             --clobber \
             --repo AmarBego/GitTop
       
       - name: Upload artifact
-        if: steps.release.outputs.is_prerelease != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: flatpak-bundle
-          path: gittop-${{ steps.release.outputs.version }}.flatpak
+          path: gittop-${{ needs.check.outputs.version }}.flatpak
+

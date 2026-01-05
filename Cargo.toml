@@ -1,6 +1,6 @@
 [package]
 name = "GitTop"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2024"
 description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["AmarBego"]
@@ -35,9 +35,9 @@ iced_aw = { version = "0.13", default-features = false, features = [
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # HTTP client for GitHub API
-reqwest = { version = "0.12", features = [
+reqwest = { version = "0.13.1", features = [
     "json",
-    "rustls-tls",
+    "rustls",
 ], default-features = false }
 
 # Serialization
@@ -70,8 +70,8 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Embedded database for caching
 sled = "0.34"
 
-# System tray
-tray-icon = "0.21.2"
+# System tray (no menus - using iced_aw instead to avoid xdotool)
+tray-icon = { version = "0.21.2", default-features = false }
 image = { version = "0.25", default-features = false, features = [
     "ico",
     "png",
