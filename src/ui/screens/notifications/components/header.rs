@@ -7,14 +7,14 @@ use crate::settings::IconTheme;
 use crate::ui::{icons, theme};
 
 use crate::github::NotificationView;
+use crate::ui::features::sidebar::SidebarState;
 use crate::ui::features::thread_actions::ThreadActionMessage;
-use crate::ui::screens::notifications::helper::FilterSettings;
 use crate::ui::screens::notifications::messages::{FilterMessage, NotificationMessage};
 
 pub fn view<'a>(
     filtered_notifications: &[NotificationView],
     is_loading: bool,
-    filters: &FilterSettings,
+    filters: &SidebarState,
     icon_theme: IconTheme,
 ) -> Element<'a, NotificationMessage> {
     let p = theme::palette();

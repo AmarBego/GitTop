@@ -16,19 +16,21 @@ use iced::widget::row;
 use iced::{Element, Fill, Task};
 
 use super::desktop_notify;
-use super::helper::{FilterSettings, ProcessedNotification};
-use super::messages::{FilterMessage, NotificationMessage};
+use super::helper::ProcessedNotification;
+use super::messages::{FilterMessage, NavigationMessage, NotificationMessage};
 use super::processing::ProcessingState;
 use crate::github::{GitHubClient, GitHubError, NotificationView, UserInfo};
 use crate::settings::IconTheme;
+use crate::ui::context::AppContext;
+use crate::ui::effects::{AppEffect, NavigateTo, SessionEffect};
 use crate::ui::features::bulk_actions::{BulkActionState, update_bulk_action};
 use crate::ui::features::notification_details::{
     NotificationDetailsState, update_notification_details,
 };
 use crate::ui::features::notification_list::{self, ListArgs, NotificationListMessage};
-use crate::ui::features::sidebar::{SidebarState, view as view_sidebar};
+use crate::ui::features::sidebar::{self, SidebarState, SidebarViewArgs, view as view_sidebar};
 use crate::ui::features::thread_actions::{ThreadActionState, update_thread_action};
-use crate::ui::window_state;
+use crate::ui::state;
 
 use std::collections::HashMap;
 
@@ -42,7 +44,7 @@ pub struct NotificationsScreen {
     pub client: GitHubClient,
     pub user: UserInfo,
     pub processing: ProcessingState,
-    pub filters: FilterSettings,
+    pub sidebar_state: SidebarState,
     pub is_loading: bool,
     pub error_message: Option<String>,
 
@@ -54,8 +56,7 @@ pub struct NotificationsScreen {
     // === Internal State ===
     seen_notification_timestamps: HashMap<String, chrono::DateTime<chrono::Utc>>,
 
-    pub(crate) scroll_offset: f32,
-    pub(crate) viewport_height: f32,
+    pub(crate) list_state: notification_list::NotificationListState,
 }
 
 impl NotificationsScreen {
@@ -64,15 +65,14 @@ impl NotificationsScreen {
             client,
             user,
             processing: ProcessingState::new(),
-            filters: FilterSettings::default(),
+            sidebar_state: SidebarState::default(),
             is_loading: true,
             error_message: None,
             thread_actions: ThreadActionState::new(),
             bulk_actions: BulkActionState::new(),
             notification_details: NotificationDetailsState::new(),
             seen_notification_timestamps: HashMap::new(),
-            scroll_offset: 0.0,
-            viewport_height: 600.0,
+            list_state: notification_list::NotificationListState::new(),
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -80,7 +80,7 @@ impl NotificationsScreen {
 
     fn fetch_notifications(&self) -> Task<NotificationMessage> {
         let client = self.client.clone();
-        let show_all = self.filters.show_all;
+        let show_all = self.sidebar_state.show_all;
         let account = self.user.login.clone();
         Task::perform(
             async move { client.get_notification_views(show_all, &account).await },
@@ -97,8 +97,8 @@ impl NotificationsScreen {
     pub fn enter_low_memory_mode(&mut self) {
         self.processing.enter_low_memory_mode();
         self.error_message = None;
-        self.scroll_offset = 0.0;
-        self.viewport_height = 600.0;
+        self.error_message = None;
+        self.list_state.reset();
 
         if self.seen_notification_timestamps.len() > 500 {
             self.seen_notification_timestamps.shrink_to_fit();
@@ -112,7 +112,7 @@ impl NotificationsScreen {
     pub fn set_cross_account_priority(&mut self, priority: Vec<ProcessedNotification>) {
         self.processing.cross_account_priority = priority;
         self.processing
-            .rebuild_groups(&mut self.filters, &self.user.login);
+            .rebuild_groups(&mut self.sidebar_state, &self.user.login);
     }
 
     // === Message Routing ===
@@ -137,7 +137,7 @@ impl NotificationsScreen {
                 );
                 if result.needs_rebuild {
                     self.processing
-                        .rebuild_groups(&mut self.filters, &self.user.login);
+                        .rebuild_groups(&mut self.sidebar_state, &self.user.login);
                 }
                 if result.needs_refresh {
                     self.is_loading = true;
@@ -155,7 +155,7 @@ impl NotificationsScreen {
                 );
                 if result.needs_rebuild {
                     self.processing
-                        .rebuild_groups(&mut self.filters, &self.user.login);
+                        .rebuild_groups(&mut self.sidebar_state, &self.user.login);
                 }
                 result.task.map(NotificationMessage::Bulk)
             }
@@ -173,49 +173,93 @@ impl NotificationsScreen {
             // UI state
             NotificationMessage::Filter(msg) => self.update_filter(msg),
             NotificationMessage::List(msg) => self.update_view(msg),
+            NotificationMessage::Sidebar(msg) => self.update_sidebar(msg),
+            NotificationMessage::SidebarAction(action) => self.handle_sidebar_action(action),
             NotificationMessage::Navigation(_msg) => Task::none(),
+        }
+    }
+
+    fn handle_sidebar_action(
+        &mut self,
+        action: crate::ui::features::sidebar::SidebarAction,
+    ) -> Task<NotificationMessage> {
+        use crate::ui::features::sidebar::SidebarAction;
+        match action {
+            SidebarAction::FilterChanged => {
+                self.list_state.reset();
+                self.processing
+                    .rebuild_groups(&mut self.sidebar_state, &self.user.login);
+                Task::none()
+            }
+            SidebarAction::SwitchAccount(u) => Task::done(NotificationMessage::Navigation(
+                NavigationMessage::SwitchAccount(u),
+            )),
+            SidebarAction::OpenSettings => Task::done(NotificationMessage::Navigation(
+                NavigationMessage::OpenSettings,
+            )),
+            SidebarAction::Logout => {
+                Task::done(NotificationMessage::Navigation(NavigationMessage::Logout))
+            }
+        }
+    }
+
+    /// Update with effect pattern - returns task and any app-level effect.
+    pub fn update_with_effect(
+        &mut self,
+        message: NotificationMessage,
+        ctx: &mut AppContext,
+    ) -> (Task<NotificationMessage>, AppEffect) {
+        match message {
+            // Navigation messages become effects
+            NotificationMessage::Navigation(nav) => match nav {
+                NavigationMessage::Logout => {
+                    (Task::none(), AppEffect::Session(SessionEffect::Logout))
+                }
+                NavigationMessage::OpenSettings => {
+                    (Task::none(), AppEffect::Navigate(NavigateTo::Settings))
+                }
+                NavigationMessage::OpenRuleEngine => (
+                    Task::none(),
+                    AppEffect::Navigate(NavigateTo::RuleEngine {
+                        from_settings: false,
+                    }),
+                ),
+                NavigationMessage::SwitchAccount(username) => (
+                    Task::none(),
+                    AppEffect::Session(SessionEffect::SwitchAccount(username)),
+                ),
+                NavigationMessage::TogglePowerMode => {
+                    ctx.settings.power_mode = !ctx.settings.power_mode;
+                    ctx.settings.save_silent();
+                    self.collapse_all_groups();
+
+                    let task: Task<NotificationMessage> = if ctx.settings.power_mode {
+                        state::resize_for_power_mode()
+                    } else {
+                        Task::none()
+                    };
+                    (task, AppEffect::None)
+                }
+            },
+
+            // Other messages handled normally
+            other => (self.update(other), AppEffect::None),
         }
     }
 
     fn update_filter(&mut self, message: FilterMessage) -> Task<NotificationMessage> {
         match message {
             FilterMessage::ToggleShowAll => {
-                self.filters.show_all = !self.filters.show_all;
-                self.scroll_offset = 0.0;
+                self.sidebar_state.show_all = !self.sidebar_state.show_all;
+                self.list_state.reset();
                 self.is_loading = true;
                 self.fetch_notifications()
-            }
-            FilterMessage::SelectType(subject_type) => {
-                self.filters.selected_type = subject_type;
-                self.scroll_offset = 0.0;
-                self.processing
-                    .rebuild_groups(&mut self.filters, &self.user.login);
-                Task::none()
-            }
-            FilterMessage::SelectRepo(repo) => {
-                self.filters.selected_repo = repo;
-                self.scroll_offset = 0.0;
-                self.processing
-                    .rebuild_groups(&mut self.filters, &self.user.login);
-                Task::none()
             }
         }
     }
 
     fn update_view(&mut self, message: NotificationListMessage) -> Task<NotificationMessage> {
-        match message {
-            NotificationListMessage::ToggleGroup(index) => {
-                if let Some(group) = self.processing.groups.get_mut(index) {
-                    group.is_expanded = !group.is_expanded;
-                }
-                Task::none()
-            }
-            NotificationListMessage::OnScroll(viewport) => {
-                self.scroll_offset = viewport.absolute_offset().y;
-                self.viewport_height = viewport.bounds().height;
-                Task::none()
-            }
-        }
+        notification_list::update(&mut self.list_state, message, &mut self.processing.groups)
     }
 
     // === View Composition ===
@@ -227,7 +271,7 @@ impl NotificationsScreen {
         sidebar_width: f32,
         power_mode: bool,
     ) -> Element<'a, NotificationMessage> {
-        let total_count = if let Some(ref repo) = self.filters.selected_repo {
+        let total_count = if let Some(ref repo) = self.sidebar_state.selected_repo {
             self.processing
                 .all_notifications
                 .iter()
@@ -237,7 +281,7 @@ impl NotificationsScreen {
             self.processing.all_notifications.len()
         };
 
-        let total_repo_count = if let Some(ref selected_type) = self.filters.selected_type {
+        let total_repo_count = if let Some(ref selected_type) = self.sidebar_state.selected_type {
             self.processing
                 .all_notifications
                 .iter()
@@ -248,19 +292,20 @@ impl NotificationsScreen {
         };
 
         row![
-            view_sidebar(SidebarState {
+            view_sidebar(SidebarViewArgs {
                 user: &self.user,
-                accounts,
+                accounts: accounts.clone(),
                 type_counts: &self.processing.type_counts,
                 repo_counts: &self.processing.repo_counts,
-                selected_type: self.filters.selected_type,
-                selected_repo: self.filters.selected_repo.as_deref(),
+                selected_type: self.sidebar_state.selected_type,
+                selected_repo: self.sidebar_state.selected_repo.as_deref(),
                 total_count,
                 total_repo_count,
                 icon_theme,
                 width: sidebar_width,
                 power_mode,
-            }),
+            })
+            .map(NotificationMessage::Sidebar),
             self.view_main_content(icon_theme, power_mode)
         ]
         .height(Fill)
@@ -293,10 +338,9 @@ impl NotificationsScreen {
                         .iter()
                         .any(|g| !g.notifications.is_empty()),
                     error_message: self.error_message.as_ref(),
-                    filters: &self.filters,
+                    filters: &self.sidebar_state,
                     bulk_actions: &self.bulk_actions,
-                    scroll_offset: self.scroll_offset,
-                    viewport_height: self.viewport_height,
+                    list_state: &self.list_state,
                     icon_theme,
                     power_mode,
                 })
@@ -306,25 +350,10 @@ impl NotificationsScreen {
             .into()
         } else {
             iced::widget::column![
-                // self.view_content_header(icon_theme), // Removed as it was likely part of view.rs which we are deleting.
-                // Wait, view.rs had view_content_header? I better check.
-                // Assuming view_content_header logic is handled or we need to keep it?
-                // The implementation plan said delete view.rs.
-                // Let's assume view_content_header was a small helper in view.rs or imported.
-                // If it was in view.rs, I might have missed copying it to notification_list if it was relevant.
-                // Re-checking view.rs content... view_content_header was NOT in the file view I saw.
-                // It was referenced but I didn't see definition. Wait.
-                // Line 42: self.view_content_header(icon_theme),
-                // Let's check if it exists in screen.rs or components.
-                // It's not in screen.rs outline either.
-                // Maybe it's in components/header.rs?
-                // yes `view_content_header` implies something like that.
-                // Let's use `crate::ui::screens::notifications::components::header::view_content_header` if possible.
-                // Or just use the notification_list view for now.
                 super::components::header::view(
                     &self.processing.filtered_notifications,
                     self.is_loading,
-                    &self.filters,
+                    &self.sidebar_state,
                     icon_theme
                 ),
                 notification_list::view(ListArgs {
@@ -336,10 +365,9 @@ impl NotificationsScreen {
                         .iter()
                         .any(|g| !g.notifications.is_empty()),
                     error_message: self.error_message.as_ref(),
-                    filters: &self.filters,
+                    filters: &self.sidebar_state,
                     bulk_actions: &self.bulk_actions,
-                    scroll_offset: self.scroll_offset,
-                    viewport_height: self.viewport_height,
+                    list_state: &self.list_state,
                     icon_theme,
                     power_mode,
                 })
@@ -390,10 +418,10 @@ impl NotificationsScreen {
                 self.processing.all_notifications = notifications;
                 // Rebuild groups will process notifications
                 self.processing
-                    .rebuild_groups(&mut self.filters, &self.user.login);
+                    .rebuild_groups(&mut self.sidebar_state, &self.user.login);
 
-                let is_hidden = window_state::is_hidden();
-                let should_notify = is_hidden || !window_state::is_focused();
+                let is_hidden = state::is_hidden();
+                let should_notify = is_hidden || !state::is_focused();
 
                 if should_notify {
                     // Send desktop notifications using processed data
@@ -426,5 +454,12 @@ impl NotificationsScreen {
             }
         }
         Task::none()
+    }
+
+    fn update_sidebar(
+        &mut self,
+        message: crate::ui::features::sidebar::SidebarMessage,
+    ) -> Task<NotificationMessage> {
+        sidebar::update(&mut self.sidebar_state, message).map(NotificationMessage::SidebarAction)
     }
 }
