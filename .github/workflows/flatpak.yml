@@ -6,6 +6,16 @@ on:
     types:
       - completed
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.2.0)'
+        required: true
+        type: string
+      skip_prerelease_check:
+        description: 'Skip prerelease check (for testing)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   flatpak:
@@ -14,10 +24,11 @@ jobs:
     permissions:
       actions: read
       contents: write
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     
     steps:
       - name: Download release metadata
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: release-meta
@@ -28,8 +39,19 @@ jobs:
       - name: Read release info
         id: release
         run: |
-          TAG=$(cat release-meta/tag)
-          IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # Manual dispatch - use inputs
+            TAG="${{ inputs.tag }}"
+            IS_PRERELEASE="false"
+            if [ "${{ inputs.skip_prerelease_check }}" == "true" ]; then
+              IS_PRERELEASE="false"
+            fi
+          else
+            # Automatic workflow_run - use metadata
+            TAG=$(cat release-meta/tag)
+            IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          fi
+          
           VERSION="${TAG#v}"
           
           echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -41,6 +63,7 @@ jobs:
         if: steps.release.outputs.is_prerelease == 'true'
         run: |
           echo "::notice::Skipping Flatpak build for prerelease: ${{ steps.release.outputs.tag }}"
+          exit 0
 
       - uses: actions/checkout@v4
         if: steps.release.outputs.is_prerelease != 'true'
