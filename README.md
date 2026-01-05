@@ -114,7 +114,7 @@ Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe`
 **Linux:**
 ```bash
 # Arch
-sudo pacman -S gcc-libs gtk3 xdotool libappindicator-gtk3
+sudo pacman -S gcc-libs gtk3 libappindicator-gtk3
 
 # Others coming soon...
 ```
