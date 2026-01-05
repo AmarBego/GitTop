@@ -36,7 +36,3 @@ Packaging:
   - ".github/workflows/chocolatey.yml"
   - ".github/workflows/scoop.yml"
   - ".github/workflows/winget.yml"
-
-# GitHub Assets
-GitHub:
-  - ".github/**"
