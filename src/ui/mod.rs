@@ -8,6 +8,5 @@ pub(crate) mod routing;
 mod screens;
 pub mod state;
 pub mod theme;
-mod widgets;
 
 pub use app::App;

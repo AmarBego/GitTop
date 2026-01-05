@@ -1,0 +1,33 @@
+app-id: com.github.AmarBego.GitTop
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: gittop
+
+finish-args:
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+  - --own-name=org.kde.StatusNotifierItem-*
+  - --talk-name=org.freedesktop.secrets
+  - --device=dri
+  - --filesystem=xdg-config/gittop:create
+  - --filesystem=xdg-cache/gittop:create
+  - --filesystem=xdg-data/gittop:create
+
+modules:
+  - name: gittop
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 gittop /app/bin/gittop
+      - install -Dm644 gittop.desktop /app/share/applications/com.github.AmarBego.GitTop.desktop
+      - install -Dm644 gittop.png /app/share/icons/hicolor/256x256/apps/com.github.AmarBego.GitTop.png
+      - install -Dm644 com.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/com.github.AmarBego.GitTop.metainfo.xml
+    sources:
+      - type: dir
+        path: ../../gittop-linux-x86_64
+      - type: file
+        path: com.github.AmarBego.GitTop.metainfo.xml

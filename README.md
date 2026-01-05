@@ -67,6 +67,16 @@ scoop install gittop
 
 ### Linux
 
+**Flatpak:**
+```bash
+# From Flathub (when published)
+# flatpak install flathub com.github.AmarBego.GitTop
+
+# Or install from bundled .flatpak file
+flatpak install gittop-VERSION.flatpak
+flatpak run com.github.AmarBego.GitTop
+```
+
 **Arch Linux (AUR):**
 ```bash
 # If using yay
