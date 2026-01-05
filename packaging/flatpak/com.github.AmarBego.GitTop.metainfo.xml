@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.github.AmarBego.GitTop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>GitTop</name>
+  <summary>A lightweight GitHub notifications client</summary>
+  <description>
+    <p>
+      GitTop is a lightweight desktop client for GitHub notifications. Why spin up a browser just to check your GitHub notifications?
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>Super lean: ~5-15MB RAM whilst in use (1-2MB in tray)</li>
+      <li>Multi-account: Seamless support for multiple GitHub accounts</li>
+      <li>Smart Rules: Powerful engine for priorities and hiding noisy notification types</li>
+      <li>Cross platform: Native experience on Windows and Linux</li>
+      <li>Dual Mode: Minimalist by default. Enable Power Mode for in-app notification viewing, rule engine and more</li>
+      <li>Stay focused: Be on top of your notifications</li>
+    </ul>
+  </description>
+  
+  <launchable type="desktop-id">com.github.AmarBego.GitTop.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/AmarBego/GitTop/main/assets/images/showcase.png</image>
+      <caption>GitTop main interface</caption>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://amarbego.github.io/GitTop/</url>
+  <url type="bugtracker">https://github.com/AmarBego/GitTop/issues</url>
+  <url type="help">https://amarbego.github.io/GitTop/</url>
+  <url type="vcs-browser">https://github.com/AmarBego/GitTop</url>
+  
+  <developer id="com.github.AmarBego">
+    <name>AmarBego</name>
+  </developer>
+  
+  <categories>
+    <category>Development</category>
+    <category>Utility</category>
+  </categories>
+  
+  <keywords>
+    <keyword>github</keyword>
+    <keyword>notifications</keyword>
+    <keyword>git</keyword>
+  </keywords>
+  
+  <provides>
+    <binary>gittop</binary>
+  </provides>
+  
+  <content_rating type="oars-1.1" />
+  
+  <releases>
+    <release version="0.2.0" date="2026-01-01">
+      <description>
+        <p>Latest stable release with bug fixes and improvements.</p>
+      </description>
+    </release>
+  </releases>
+</component>
