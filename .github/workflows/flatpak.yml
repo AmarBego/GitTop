@@ -45,7 +45,12 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
-            IS_PRERELEASE="false"
+            if [[ "$TAG" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+            
             if [ "${{ inputs.skip_prerelease_check }}" == "true" ]; then
               IS_PRERELEASE="false"
             fi

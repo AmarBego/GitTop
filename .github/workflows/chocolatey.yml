@@ -34,6 +34,9 @@ jobs:
         run: |
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          if [[ "$TAG" == *"-"* ]]; then
+            IS_PRERELEASE="true"
+          fi
           VERSION="${TAG#v}"
 
           echo "tag=$TAG" >> $GITHUB_OUTPUT
