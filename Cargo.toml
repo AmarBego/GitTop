@@ -6,8 +6,44 @@ description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["AmarBego"]
 license = "AGPL-3.0-only"
 
-[package.metadata.wix]
-wxs = ["packaging/wix/main.wxs"]
+
+[package.metadata.deb]
+maintainer = "AmarBego <begovicamar@proton.me>"
+copyright = "2024, AmarBego"
+license-file = ["LICENSE.md", "4"]
+depends = "$auto"
+section = "utils"
+assets = [
+    [
+        "target/release/gittop",
+        "usr/bin/",
+        "755",
+    ],
+    [
+        "src/platform/resources/gittop.desktop",
+        "usr/share/applications/",
+        "644",
+    ],
+    [
+        "assets/images/GitTop-256x256.png",
+        "usr/share/icons/hicolor/256x256/apps/gittop.png",
+        "644",
+    ],
+    [
+        "README.txt",
+        "usr/share/doc/gittop/",
+        "644",
+    ],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/gittop", dest = "/usr/bin/gittop", mode = "755" },
+    { source = "src/platform/resources/gittop.desktop", dest = "/usr/share/applications/gittop.desktop", mode = "644" },
+    { source = "assets/images/GitTop-256x256.png", dest = "/usr/share/icons/hicolor/256x256/apps/gittop.png", mode = "644" },
+    { source = "README.txt", dest = "/usr/share/doc/gittop/README.txt", mode = "644" },
+    { source = "LICENSE.md", dest = "/usr/share/doc/gittop/LICENSE.md", mode = "644" },
+]
 
 [[bin]]
 name = "gittop"

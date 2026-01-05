@@ -132,12 +132,35 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev
 
+      - name: Install packaging tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
       - name: Build release
         env:
           SCCACHE_GHA_ENABLED: "true"
           SCCACHE_GHA_CACHE_PREFIX: "sccache-linux"
           RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_LINUX }}
+
+      - name: Generate packages
+        run: |
+          # Ensure binary is in the expected location for packaging tools (if they rely on Cargo.toml paths)
+          mkdir -p target/release
+          cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} target/release/
+          
+          # Generate .deb
+          cargo deb --no-build --target ${{ env.TARGET_LINUX }}
+          
+          # Generate .rpm
+          # cargo-generate-rpm looks for the binary in target/release by default or respects explicit config
+          cargo generate-rpm
+          
+          # Move packages to a staging area for easier upload
+          mkdir -p dist
+          mv target/${{ env.TARGET_LINUX }}/debian/*.deb dist/ || mv target/debian/*.deb dist/
+          mv target/generate-rpm/*.rpm dist/
 
       - name: Package Linux release
         run: |
@@ -162,7 +185,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-x86_64
-          path: ${{ env.APP_NAME }}-linux-x86_64.tar.gz
+          path: |
+            ${{ env.APP_NAME }}-linux-x86_64.tar.gz
+            dist/*.deb
+            dist/*.rpm
 
   release:
     name: Create GitHub Release
@@ -191,6 +217,8 @@ jobs:
             artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip \
             artifacts/windows-x86_64/target/installer/*.exe \
             artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz \
+            artifacts/linux-x86_64/dist/*.deb \
+            artifacts/linux-x86_64/dist/*.rpm \
             | sort > SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -204,6 +232,8 @@ jobs:
             artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip
             artifacts/windows-x86_64/target/installer/*.exe
             artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz
+            artifacts/linux-x86_64/dist/*.deb
+            artifacts/linux-x86_64/dist/*.rpm
             SHA256SUMS.txt
 
       # Save release info for downstream workflows (e.g., AUR)
