@@ -92,49 +92,14 @@ tar xzf gittop-linux-x86_64.tar.gz
 ./gittop-linux-x86_64/gittop
 ```
 
-## Building from source
+## Building from Source
 
-Requirements:
-- Rust 1.85+ (edition 2024)
-- Platform-specific dependencies (see below)
+For those who prefer to compile from source or are interested in contributing, please check out our [Contribution Guide](CONTRIBUTING.md).
 
-```bash
-git clone https://github.com/AmarBego/GitTop.git
-cd GitTop
-cargo build --release
-
-# Linux: Install desktop integration (icons, .desktop file)
-./scripts/install.sh
-```
-
-Binary will be at `target/release/gittop` (Linux) or `target\release\gittop.exe` (Windows).
-
-### Platform dependencies
-
-**Linux:**
-```bash
-# Arch
-sudo pacman -S gcc-libs gtk3 libappindicator-gtk3
-
-# Others coming soon...
-```
-
-**Windows:** No additional dependencies.
-
-## Development
-
-See https://amarbego.github.io/GitTop/dev/ for development covering architecture, branching strategy, release process, and more.
-
-```bash
-# Run in development mode
-cargo run
-
-# Run with bacon (recommended for dev)
-bacon run
-
-# Format + lint + test (pre-commit)
-prek run
-```
+It covers everything from:
+- Building and running locally with `bacon`
+- Platform-specific dependencies
+- Access to our full [Developer Documentation](https://amarbego.github.io/GitTop/dev/)
 
 ## License
 

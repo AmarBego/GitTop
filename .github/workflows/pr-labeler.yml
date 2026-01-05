@@ -1,6 +1,7 @@
 name: "Pull Request Labeler"
 on:
-  - pull_request_target
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened]
 
 jobs:
   triage:
@@ -13,3 +14,78 @@ jobs:
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           sync-labels: true
+
+      - name: Check for incomplete template
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || "";
+            const labelName = "triage/incomplete";
+            const labelColor = "e6a300"; // yellow/orange
+            const labelDescription = "PR template not fully filled out";
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+
+            // Ensure label exists with correct properties
+            try {
+              // Try to Create the label (will fail if it exists)
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: labelName,
+                color: labelColor,
+                description: labelDescription
+              });
+            } catch (error) {
+              // If it already exists, verify/update it (optional, but good for consistency)
+              if (error.status === 422) { // Validation failed usually means it exists
+                 try {
+                   await github.rest.issues.updateLabel({
+                      owner,
+                      repo,
+                      name: labelName,
+                      color: labelColor,
+                      description: labelDescription
+                   });
+                 } catch(e) {}
+              }
+            }
+
+            // Normalize line endings
+            const normalizedBody = body.replace(/\r\n/g, "\n");
+
+            const incompleteMarkers = [
+              "## What changed?\n...",
+              "## Why?\n...",
+              "## How was this tested?\n...",
+            ];
+
+            const needsLabel = incompleteMarkers.some(m => normalizedBody.includes(m));
+            const currentLabels = context.payload.pull_request.labels.map(l => l.name);
+            const hasLabel = currentLabels.includes(labelName);
+
+            if (needsLabel && !hasLabel) {
+              console.log(`Found incomplete template marker in PR body. Adding label '${labelName}'.`);
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: [labelName]
+              });
+            } else if (!needsLabel && hasLabel) {
+              console.log(`No incomplete markers found. Ensuring label '${labelName}' is removed.`);
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number,
+                  name: labelName
+                });
+              } catch (error) {
+                // Ignore 404 if label doesn't exist
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
