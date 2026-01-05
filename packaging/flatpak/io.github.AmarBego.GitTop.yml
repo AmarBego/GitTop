@@ -1,4 +1,4 @@
-app-id: com.github.AmarBego.GitTop
+app-id: io.github.AmarBego.GitTop
 runtime: org.freedesktop.Platform
 runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
@@ -11,7 +11,6 @@ finish-args:
   - --share=ipc
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
-  - --own-name=org.kde.StatusNotifierItem-*
   - --talk-name=org.freedesktop.secrets
   - --device=dri
   - --filesystem=xdg-config/gittop:create
@@ -23,11 +22,11 @@ modules:
     buildsystem: simple
     build-commands:
       - install -Dm755 gittop /app/bin/gittop
-      - install -Dm644 gittop.desktop /app/share/applications/com.github.AmarBego.GitTop.desktop
-      - install -Dm644 gittop.png /app/share/icons/hicolor/256x256/apps/com.github.AmarBego.GitTop.png
-      - install -Dm644 com.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/com.github.AmarBego.GitTop.metainfo.xml
+      - install -Dm644 gittop.desktop /app/share/applications/io.github.AmarBego.GitTop.desktop
+      - install -Dm644 gittop.png /app/share/icons/hicolor/256x256/apps/io.github.AmarBego.GitTop.png
+      - install -Dm644 io.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/io.github.AmarBego.GitTop.metainfo.xml
     sources:
       - type: dir
         path: ../../gittop-linux-x86_64
       - type: file
-        path: com.github.AmarBego.GitTop.metainfo.xml
+        path: io.github.AmarBego.GitTop.metainfo.xml

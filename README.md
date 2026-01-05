@@ -70,11 +70,11 @@ scoop install gittop
 **Flatpak:**
 ```bash
 # From Flathub (when published)
-# flatpak install flathub com.github.AmarBego.GitTop
+# flatpak install flathub io.github.AmarBego.GitTop
 
 # Or install from bundled .flatpak file
 flatpak install gittop-VERSION.flatpak
-flatpak run com.github.AmarBego.GitTop
+flatpak run io.github.AmarBego.GitTop
 ```
 
 **Arch Linux (AUR):**
