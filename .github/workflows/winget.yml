@@ -5,6 +5,11 @@ on:
     workflows: ["Release"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Release Workflow Run ID"
+        required: true
 
 jobs:
   check:
@@ -13,7 +18,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
@@ -26,7 +31,7 @@ jobs:
           name: release-meta
           path: release-meta
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
 
       - name: Read release info
         id: release
@@ -56,7 +61,7 @@ jobs:
   winget:
     name: Update Winget Package
     needs: check
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       actions: read
     if: ${{ needs.check.outputs.should_build == 'true' }}
@@ -64,15 +69,14 @@ jobs:
     steps:
       - name: Install wingetcreate
         run: |
-          curl -L https://aka.ms/wingetcreate/latest -o wingetcreate.exe
-          chmod +x wingetcreate.exe
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
 
       - name: Update Winget package
         run: |
-          ./wingetcreate.exe update AmarBego.GitTop \
-            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-windows-x86_64-setup.exe|x64" \
-            --version ${{ needs.check.outputs.version }} \
-            --submit \
+          .\wingetcreate.exe update AmarBego.GitTop `
+            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-windows-x86_64-setup.exe|x64" `
+            --version ${{ needs.check.outputs.version }} `
+            --submit `
             --token ${{ secrets.WINGET_TOKEN }}
 
       - uses: kesin11/actions-timeline@v2
