@@ -185,8 +185,12 @@ pub mod tray {
 
             let tray = GitTopTray { tx };
 
-            // Use blocking spawn API - spawns tray service in background thread
-            let handle = tray.spawn()?;
+            // Check if running in Flatpak (file exists)
+            let is_flatpak = std::path::Path::new("/.flatpak-info").exists();
+
+            // Use blocking spawn API
+            // For Flatpak, we must disable D-Bus name ownership as we can't own arbitrary names.
+            let handle = tray.disable_dbus_name(is_flatpak).spawn()?;
 
             Ok(Self { handle })
         }
