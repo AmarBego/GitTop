@@ -70,8 +70,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Embedded database for caching
 sled = "0.34"
 
-# System tray (no menus - using iced_aw instead to avoid xdotool)
-tray-icon = { version = "0.21.2", default-features = false }
+# Image processing for tray icons
 image = { version = "0.25", default-features = false, features = [
     "ico",
     "png",
@@ -96,11 +95,15 @@ windows = { version = "0.62.2", features = [
 ] }
 tauri-winrt-notification = "0.7"
 keyring = { version = "3", features = ["windows-native"] }
+# System tray (native on Windows)
+tray-icon = { version = "0.21.2", default-features = false }
 
 # macOS-specific APIs
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
 keyring = { version = "3", features = ["apple-native"] }
+# System tray (native on macOS)
+tray-icon = { version = "0.21.2", default-features = false }
 
 # Linux-specific APIs
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -110,8 +113,8 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
 ] }
 notify-rust = "4"
 keyring = { version = "3", features = ["sync-secret-service"] }
-# GTK for tray-icon initialization
-gtk = "0.18"
+# Pure-Rust system tray via StatusNotifierItem
+ksni = { version = "0.3", features = ["blocking"] }
 
 # FreeBSD-specific APIs
 [target.'cfg(target_os = "freebsd")'.dependencies]
@@ -121,8 +124,8 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
 ] }
 notify-rust = "4"
 keyring = { version = "3", features = ["sync-secret-service"] }
-# GTK for tray-icon initialization
-gtk = "0.18"
+# Pure-Rust system tray via StatusNotifierItem
+ksni = { version = "0.3", features = ["blocking"] }
 
 # Build dependencies for Windows icon embedding
 [target.'cfg(windows)'.build-dependencies]

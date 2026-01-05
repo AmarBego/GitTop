@@ -51,9 +51,6 @@ fn main() -> iced::Result {
 
     platform::enable_dark_mode();
 
-    // Initialize tray subsystem (GTK on Linux)
-    platform::init_tray();
-
     let _tray = match tray::TrayManager::new() {
         Ok(t) => Some(t),
         Err(e) => {

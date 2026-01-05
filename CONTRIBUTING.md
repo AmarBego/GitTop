@@ -23,7 +23,7 @@ Before you dive in, please verify the architectural guidelines and branching str
     ```
 
 **Linux Specifics:**
-*   **Arch Linux**: `sudo pacman -S gcc-libs gtk3 libappindicator-gtk3`
+*   **Arch Linux**: `sudo pacman -S gcc-libs`
 *   **Desktop Integration**: Run `./scripts/install.sh` to install desktop icons and `.desktop` files.
 
 ### Installation
