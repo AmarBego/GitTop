@@ -72,7 +72,7 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ needs.check.outputs.version }}"
-          $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-setup.exe"
+          $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-windows-x86_64-setup.exe"
           Invoke-WebRequest -Uri $url -OutFile gittop-setup.exe
 
           # Calculate checksum

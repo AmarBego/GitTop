@@ -170,7 +170,7 @@ jobs:
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          bundle: gittop-${{ needs.check.outputs.version }}.flatpak
+          bundle: gittop-${{ needs.check.outputs.version }}-linux-x86_64.flatpak
           manifest-path: packaging/flatpak/flatpak-github-action-modified-io.github.AmarBego.GitTop.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
@@ -182,7 +182,7 @@ jobs:
           VERSION="${{ needs.check.outputs.version }}"
 
           gh release upload ${{ needs.check.outputs.tag }} \
-            gittop-${VERSION}.flatpak \
+            gittop-${VERSION}-linux-x86_64.flatpak \
             --clobber \
             --repo AmarBego/GitTop
 
@@ -190,6 +190,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flatpak-bundle
-          path: gittop-${{ needs.check.outputs.version }}.flatpak
+          path: gittop-${{ needs.check.outputs.version }}-linux-x86_64.flatpak
 
       - uses: kesin11/actions-timeline@v2

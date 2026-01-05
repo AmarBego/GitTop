@@ -70,7 +70,7 @@ jobs:
       - name: Update Winget package
         run: |
           ./wingetcreate.exe update AmarBego.GitTop \
-            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-setup.exe|x64" \
+            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-windows-x86_64-setup.exe|x64" \
             --version ${{ needs.check.outputs.version }} \
             --submit \
             --token ${{ secrets.WINGET_TOKEN }}

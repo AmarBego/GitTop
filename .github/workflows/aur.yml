@@ -75,7 +75,7 @@ jobs:
           VERSION="${VERSION#v}"
 
           # Download tarball and calculate checksum
-          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-linux-x86_64.tar.gz"
+          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-x86_64.tar.gz"
           curl -L -o /tmp/gittop.tar.gz "$URL"
           CHECKSUM=$(sha256sum /tmp/gittop.tar.gz | cut -d' ' -f1)
           rm /tmp/gittop.tar.gz

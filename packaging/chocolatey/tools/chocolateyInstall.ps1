@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $packageName = 'gittop'
 
 $version = '{{VERSION}}'
-$url64 = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-setup.exe"
+$url64 = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-windows-x86_64-setup.exe"
 $checksum64 = '{{CHECKSUM}}'
 $checksumType64 = 'sha256'
 

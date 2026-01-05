@@ -68,11 +68,11 @@ jobs:
           # Inno Setup is pre-installed on windows-latest at this path
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DMyAppVersion="$version" packaging/innosetup/gittop.iss
 
-      - name: Package Windows release
+      - name: Packaging Windows release
         shell: pwsh
         run: |
           echo "::group::Prepare Staging Directory"
-          $stagingDir = "${{ env.APP_NAME }}-windows-x86_64"
+          $stagingDir = "gittop-${{ steps.version.outputs.version }}-windows-x86_64"
           New-Item -ItemType Directory -Force -Path $stagingDir
           echo "::endgroup::"
 
@@ -84,7 +84,7 @@ jobs:
 
           echo "::group::Compress Archive"
           # Zip the directory (not glob) for deterministic contents
-          Compress-Archive -Path $stagingDir -DestinationPath "${{ env.APP_NAME }}-windows-x86_64.zip"
+          Compress-Archive -Path $stagingDir -DestinationPath "gittop-${{ steps.version.outputs.version }}-windows-x86_64.zip"
           echo "::endgroup::"
 
       - name: Upload artifacts
@@ -92,7 +92,7 @@ jobs:
         with:
           name: windows-x86_64
           path: |
-            ${{ env.APP_NAME }}-windows-x86_64.zip
+            gittop-*-windows-x86_64.zip
             target/installer/*.exe
 
   build-linux:
@@ -146,7 +146,11 @@ jobs:
 
       - name: Generate packages
         run: |
-          # Ensure binary is in the expected location for packaging tools (if they rely on Cargo.toml paths)
+          # Inject the dynamic version from the tag into Cargo.toml so packaging tools use it
+          # This handles prereleases (e.g., 0.3.0-alpha.7) correctly
+          sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.version }}"/' Cargo.toml
+
+          # Ensure binary is in the expected location for packaging tools
           mkdir -p target/release
           cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} target/release/
           
@@ -154,31 +158,43 @@ jobs:
           cargo deb --no-build --target ${{ env.TARGET_LINUX }}
           
           # Generate .rpm
-          # cargo-generate-rpm looks for the binary in target/release by default or respects explicit config
           cargo generate-rpm
           
-          # Move packages to a staging area for easier upload
+          # Move packages to a staging area
           mkdir -p dist
-          mv target/${{ env.TARGET_LINUX }}/debian/*.deb dist/ || mv target/debian/*.deb dist/
-          mv target/generate-rpm/*.rpm dist/
+          
+          # Name format: gittop-{version}-linux-x86_64.{deb,rpm}
+          
+          # Handle .deb
+          for file in target/${{ env.TARGET_LINUX }}/debian/*.deb target/debian/*.deb; do
+            [ -e "$file" ] || continue
+            # Standardize name
+            mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.deb"
+          done
+          
+          # Handle .rpm
+          for file in target/generate-rpm/*.rpm; do
+            [ -e "$file" ] || continue
+             mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.rpm"
+          done
 
       - name: Package Linux release
         run: |
           echo "::group::Prepare Staging Directory"
-          mkdir -p ${{ env.APP_NAME }}-linux-x86_64
-          cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} ${{ env.APP_NAME }}-linux-x86_64/
-          cp LICENSE.md ${{ env.APP_NAME }}-linux-x86_64/
-          cp README.txt ${{ env.APP_NAME }}-linux-x86_64/
-          cp src/platform/resources/gittop.desktop ${{ env.APP_NAME }}-linux-x86_64/
-          cp assets/images/GitTop-256x256.png ${{ env.APP_NAME }}-linux-x86_64/gittop.png
-          chmod +x ${{ env.APP_NAME }}-linux-x86_64/${{ env.APP_NAME }}
+          mkdir -p gittop-${{ steps.version.outputs.version }}-linux-x86_64
+          cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} gittop-${{ steps.version.outputs.version }}-linux-x86_64/
+          cp LICENSE.md gittop-${{ steps.version.outputs.version }}-linux-x86_64/
+          cp README.txt gittop-${{ steps.version.outputs.version }}-linux-x86_64/
+          cp src/platform/resources/gittop.desktop gittop-${{ steps.version.outputs.version }}-linux-x86_64/
+          cp assets/images/GitTop-256x256.png gittop-${{ steps.version.outputs.version }}-linux-x86_64/gittop.png
+          chmod +x gittop-${{ steps.version.outputs.version }}-linux-x86_64/${{ env.APP_NAME }}
           echo "::endgroup::"
 
           echo "::group::Create Tarball"
           tar --sort=name \
               --owner=0 --group=0 --numeric-owner \
-              -czf ${{ env.APP_NAME }}-linux-x86_64.tar.gz \
-              ${{ env.APP_NAME }}-linux-x86_64
+              -czf gittop-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz \
+              gittop-${{ steps.version.outputs.version }}-linux-x86_64
           echo "::endgroup::"
 
       - name: Upload artifacts
@@ -186,7 +202,7 @@ jobs:
         with:
           name: linux-x86_64
           path: |
-            ${{ env.APP_NAME }}-linux-x86_64.tar.gz
+            gittop-*-linux-x86_64.tar.gz
             dist/*.deb
             dist/*.rpm
 
@@ -214,9 +230,9 @@ jobs:
       - name: Generate checksums
         run: |
           sha256sum \
-            artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip \
+            artifacts/windows-x86_64/gittop-*-windows-x86_64.zip \
             artifacts/windows-x86_64/target/installer/*.exe \
-            artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz \
+            artifacts/linux-x86_64/gittop-*-linux-x86_64.tar.gz \
             artifacts/linux-x86_64/dist/*.deb \
             artifacts/linux-x86_64/dist/*.rpm \
             | sort > SHA256SUMS.txt
@@ -229,9 +245,9 @@ jobs:
           prerelease: ${{ needs.build-windows.outputs.is_prerelease == 'true' }}
           generate_release_notes: true
           files: |
-            artifacts/windows-x86_64/${{ env.APP_NAME }}-windows-x86_64.zip
+            artifacts/windows-x86_64/gittop-*-windows-x86_64.zip
             artifacts/windows-x86_64/target/installer/*.exe
-            artifacts/linux-x86_64/${{ env.APP_NAME }}-linux-x86_64.tar.gz
+            artifacts/linux-x86_64/gittop-*-linux-x86_64.tar.gz
             artifacts/linux-x86_64/dist/*.deb
             artifacts/linux-x86_64/dist/*.rpm
             SHA256SUMS.txt

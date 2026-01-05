@@ -75,7 +75,7 @@ jobs:
           curl -L -o SHA256SUMS.txt "https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/SHA256SUMS.txt"
 
           # Extract checksum for the Windows zip (format: "hash  path/to/file.zip")
-          CHECKSUM=$(grep 'gittop-windows-x86_64\.zip$' SHA256SUMS.txt | cut -d' ' -f1)
+          CHECKSUM=$(grep "gittop-${VERSION}-windows-x86_64\.zip$" SHA256SUMS.txt | cut -d' ' -f1)
 
           if [ -z "$CHECKSUM" ]; then
             echo "::error::Could not find checksum for gittop-windows-x86_64.zip in SHA256SUMS.txt"
@@ -93,7 +93,7 @@ jobs:
           # Update the manifest using jq for proper JSON manipulation
           jq --arg ver "$VERSION" --arg hash "$CHECKSUM" '
             .version = $ver |
-            .architecture."64bit".url = "https://github.com/AmarBego/GitTop/releases/download/v\($ver)/gittop-windows-x86_64.zip" |
+            .architecture."64bit".url = "https://github.com/AmarBego/GitTop/releases/download/v\($ver)/gittop-\($ver)-windows-x86_64.zip" |
             .architecture."64bit".hash = $hash
           ' bucket/gittop.json > bucket/gittop.json.tmp && mv bucket/gittop.json.tmp bucket/gittop.json
 
