@@ -7,15 +7,19 @@ on:
       - completed
 
 jobs:
-  scoop:
-    name: Update Scoop Bucket
+  jobs:
+  check:
+    name: Check Release Status
     runs-on: ubuntu-latest
     permissions:
       actions: read
-      contents: write
-      pull-requests: write
+      contents: read
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -37,21 +41,35 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
 
-      - name: Skip prerelease
-        if: steps.release.outputs.is_prerelease == 'true'
+      - name: Determine if should run
+        id: check
         run: |
-          echo "::notice::Skipping Scoop update for prerelease: ${{ steps.release.outputs.tag }}"
+          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping Scoop update for prerelease: ${{ steps.release.outputs.tag }}"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
 
+  scoop:
+    name: Update Scoop Bucket
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pull-requests: write
+    if: ${{ needs.check.outputs.should_build == 'true' }}
+
+    steps:
       - uses: actions/checkout@v4
-        if: steps.release.outputs.is_prerelease != 'true'
         with:
           ref: main
 
       - name: Get checksum from release
-        if: steps.release.outputs.is_prerelease != 'true'
         id: checksum
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
+          VERSION="${{ needs.check.outputs.version }}"
           curl -L -o SHA256SUMS.txt "https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/SHA256SUMS.txt"
           
           # Extract checksum for the Windows zip (format: "hash  path/to/file.zip")
@@ -66,9 +84,8 @@ jobs:
           echo "Checksum: $CHECKSUM"
 
       - name: Update Scoop manifest
-        if: steps.release.outputs.is_prerelease != 'true'
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
+          VERSION="${{ needs.check.outputs.version }}"
           CHECKSUM="${{ steps.checksum.outputs.checksum }}"
           
           # Update the manifest using jq for proper JSON manipulation
@@ -82,11 +99,10 @@ jobs:
           cat bucket/gittop.json
 
       - name: Create PR for Scoop update
-        if: steps.release.outputs.is_prerelease != 'true'
         env:
           GH_TOKEN: ${{ secrets.SCOOP_PR_TOKEN }}
         run: |
-          BRANCH="scoop-update-${{ steps.release.outputs.version }}"
+          BRANCH="scoop-update-${{ needs.check.outputs.version }}"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -98,11 +114,11 @@ jobs:
           fi
 
           git checkout -b "$BRANCH"
-          git commit -m "scoop: update to ${{ steps.release.outputs.tag }}"
+          git commit -m "scoop: update to ${{ needs.check.outputs.tag }}"
           git push origin "$BRANCH"
 
           gh pr create \
-            --title "scoop: update to ${{ steps.release.outputs.tag }}" \
-            --body "Automated Scoop manifest update for release ${{ steps.release.outputs.tag }}" \
+            --title "scoop: update to ${{ needs.check.outputs.tag }}" \
+            --body "Automated Scoop manifest update for release ${{ needs.check.outputs.tag }}" \
             --base main \
             --head "$BRANCH"

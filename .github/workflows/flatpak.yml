@@ -131,6 +131,7 @@ jobs:
       
       - name: Update manifest tag and commit
         run: |
+          git config --global --add safe.directory '$GITHUB_WORKSPACE'
           TAG="${{ needs.check.outputs.tag }}"
           VERSION="${{ needs.check.outputs.version }}"
           

@@ -7,17 +7,20 @@ on:
       - completed
 
 jobs:
-  # Job for stable releases (gittop-bin)
-  aur-stable-bin:
-    name: Update gittop-bin (AUR)
+  jobs:
+  check:
+    name: Check Release Status
     runs-on: ubuntu-latest
     permissions:
-      actions: read    # Required to download artifacts from another workflow
-      contents: read   # Required to checkout the repo
-    # Only run if Release workflow succeeded
+      actions: read
+      contents: read
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    
     steps:
-      # Download the release metadata artifact from the triggering workflow
       - name: Download release metadata
         uses: actions/download-artifact@v4
         with:
@@ -31,26 +34,42 @@ jobs:
         run: |
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
+          VERSION="${TAG#v}"
           
           echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Release tag: $TAG, Prerelease: $IS_PRERELEASE"
+          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
 
-      - name: Skip prerelease
-        if: steps.release.outputs.is_prerelease == 'true'
+      - name: Determine if should run
+        id: check
         run: |
-          echo "::notice::Skipping AUR update for prerelease: ${{ steps.release.outputs.tag }}"
+          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping AUR update for prerelease: ${{ steps.release.outputs.tag }}"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
 
+  # Job for stable releases (gittop-bin)
+  aur-stable-bin:
+    name: Update gittop-bin (AUR)
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read    # Required to download artifacts from another workflow
+      contents: read   # Required to checkout the repo
+    # Only run if Release workflow succeeded
+    if: ${{ needs.check.outputs.should_build == 'true' }}
+    steps:
       - uses: actions/checkout@v4
-        if: steps.release.outputs.is_prerelease != 'true'
         with:
-          ref: ${{ steps.release.outputs.tag }}
+          ref: ${{ needs.check.outputs.tag }}
 
       # Update pkgver and sha256sums in PKGBUILD
       - name: Update PKGBUILD version and checksum
-        if: steps.release.outputs.is_prerelease != 'true'
         run: |
-          VERSION="${{ steps.release.outputs.tag }}"
+          VERSION="${{ needs.check.outputs.tag }}"
           VERSION="${VERSION#v}"
           
           # Download tarball and calculate checksum
@@ -69,7 +88,6 @@ jobs:
 
       # Publish to AUR (checksums already updated, no need for updpkgsums)
       - name: Publish gittop-bin
-        if: steps.release.outputs.is_prerelease != 'true'
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
           pkgname: gittop-bin
@@ -78,7 +96,7 @@ jobs:
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: Update to ${{ steps.release.outputs.tag }}
+          commit_message: Update to ${{ needs.check.outputs.tag }}
           ssh_keyscan_types: ed25519
           updpkgsums: false
 

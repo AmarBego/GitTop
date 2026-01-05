@@ -7,13 +7,18 @@ on:
       - completed
 
 jobs:
-  winget:
-    name: Update Winget Package
+  check:
+    name: Check Release Status
     runs-on: ubuntu-latest
     permissions:
       actions: read
+      contents: read
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -35,22 +40,34 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
           echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
 
-      - name: Skip prerelease
-        if: steps.release.outputs.is_prerelease == 'true'
+      - name: Determine if should run
+        id: check
         run: |
-          echo "::notice::Skipping Winget update for prerelease: ${{ steps.release.outputs.tag }}"
+          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping Winget update for prerelease: ${{ steps.release.outputs.tag }}"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
 
+  winget:
+    name: Update Winget Package
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    if: ${{ needs.check.outputs.should_build == 'true' }}
+
+    steps:
       - name: Install wingetcreate
-        if: steps.release.outputs.is_prerelease != 'true'
         run: |
           curl -L https://aka.ms/wingetcreate/latest -o wingetcreate.exe
           chmod +x wingetcreate.exe
 
       - name: Update Winget package
-        if: steps.release.outputs.is_prerelease != 'true'
         run: |
           ./wingetcreate.exe update AmarBego.GitTop \
-            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ steps.release.outputs.tag }}/gittop-${{ steps.release.outputs.version }}-setup.exe|x64" \
-            --version ${{ steps.release.outputs.version }} \
+            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-setup.exe|x64" \
+            --version ${{ needs.check.outputs.version }} \
             --submit \
             --token ${{ secrets.WINGET_TOKEN }}
