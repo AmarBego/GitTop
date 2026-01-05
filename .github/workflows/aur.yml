@@ -18,7 +18,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-    
+
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -34,7 +34,7 @@ jobs:
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
           VERSION="${TAG#v}"
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
@@ -56,8 +56,8 @@ jobs:
     needs: check
     runs-on: ubuntu-latest
     permissions:
-      actions: read    # Required to download artifacts from another workflow
-      contents: read   # Required to checkout the repo
+      actions: read # Required to download artifacts from another workflow
+      contents: read # Required to checkout the repo
     # Only run if Release workflow succeeded
     if: ${{ needs.check.outputs.should_build == 'true' }}
     steps:
@@ -70,17 +70,17 @@ jobs:
         run: |
           VERSION="${{ needs.check.outputs.tag }}"
           VERSION="${VERSION#v}"
-          
+
           # Download tarball and calculate checksum
           URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-linux-x86_64.tar.gz"
           curl -L -o /tmp/gittop.tar.gz "$URL"
           CHECKSUM=$(sha256sum /tmp/gittop.tar.gz | cut -d' ' -f1)
           rm /tmp/gittop.tar.gz
-          
+
           # Update PKGBUILD
           sed -i "s/^pkgver=.*/pkgver=${VERSION}/" ./packaging/aur/stable-bin/PKGBUILD
           sed -i "s/^sha256sums=.*/sha256sums=('${CHECKSUM}')/" ./packaging/aur/stable-bin/PKGBUILD
-          
+
           echo "Updated PKGBUILD to version: $VERSION"
           echo "Checksum: $CHECKSUM"
           grep -E "^(pkgver|sha256sums)=" ./packaging/aur/stable-bin/PKGBUILD

@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v0.2.0)'
+        description: "Release tag (e.g., v0.2.0)"
         required: true
         type: string
       skip_prerelease_check:
-        description: 'Skip prerelease check (for testing)'
+        description: "Skip prerelease check (for testing)"
         required: false
         type: boolean
         default: false
@@ -29,7 +29,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-    
+
     steps:
       - name: Download release metadata
         if: github.event_name == 'workflow_run'
@@ -53,9 +53,9 @@ jobs:
             TAG=$(cat release-meta/tag)
             IS_PRERELEASE=$(cat release-meta/is_prerelease)
           fi
-          
+
           VERSION="${TAG#v}"
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
@@ -82,38 +82,38 @@ jobs:
     permissions:
       contents: write
     if: ${{ needs.check.outputs.should_build == 'true' }}
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.check.outputs.tag }}
-      
+
       - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
-          
+
           echo "::group::Generate Cargo Vendor Sources"
           rustc --version
-      
+
       - name: Generate Cargo vendor sources
         run: |
           source "$HOME/.cargo/env"
-          
+
           echo "::group::Generate Cargo Vendor Sources"
           # Generate cargo vendor
           cargo vendor packaging/flatpak/vendor
-          
+
           # Create cargo config
           mkdir -p packaging/flatpak/.cargo
           cat > packaging/flatpak/.cargo/config.toml << 'EOF'
           [source.crates-io]
           replace-with = "vendored-sources"
-          
+
           [source.vendored-sources]
           directory = "vendor"
           EOF
-          
+
           # Create generated-sources.json
           cat > packaging/flatpak/generated-sources.json << 'EOF'
           [
@@ -129,27 +129,27 @@ jobs:
             }
           ]
           EOF
-          
+
           echo "::endgroup::"
-          
+
           echo "::endgroup::"
           echo "Generated Cargo vendor sources"
-      
+
       - name: Update manifest tag and commit
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           TAG="${{ needs.check.outputs.tag }}"
           VERSION="${{ needs.check.outputs.version }}"
-          
+
           # Get the actual commit hash for the tag
           COMMIT_HASH=$(git rev-parse ${TAG}^{commit})
-          
+
           # Update the manifest with both tag and commit
           sed -i "s/tag: .*/tag: ${TAG}/" packaging/flatpak/io.github.AmarBego.GitTop.yml
           sed -i "s/commit: .*/commit: ${COMMIT_HASH}/" packaging/flatpak/io.github.AmarBego.GitTop.yml
-          
+
           echo "Updated manifest to ${TAG} (commit: ${COMMIT_HASH})"
-      
+
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
@@ -157,18 +157,18 @@ jobs:
           manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
-      
+
       - name: Upload Flatpak to Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.check.outputs.version }}"
-          
+
           gh release upload ${{ needs.check.outputs.tag }} \
             gittop-${VERSION}.flatpak \
             --clobber \
             --repo AmarBego/GitTop
-      
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -176,4 +176,3 @@ jobs:
           path: gittop-${{ needs.check.outputs.version }}.flatpak
 
       - uses: kesin11/actions-timeline@v2
-

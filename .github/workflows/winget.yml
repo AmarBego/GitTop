@@ -18,7 +18,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-    
+
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -34,7 +34,7 @@ jobs:
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
           VERSION="${TAG#v}"
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT

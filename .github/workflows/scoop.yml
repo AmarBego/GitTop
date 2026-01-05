@@ -18,7 +18,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-    
+
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -34,7 +34,7 @@ jobs:
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
           VERSION="${TAG#v}"
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
@@ -70,15 +70,15 @@ jobs:
         run: |
           VERSION="${{ needs.check.outputs.version }}"
           curl -L -o SHA256SUMS.txt "https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/SHA256SUMS.txt"
-          
+
           # Extract checksum for the Windows zip (format: "hash  path/to/file.zip")
           CHECKSUM=$(grep 'gittop-windows-x86_64\.zip$' SHA256SUMS.txt | cut -d' ' -f1)
-          
+
           if [ -z "$CHECKSUM" ]; then
             echo "::error::Could not find checksum for gittop-windows-x86_64.zip in SHA256SUMS.txt"
             exit 1
           fi
-          
+
           echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
           echo "Checksum: $CHECKSUM"
 
@@ -86,14 +86,14 @@ jobs:
         run: |
           VERSION="${{ needs.check.outputs.version }}"
           CHECKSUM="${{ steps.checksum.outputs.checksum }}"
-          
+
           # Update the manifest using jq for proper JSON manipulation
           jq --arg ver "$VERSION" --arg hash "$CHECKSUM" '
             .version = $ver |
             .architecture."64bit".url = "https://github.com/AmarBego/GitTop/releases/download/v\($ver)/gittop-windows-x86_64.zip" |
             .architecture."64bit".hash = $hash
           ' bucket/gittop.json > bucket/gittop.json.tmp && mv bucket/gittop.json.tmp bucket/gittop.json
-          
+
           echo "Updated bucket/gittop.json:"
           cat bucket/gittop.json
 

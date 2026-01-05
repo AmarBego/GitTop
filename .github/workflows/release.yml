@@ -75,13 +75,13 @@ jobs:
           $stagingDir = "${{ env.APP_NAME }}-windows-x86_64"
           New-Item -ItemType Directory -Force -Path $stagingDir
           echo "::endgroup::"
-          
+
           echo "::group::Copy Artifacts"
           Copy-Item "target/${{ env.TARGET_WINDOWS }}/release/${{ env.APP_NAME }}.exe" "$stagingDir/"
           Copy-Item "LICENSE.md" "$stagingDir/"
           Copy-Item "README.txt" "$stagingDir/"
           echo "::endgroup::"
-          
+
           echo "::group::Compress Archive"
           # Zip the directory (not glob) for deterministic contents
           Compress-Archive -Path $stagingDir -DestinationPath "${{ env.APP_NAME }}-windows-x86_64.zip"
@@ -226,7 +226,7 @@ jobs:
           echo "| Type | Version | Tag |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
           echo "| ${{ needs.build-windows.outputs.is_prerelease == 'true' && 'Prerelease' || 'Stable' }} | ${{ needs.build-windows.outputs.version }} | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Checksums (SHA256)" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
