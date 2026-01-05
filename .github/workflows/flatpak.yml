@@ -120,12 +120,12 @@ jobs:
             {
               "type": "dir",
               "path": "vendor",
-              "dest": "cargo/vendor"
+              "dest": ".cargo/vendor"
             },
             {
               "type": "file",
               "path": ".cargo/config.toml",
-              "dest": "cargo"
+              "dest": ".cargo"
             }
           ]
           EOF
