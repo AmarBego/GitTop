@@ -6,7 +6,7 @@ on:
     types:
       - completed
   workflow_dispatch:
-      
+
 jobs:
   check:
     name: Check Release Status
@@ -19,7 +19,7 @@ jobs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-    
+
     steps:
       - name: Download release metadata
         uses: actions/download-artifact@v4
@@ -35,7 +35,7 @@ jobs:
           TAG=$(cat release-meta/tag)
           IS_PRERELEASE=$(cat release-meta/is_prerelease)
           VERSION="${TAG#v}"
-          
+
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
@@ -59,7 +59,7 @@ jobs:
       actions: read
       contents: read
     if: ${{ needs.check.outputs.should_build == 'true' }}
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +71,7 @@ jobs:
           $version = "${{ needs.check.outputs.version }}"
           $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-setup.exe"
           Invoke-WebRequest -Uri $url -OutFile gittop-setup.exe
-          
+
           # Calculate checksum
           $hash = (Get-FileHash gittop-setup.exe -Algorithm SHA256).Hash
           echo "checksum=$hash" >> $env:GITHUB_OUTPUT
@@ -82,18 +82,18 @@ jobs:
         run: |
           $version = "${{ needs.check.outputs.version }}"
           $checksum = "${{ steps.download.outputs.checksum }}"
-          
+
           # Update nuspec
           $nuspec = Get-Content packaging/chocolatey/gittop.nuspec -Raw
           $nuspec = $nuspec -replace '\{\{VERSION\}\}', $version
           Set-Content packaging/chocolatey/gittop.nuspec $nuspec
-          
+
           # Update install script
           $install = Get-Content packaging/chocolatey/tools/chocolateyInstall.ps1 -Raw
           $install = $install -replace '\{\{VERSION\}\}', $version
           $install = $install -replace '\{\{CHECKSUM\}\}', $checksum
           Set-Content packaging/chocolatey/tools/chocolateyInstall.ps1 $install
-          
+
           Write-Host "Updated package for version $version with checksum $checksum"
 
       - name: Pack Chocolatey package
@@ -111,3 +111,5 @@ jobs:
           cd packaging/chocolatey
           $nupkg = Get-ChildItem *.nupkg | Select-Object -First 1
           choco push $nupkg.Name --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+
+      - uses: kesin11/actions-timeline@v2

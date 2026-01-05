@@ -1,0 +1,32 @@
+# .github/labeler.yml
+
+# CI/CD
+CI:
+- .github/workflows/**
+
+# Documentation
+Docs:
+- '**/*.md'
+- '**/*.txt'
+- 'docs/**'
+
+# Rust Code
+Rust:
+- '**/*.rs'
+- 'Cargo.toml'
+- 'Cargo.lock'
+
+# Packaging
+Packaging:
+- 'packaging/**'
+- 'build.rs'
+- '.github/workflows/flatpak.yml'
+- '.github/workflows/release.yml'
+- '.github/workflows/aur.yml'
+- '.github/workflows/chocolatey.yml'
+- '.github/workflows/scoop.yml'
+- '.github/workflows/winget.yml'
+
+# GitHub Assets
+GitHub:
+- '.github/**'

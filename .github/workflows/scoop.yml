@@ -121,3 +121,5 @@ jobs:
             --body "Automated Scoop manifest update for release ${{ needs.check.outputs.tag }}" \
             --base main \
             --head "$BRANCH"
+
+      - uses: kesin11/actions-timeline@v2

@@ -61,52 +61,6 @@ jobs:
           RUSTC_WRAPPER: "sccache"
         run: cargo build --release --target ${{ env.TARGET_WINDOWS }}
 
-      # TODO: Re-enable MSI build once code signing is set up
-      # - name: Build MSI installer (WiX)
-      #   id: msi
-      #   shell: pwsh
-      #   run: |
-      #     $fullVersion = "${{ steps.version.outputs.version }}".Trim()
-      #     
-      #     # Parse SemVer → MSI version (Major.Minor.Build.0)
-      #     # Build = (patch * 10000) + base + n
-      #     # Reserved ranges per patch: alpha=1000-1999, beta=2000-2999, rc=3000-3999, stable=4000+
-      #     if ($fullVersion -match '^(\d+)\.(\d+)\.(\d+)(?:-(alpha|beta|rc)\.(\d+))?$') {
-      #       $major = [int]$matches[1]
-      #       $minor = [int]$matches[2]
-      #       $patch = [int]$matches[3]
-      #       $stage = $matches[4]
-      #       $n = if ($matches[5]) { [int]$matches[5] } else { 0 }
-      #       
-      #       # Base offsets per stage
-      #       $base = switch ($stage) {
-      #         'alpha' { 1000 }
-      #         'beta'  { 2000 }
-      #         'rc'    { 3000 }
-      #         default { 4000 }  # stable
-      #       }
-      #       
-      #       # Include patch in build for upgrade monotonicity across patches
-      #       $build = ($patch * 10000) + $base + $n
-      #       
-      #       # Validate MSI field constraints (0-65535)
-      #       if ($build -gt 65535) {
-      #         throw "MSI build number overflow: $build > 65535 (max 6 patches per minor)"
-      #       }
-      #       
-      #       $msiVersion = "$major.$minor.$build.0"
-      #     } else {
-      #       throw "Invalid version format: $fullVersion (expected: X.Y.Z or X.Y.Z-stage.N)"
-      #     }
-      #     
-      #     Write-Host "SemVer: $fullVersion -> MSI: $msiVersion"
-      #     echo "msi_version=$msiVersion" >> $env:GITHUB_OUTPUT
-      #     
-      #     # Substitute version placeholder in WXS
-      #     (Get-Content packaging/wix/main.wxs) -replace '\{\{VERSION\}\}', $msiVersion | Set-Content packaging/wix/main.wxs
-      #     cargo install cargo-wix --version 0.3.8
-      #     cargo wix --no-build --nocapture -I packaging/wix/main.wxs --output target/wix/gittop-$fullVersion.msi
-
       - name: Build EXE installer (Inno Setup)
         shell: pwsh
         run: |
@@ -117,15 +71,21 @@ jobs:
       - name: Package Windows release
         shell: pwsh
         run: |
+          echo "::group::Prepare Staging Directory"
           $stagingDir = "${{ env.APP_NAME }}-windows-x86_64"
           New-Item -ItemType Directory -Force -Path $stagingDir
+          echo "::endgroup::"
           
+          echo "::group::Copy Artifacts"
           Copy-Item "target/${{ env.TARGET_WINDOWS }}/release/${{ env.APP_NAME }}.exe" "$stagingDir/"
           Copy-Item "LICENSE.md" "$stagingDir/"
           Copy-Item "README.txt" "$stagingDir/"
+          echo "::endgroup::"
           
+          echo "::group::Compress Archive"
           # Zip the directory (not glob) for deterministic contents
           Compress-Archive -Path $stagingDir -DestinationPath "${{ env.APP_NAME }}-windows-x86_64.zip"
+          echo "::endgroup::"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -181,6 +141,7 @@ jobs:
 
       - name: Package Linux release
         run: |
+          echo "::group::Prepare Staging Directory"
           mkdir -p ${{ env.APP_NAME }}-linux-x86_64
           cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} ${{ env.APP_NAME }}-linux-x86_64/
           cp LICENSE.md ${{ env.APP_NAME }}-linux-x86_64/
@@ -188,10 +149,14 @@ jobs:
           cp src/platform/resources/gittop.desktop ${{ env.APP_NAME }}-linux-x86_64/
           cp assets/images/GitTop-256x256.png ${{ env.APP_NAME }}-linux-x86_64/gittop.png
           chmod +x ${{ env.APP_NAME }}-linux-x86_64/${{ env.APP_NAME }}
+          echo "::endgroup::"
+
+          echo "::group::Create Tarball"
           tar --sort=name \
               --owner=0 --group=0 --numeric-owner \
               -czf ${{ env.APP_NAME }}-linux-x86_64.tar.gz \
               ${{ env.APP_NAME }}-linux-x86_64
+          echo "::endgroup::"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -251,6 +216,29 @@ jobs:
       - name: Upload release metadata
         uses: actions/upload-artifact@v4
         with:
-          name: release-meta
           path: release-meta/
           retention-days: 1
+
+      - name: Generate Job Summary
+        if: success()
+        run: |
+          echo "### Release Created :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "| Type | Version | Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ needs.build-windows.outputs.is_prerelease == 'true' && 'Prerelease' || 'Stable' }} | ${{ needs.build-windows.outputs.version }} | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Checksums (SHA256)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup artifacts
+        if: always()
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            windows-x86_64
+            linux-x86_64
+
+      - uses: kesin11/actions-timeline@v2

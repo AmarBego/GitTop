@@ -99,6 +99,8 @@ jobs:
           ssh_keyscan_types: ed25519
           updpkgsums: false
 
+      - uses: kesin11/actions-timeline@v2
+
   # TODO: Job for beta releases (gittop-beta-bin)
   # aur-beta-bin:
   #   name: Update gittop-beta-bin (AUR)

@@ -92,12 +92,15 @@ jobs:
         run: |
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
           source "$HOME/.cargo/env"
+          
+          echo "::group::Generate Cargo Vendor Sources"
           rustc --version
       
       - name: Generate Cargo vendor sources
         run: |
           source "$HOME/.cargo/env"
           
+          echo "::group::Generate Cargo Vendor Sources"
           # Generate cargo vendor
           cargo vendor packaging/flatpak/vendor
           
@@ -127,6 +130,9 @@ jobs:
           ]
           EOF
           
+          echo "::endgroup::"
+          
+          echo "::endgroup::"
           echo "Generated Cargo vendor sources"
       
       - name: Update manifest tag and commit
@@ -168,4 +174,6 @@ jobs:
         with:
           name: flatpak-bundle
           path: gittop-${{ needs.check.outputs.version }}.flatpak
+
+      - uses: kesin11/actions-timeline@v2
 
