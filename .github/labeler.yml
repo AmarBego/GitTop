@@ -2,31 +2,41 @@
 
 # CI/CD
 CI:
-- .github/workflows/**
+  - .github/workflows/**
 
 # Documentation
 Docs:
-- '**/*.md'
-- '**/*.txt'
-- 'docs/**'
+  - "**/*.md"
+  - "**/*.txt"
+
+# Web
+Web:
+  - "www/**"
 
 # Rust Code
 Rust:
-- '**/*.rs'
-- 'Cargo.toml'
-- 'Cargo.lock'
+  - "**/*.rs"
+  - "Cargo.toml"
+  - "Cargo.lock"
+
+# Areas
+UI:
+  - "src/ui/**"
+
+Platform:
+  - "src/platform/**"
 
 # Packaging
 Packaging:
-- 'packaging/**'
-- 'build.rs'
-- '.github/workflows/flatpak.yml'
-- '.github/workflows/release.yml'
-- '.github/workflows/aur.yml'
-- '.github/workflows/chocolatey.yml'
-- '.github/workflows/scoop.yml'
-- '.github/workflows/winget.yml'
+  - "packaging/**"
+  - "build.rs"
+  - ".github/workflows/flatpak.yml"
+  - ".github/workflows/release.yml"
+  - ".github/workflows/aur.yml"
+  - ".github/workflows/chocolatey.yml"
+  - ".github/workflows/scoop.yml"
+  - ".github/workflows/winget.yml"
 
 # GitHub Assets
 GitHub:
-- '.github/**'
+  - ".github/**"
