@@ -79,4 +79,16 @@ jobs:
             --submit `
             --token ${{ secrets.WINGET_TOKEN }}
 
+      - name: Overwrite PR Message
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          # Wait briefly for PR index
+          Start-Sleep -Seconds 10
+          # Find the PR created by me (authenticated user)
+          $pr = gh pr list --repo microsoft/winget-pkgs --search "AmarBego.GitTop in:title is:pr is:open author:@me" --limit 1 --json number --jq '.[0].number'
+          if ($pr) {
+            gh pr edit $pr --repo microsoft/winget-pkgs --body "Automatically updated by workflow [GitTop Release ${{ needs.check.outputs.version }}]"
+          }
+
       - uses: kesin11/actions-timeline@v2
