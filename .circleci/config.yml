@@ -1,31 +1,447 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine.
-# See: https://circleci.com/docs/reference/configuration-reference
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#jobs-overview & https://circleci.com/docs/reference/configuration-reference/#jobs
-jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Docker Hub or use one of our convenience images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/guides/execution-managed/executor-intro/ & https://circleci.com/docs/reference/configuration-reference/#executor-job
-    docker:
-      # Specify the version you desire here
-      # See: https://circleci.com/developer/images/image/cimg/base
-      - image: cimg/base:current
+orbs:
+  gh: circleci/github-cli@2.3
+  win: circleci/windows@5.0
 
-    # Add steps to the job
-    # See: https://circleci.com/docs/guides/orchestrate/jobs-steps/#steps-overview & https://circleci.com/docs/reference/configuration-reference/#steps
+# ==============================================================================
+# Executors
+# ==============================================================================
+executors:
+  rust-linux:
+    docker:
+      - image: cimg/rust:1.83
+    resource_class: medium
+
+# ==============================================================================
+# Commands (Reusable Steps)
+# ==============================================================================
+commands:
+  install-rust-windows:
     steps:
-      # Checkout the code as the first step.
+      - run:
+          name: Install Rust
+          shell: powershell.exe
+          command: |
+            Invoke-WebRequest -Uri https://win.rustup.rs/x86_64 -OutFile rustup-init.exe
+            .\rustup-init.exe -y --default-toolchain stable --target x86_64-pc-windows-msvc
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            rustc --version
+            cargo --version
+
+  restore-cargo-cache-linux:
+    steps:
+      - restore_cache:
+          keys:
+            - cargo-linux-v1-{{ checksum "Cargo.lock" }}
+            - cargo-linux-v1-
+
+  save-cargo-cache-linux:
+    steps:
+      - save_cache:
+          key: cargo-linux-v1-{{ checksum "Cargo.lock" }}
+          paths:
+            - ~/.cargo/registry
+            - ~/.cargo/git
+            - target
+
+  restore-cargo-cache-windows:
+    steps:
+      - restore_cache:
+          keys:
+            - cargo-windows-v1-{{ checksum "Cargo.lock" }}
+            - cargo-windows-v1-
+
+  save-cargo-cache-windows:
+    steps:
+      - save_cache:
+          key: cargo-windows-v1-{{ checksum "Cargo.lock" }}
+          paths:
+            - C:\Users\circleci\.cargo\registry
+            - C:\Users\circleci\.cargo\git
+            - target
+
+# ==============================================================================
+# Jobs
+# ==============================================================================
+jobs:
+  # ----------------------------------------------------------------------------
+  # PR Check: Linux Build
+  # ----------------------------------------------------------------------------
+  build-linux:
+    executor: rust-linux
+    steps:
+      - checkout
+      - restore-cargo-cache-linux
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev
+      - run:
+          name: Build release
+          command: cargo build --release --target x86_64-unknown-linux-gnu
+      - run:
+          name: Display binary size
+          command: |
+            ls -lh target/x86_64-unknown-linux-gnu/release/gittop
+      - save-cargo-cache-linux
+
+  # ----------------------------------------------------------------------------
+  # PR Check: Windows Build
+  # ----------------------------------------------------------------------------
+  build-windows:
+    executor:
+      name: win/default
+      size: medium
+    steps:
+      - checkout
+      - restore-cargo-cache-windows
+      - install-rust-windows
+      - run:
+          name: Build release
+          shell: powershell.exe
+          command: |
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            cargo build --release --target x86_64-pc-windows-msvc
+      - run:
+          name: Display binary size
+          shell: powershell.exe
+          command: |
+            $size = (Get-Item "target/x86_64-pc-windows-msvc/release/gittop.exe").Length / 1MB
+            Write-Host ("Binary size: {0:N2} MB" -f $size)
+      - save-cargo-cache-windows
+
+  # ----------------------------------------------------------------------------
+  # Release: Build Linux Packages
+  # ----------------------------------------------------------------------------
+  release-linux:
+    executor: rust-linux
+    steps:
+      - checkout
+      - restore-cargo-cache-linux
+      - run:
+          name: Install system dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev
+      - run:
+          name: Install packaging tools
+          command: |
+            cargo install cargo-deb cargo-generate-rpm
+      - run:
+          name: Extract version from tag
+          command: |
+            VERSION="${CIRCLE_TAG#v}"
+            echo "export VERSION=$VERSION" >> $BASH_ENV
+            echo "Building version: $VERSION"
+      - run:
+          name: Build release binary
+          command: cargo build --release --target x86_64-unknown-linux-gnu
+      - run:
+          name: Generate packages
+          command: |
+            # Inject version for packaging tools
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
+
+            # Ensure binary is in expected location
+            mkdir -p target/release
+            cp target/x86_64-unknown-linux-gnu/release/gittop target/release/
+
+            # Generate .deb
+            cargo deb --no-build --target x86_64-unknown-linux-gnu
+
+            # Generate .rpm
+            cargo generate-rpm
+      - run:
+          name: Package tarball
+          command: |
+            STAGING="gittop-${VERSION}-linux-x86_64"
+            mkdir -p "$STAGING"
+            cp target/x86_64-unknown-linux-gnu/release/gittop "$STAGING/"
+            cp LICENSE.md README.txt "$STAGING/"
+            cp src/platform/resources/gittop.desktop "$STAGING/"
+            cp assets/images/GitTop-256x256.png "$STAGING/gittop.png"
+            chmod +x "$STAGING/gittop"
+            tar --sort=name --owner=0 --group=0 --numeric-owner \
+                -czf "gittop-${VERSION}-linux-x86_64.tar.gz" "$STAGING"
+      - run:
+          name: Stage artifacts
+          command: |
+            mkdir -p artifacts
+            mv gittop-${VERSION}-linux-x86_64.tar.gz artifacts/
+
+            # Find and move .deb
+            find target -name "*.deb" -exec mv {} "artifacts/gittop-${VERSION}-linux-x86_64.deb" \; 2>/dev/null || true
+
+            # Find and move .rpm
+            find target -name "*.rpm" -exec mv {} "artifacts/gittop-${VERSION}-linux-x86_64.rpm" \; 2>/dev/null || true
+
+            ls -la artifacts/
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/*
+
+  # ----------------------------------------------------------------------------
+  # Release: Build Windows Packages
+  # ----------------------------------------------------------------------------
+  release-windows:
+    executor:
+      name: win/default
+      size: medium
+    steps:
+      - checkout
+      - restore-cargo-cache-windows
+      - install-rust-windows
+      - run:
+          name: Extract version from tag
+          shell: powershell.exe
+          command: |
+            $version = $env:CIRCLE_TAG -replace '^v', ''
+            echo "VERSION=$version" | Out-File -FilePath $env:BASH_ENV -Append -Encoding utf8
+            Write-Host "Building version: $version"
+            [System.Environment]::SetEnvironmentVariable('VERSION', $version, 'Process')
+      - run:
+          name: Build release
+          shell: powershell.exe
+          command: |
+            $env:Path = "$env:USERPROFILE\.cargo\bin;$env:Path"
+            cargo build --release --target x86_64-pc-windows-msvc
+      - run:
+          name: Build EXE installer (Inno Setup)
+          shell: powershell.exe
+          command: |
+            $version = $env:CIRCLE_TAG -replace '^v', ''
+            & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" /DMyAppVersion="$version" packaging/innosetup/gittop.iss
+      - run:
+          name: Package Windows release
+          shell: powershell.exe
+          command: |
+            $version = $env:CIRCLE_TAG -replace '^v', ''
+            $stagingDir = "gittop-$version-windows-x86_64"
+            New-Item -ItemType Directory -Force -Path $stagingDir
+            Copy-Item "target/x86_64-pc-windows-msvc/release/gittop.exe" "$stagingDir/"
+            Copy-Item "LICENSE.md" "$stagingDir/"
+            Copy-Item "README.txt" "$stagingDir/"
+            Compress-Archive -Path $stagingDir -DestinationPath "gittop-$version-windows-x86_64.zip"
+      - run:
+          name: Stage artifacts
+          shell: powershell.exe
+          command: |
+            $version = $env:CIRCLE_TAG -replace '^v', ''
+            New-Item -ItemType Directory -Force -Path artifacts
+            Move-Item "gittop-$version-windows-x86_64.zip" "artifacts/"
+            Move-Item "target/installer/*.exe" "artifacts/" -ErrorAction SilentlyContinue
+            Get-ChildItem artifacts/
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/*
+
+  # ----------------------------------------------------------------------------
+  # Release: Create GitHub Release
+  # ----------------------------------------------------------------------------
+  create-release:
+    executor: rust-linux
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Extract version info
+          command: |
+            VERSION="${CIRCLE_TAG#v}"
+            echo "export VERSION=$VERSION" >> $BASH_ENV
+
+            # Check if prerelease
+            if [[ "$CIRCLE_TAG" =~ -(rc|alpha|beta)\. ]]; then
+              echo "export IS_PRERELEASE=true" >> $BASH_ENV
+            else
+              echo "export IS_PRERELEASE=false" >> $BASH_ENV
+            fi
+      - run:
+          name: Generate checksums
+          command: |
+            cd artifacts
+            sha256sum * | sort > SHA256SUMS.txt
+            cat SHA256SUMS.txt
+      - gh/setup
+      - run:
+          name: Create GitHub Release
+          command: |
+            PRERELEASE_FLAG=""
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              PRERELEASE_FLAG="--prerelease"
+            fi
+
+            gh release create "$CIRCLE_TAG" \
+              --repo "$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" \
+              --title "GitTop v$VERSION" \
+              --generate-notes \
+              $PRERELEASE_FLAG \
+              artifacts/*
+      - run:
+          name: Save release metadata for downstream workflows
+          command: |
+            mkdir -p release-meta
+            echo "$CIRCLE_TAG" > release-meta/tag
+            echo "$IS_PRERELEASE" > release-meta/is_prerelease
+      - store_artifacts:
+          path: release-meta
+          destination: release-meta
+
+  # ----------------------------------------------------------------------------
+  # Release: Build Flatpak Bundle
+  # ----------------------------------------------------------------------------
+  release-flatpak:
+    machine:
+      image: ubuntu-2404:current
+    resource_class: medium
+    steps:
       - checkout
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: Extract version from tag
+          command: |
+            VERSION="${CIRCLE_TAG#v}"
+            echo "export VERSION=$VERSION" >> $BASH_ENV
+            echo "Building version: $VERSION"
+      - run:
+          name: Install Flatpak and dependencies
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y flatpak flatpak-builder
+            flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+            flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
+            flatpak install --user -y flathub org.freedesktop.Sdk.Extension.rust-stable//24.08
+      - run:
+          name: Install Rust for vendoring
+          command: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            rustc --version
+      - run:
+          name: Generate Cargo vendor sources
+          command: |
+            source "$HOME/.cargo/env"
+            cargo vendor vendor
 
-# Orchestrate jobs using workflows
-# See: https://circleci.com/docs/guides/orchestrate/workflows/ & https://circleci.com/docs/reference/configuration-reference/#workflows
+            mkdir -p .cargo
+            cat > .cargo/config.toml \<< 'EOF'
+            [source.crates-io]
+            replace-with = "vendored-sources"
+
+            [source.vendored-sources]
+            directory = "vendor"
+            EOF
+
+            echo "Vendor directory created with $(ls vendor | wc -l) crates"
+      - run:
+          name: Create modified Flatpak manifest
+          command: |
+            cat > packaging/flatpak/flatpak-circleci-modified.yml \<< 'EOF'
+            app-id: io.github.AmarBego.GitTop
+            runtime: org.freedesktop.Platform
+            runtime-version: '24.08'
+            sdk: org.freedesktop.Sdk
+            sdk-extensions:
+              - org.freedesktop.Sdk.Extension.rust-stable
+            command: gittop
+
+            finish-args:
+              - --share=network
+              - --socket=wayland
+              - --socket=fallback-x11
+              - --share=ipc
+              - --talk-name=org.kde.StatusNotifierWatcher
+              - --talk-name=org.freedesktop.Notifications
+              - --talk-name=org.freedesktop.secrets
+              - --device=dri
+              - --filesystem=xdg-config/gittop:create
+              - --filesystem=xdg-cache/gittop:create
+              - --filesystem=xdg-data/gittop:create
+
+            build-options:
+              append-path: /usr/lib/sdk/rust-stable/bin
+
+            modules:
+              - name: gittop
+                buildsystem: simple
+                build-commands:
+                  - cargo --offline build --release --verbose
+                  - install -Dm755 target/release/gittop /app/bin/gittop
+                  - sed -i "s/^Icon=.*/Icon=io.github.AmarBego.GitTop/" src/platform/resources/gittop.desktop
+                  - install -Dm644 src/platform/resources/gittop.desktop /app/share/applications/io.github.AmarBego.GitTop.desktop
+                  - install -Dm644 assets/images/GitTop-256x256.png /app/share/icons/hicolor/256x256/apps/io.github.AmarBego.GitTop.png
+                  - install -Dm644 packaging/flatpak/io.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/io.github.AmarBego.GitTop.metainfo.xml
+                sources:
+                  - type: dir
+                    path: ../../
+            EOF
+      - run:
+          name: Build Flatpak bundle
+          command: |
+            flatpak-builder --user --install-deps-from=flathub --force-clean \
+              build-dir packaging/flatpak/flatpak-circleci-modified.yml
+
+            flatpak build-export repo build-dir
+            flatpak build-bundle repo "gittop-${VERSION}-linux-x86_64.flatpak" io.github.AmarBego.GitTop
+
+            ls -lh gittop-${VERSION}-linux-x86_64.flatpak
+      - run:
+          name: Stage Flatpak artifact
+          command: |
+            mkdir -p artifacts
+            mv gittop-${VERSION}-linux-x86_64.flatpak artifacts/
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artifacts/*
+
+# ==============================================================================
+# Workflows
+# ==============================================================================
 workflows:
-  say-hello-workflow: # This is the name of the workflow, feel free to change it to better match your workflow.
-    # Inside the workflow, you define the jobs you want to run.
+  # PR checks - run on all branches except main
+  pr-check:
     jobs:
-      - say-hello
+      - build-linux:
+          filters:
+            branches:
+              ignore: main
+      - build-windows:
+          filters:
+            branches:
+              ignore: main
+
+  # Release - run on version tags only
+  release:
+    jobs:
+      - release-linux:
+          filters:
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+            branches:
+              ignore: /.*/
+      - release-windows:
+          filters:
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+            branches:
+              ignore: /.*/
+      - release-flatpak:
+          filters:
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+            branches:
+              ignore: /.*/
+      - create-release:
+          requires:
+            - release-linux
+            - release-windows
+            - release-flatpak
+          filters:
+            tags:
+              only: /^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$/
+            branches:
+              ignore: /.*/

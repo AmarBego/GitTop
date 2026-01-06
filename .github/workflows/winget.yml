@@ -1,72 +1,39 @@
 name: Winget Distribution
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types:
-      - completed
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
-      run_id:
-        description: "Release Workflow Run ID"
+      tag:
+        description: "Release tag (e.g., v0.2.0)"
         required: true
+        type: string
 
 jobs:
-  check:
-    name: Check Release Status
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      should_build: ${{ steps.check.outputs.should_build }}
-      tag: ${{ steps.release.outputs.tag }}
-      version: ${{ steps.release.outputs.version }}
-
-    steps:
-      - name: Download release metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: release-meta
-          path: release-meta
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
-
-      - name: Read release info
-        id: release
-        run: |
-          TAG=$(cat release-meta/tag)
-          IS_PRERELEASE=$(cat release-meta/is_prerelease)
-          if [[ "$TAG" == *"-"* ]]; then
-            IS_PRERELEASE="true"
-          fi
-          VERSION="${TAG#v}"
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
-
-      - name: Determine if should run
-        id: check
-        run: |
-          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
-            echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "::notice::Skipping Winget update for prerelease: ${{ steps.release.outputs.tag }}"
-          else
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          fi
-
   winget:
     name: Update Winget Package
-    needs: check
     runs-on: windows-latest
     permissions:
-      actions: read
-    if: ${{ needs.check.outputs.should_build == 'true' }}
+      contents: read
+    # Skip prereleases
+    if: ${{ !github.event.release.prerelease || github.event_name == 'workflow_dispatch' }}
 
     steps:
+      - name: Get release info
+        id: release
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.event.release.tag_name }}"
+          }
+          $version = $tag -replace '^v', ''
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Release: $tag (v$version)"
+
       - name: Install wingetcreate
         run: |
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
@@ -74,8 +41,8 @@ jobs:
       - name: Update Winget package
         run: |
           .\wingetcreate.exe update AmarBego.GitTop `
-            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ needs.check.outputs.tag }}/gittop-${{ needs.check.outputs.version }}-windows-x86_64-setup.exe|x64" `
-            --version ${{ needs.check.outputs.version }} `
+            --urls "https://github.com/AmarBego/GitTop/releases/download/${{ steps.release.outputs.tag }}/gittop-${{ steps.release.outputs.version }}-windows-x86_64-setup.exe|x64" `
+            --version ${{ steps.release.outputs.version }} `
             --submit `
             --token ${{ secrets.WINGET_TOKEN }}
 
@@ -83,12 +50,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
         run: |
-          # Wait briefly for PR index
           Start-Sleep -Seconds 10
-          # Find the PR created by me (authenticated user)
           $pr = gh pr list --repo microsoft/winget-pkgs --search "AmarBego.GitTop in:title is:pr is:open author:@me" --limit 1 --json number --jq '.[0].number'
           if ($pr) {
-            gh pr edit $pr --repo microsoft/winget-pkgs --body "Automatically updated by workflow [GitTop Release ${{ needs.check.outputs.version }}]"
+            gh pr edit $pr --repo microsoft/winget-pkgs --body "Automatically updated by workflow [GitTop Release ${{ steps.release.outputs.version }}]"
           }
 
       - uses: kesin11/actions-timeline@v2

@@ -1,89 +1,58 @@
 name: Chocolatey Distribution
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types:
-      - completed
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v0.2.0)"
+        required: true
+        type: string
 
 jobs:
-  check:
-    name: Check Release Status
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      should_build: ${{ steps.check.outputs.should_build }}
-      tag: ${{ steps.release.outputs.tag }}
-      version: ${{ steps.release.outputs.version }}
-
-    steps:
-      - name: Download release metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: release-meta
-          path: release-meta
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Read release info
-        id: release
-        run: |
-          TAG=$(cat release-meta/tag)
-          IS_PRERELEASE=$(cat release-meta/is_prerelease)
-          if [[ "$TAG" == *"-"* ]]; then
-            IS_PRERELEASE="true"
-          fi
-          VERSION="${TAG#v}"
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
-
-      - name: Determine if should run
-        id: check
-        run: |
-          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
-            echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "::notice::Skipping Chocolatey publish for prerelease: ${{ steps.release.outputs.tag }}"
-          else
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          fi
-
   chocolatey:
     name: Publish to Chocolatey
-    needs: check
     runs-on: windows-latest
     permissions:
-      actions: read
       contents: read
-    if: ${{ needs.check.outputs.should_build == 'true' }}
+    # Skip prereleases
+    if: ${{ !github.event.release.prerelease || github.event_name == 'workflow_dispatch' }}
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check.outputs.tag }}
-
-      - name: Download EXE installer
+      - name: Get release info
+        id: release
         shell: pwsh
         run: |
-          $version = "${{ needs.check.outputs.version }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $tag = "${{ inputs.tag }}"
+          } else {
+            $tag = "${{ github.event.release.tag_name }}"
+          }
+          $version = $tag -replace '^v', ''
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Release: $tag (v$version)"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Download EXE installer
+        id: download
+        shell: pwsh
+        run: |
+          $version = "${{ steps.release.outputs.version }}"
           $url = "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-windows-x86_64-setup.exe"
           Invoke-WebRequest -Uri $url -OutFile gittop-setup.exe
 
-          # Calculate checksum
           $hash = (Get-FileHash gittop-setup.exe -Algorithm SHA256).Hash
           echo "checksum=$hash" >> $env:GITHUB_OUTPUT
-        id: download
 
       - name: Prepare Chocolatey package
         shell: pwsh
         run: |
-          $version = "${{ needs.check.outputs.version }}"
+          $version = "${{ steps.release.outputs.version }}"
           $checksum = "${{ steps.download.outputs.checksum }}"
 
           # Update nuspec

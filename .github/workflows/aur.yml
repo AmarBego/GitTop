@@ -1,78 +1,45 @@
 name: AUR Distribution
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types:
-      - completed
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v0.2.0)"
+        required: true
+        type: string
 
 jobs:
-  check:
-    name: Check Release Status
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    outputs:
-      should_build: ${{ steps.check.outputs.should_build }}
-      tag: ${{ steps.release.outputs.tag }}
-      version: ${{ steps.release.outputs.version }}
-
-    steps:
-      - name: Download release metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: release-meta
-          path: release-meta
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-
-      - name: Read release info
-        id: release
-        run: |
-          TAG=$(cat release-meta/tag)
-          IS_PRERELEASE=$(cat release-meta/is_prerelease)
-          if [[ "$TAG" == *"-"* ]]; then
-            IS_PRERELEASE="true"
-          fi
-          VERSION="${TAG#v}"
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
-
-      - name: Determine if should run
-        id: check
-        run: |
-          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
-            echo "should_build=false" >> $GITHUB_OUTPUT
-            echo "::notice::Skipping AUR update for prerelease: ${{ steps.release.outputs.tag }}"
-          else
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          fi
-
-  # Job for stable releases (gittop-bin)
   aur-stable-bin:
     name: Update gittop-bin (AUR)
-    needs: check
     runs-on: ubuntu-latest
     permissions:
-      actions: read # Required to download artifacts from another workflow
-      contents: read # Required to checkout the repo
-    # Only run if Release workflow succeeded
-    if: ${{ needs.check.outputs.should_build == 'true' }}
+      contents: read
+    # Skip prereleases
+    if: ${{ !github.event.release.prerelease || github.event_name == 'workflow_dispatch' }}
+
     steps:
+      - name: Get release info
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.event.release.tag_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release: $TAG (v$VERSION)"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.check.outputs.tag }}
+          ref: ${{ steps.release.outputs.tag }}
 
-      # Update pkgver and sha256sums in PKGBUILD
       - name: Update PKGBUILD version and checksum
         run: |
-          VERSION="${{ needs.check.outputs.tag }}"
-          VERSION="${VERSION#v}"
+          VERSION="${{ steps.release.outputs.version }}"
 
           # Download tarball and calculate checksum
           URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-x86_64.tar.gz"
@@ -88,7 +55,6 @@ jobs:
           echo "Checksum: $CHECKSUM"
           grep -E "^(pkgver|sha256sums)=" ./packaging/aur/stable-bin/PKGBUILD
 
-      # Publish to AUR (checksums already updated, no need for updpkgsums)
       - name: Publish gittop-bin
         uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
         with:
@@ -98,20 +64,8 @@ jobs:
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: Update to ${{ needs.check.outputs.tag }}
+          commit_message: Update to ${{ steps.release.outputs.tag }}
           ssh_keyscan_types: ed25519
           updpkgsums: false
 
       - uses: kesin11/actions-timeline@v2
-
-  # TODO: Job for beta releases (gittop-beta-bin)
-  # aur-beta-bin:
-  #   name: Update gittop-beta-bin (AUR)
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     actions: read
-  #     contents: read
-  #   if: ${{ github.event.workflow_run.conclusion == 'success' }}
-  #   steps:
-  #     - name: Download release metadata
-  #       ...
