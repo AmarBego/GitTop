@@ -10,7 +10,7 @@ orbs:
 executors:
   rust-linux:
     docker:
-      - image: cimg/rust:1.92-bullseye
+      - image: cimg/rust:1.92.0
     resource_class: medium
 
 # ==============================================================================
@@ -61,6 +61,16 @@ commands:
             - C:\Users\circleci\.cargo\git
             - target
 
+  install-cmake-windows:
+    steps:
+      - run:
+          name: Install CMake
+          shell: powershell.exe
+          command: |
+            choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            cmake --version
+
 # ==============================================================================
 # Jobs
 # ==============================================================================
@@ -98,6 +108,7 @@ jobs:
       - checkout
       - restore-cargo-cache-windows
       - install-rust-windows
+      - install-cmake-windows
       - run:
           name: Build release
           shell: powershell.exe
@@ -194,6 +205,7 @@ jobs:
       - checkout
       - restore-cargo-cache-windows
       - install-rust-windows
+      - install-cmake-windows
       - run:
           name: Extract version from tag
           shell: powershell.exe
