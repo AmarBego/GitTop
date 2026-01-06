@@ -10,7 +10,7 @@ orbs:
 executors:
   rust-linux:
     docker:
-      - image: cimg/rust:1.83
+      - image: cimg/rust:1.92-bullseye
     resource_class: medium
 
 # ==============================================================================
