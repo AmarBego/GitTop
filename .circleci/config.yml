@@ -421,10 +421,6 @@ workflows:
           filters:
             branches:
               ignore: main
-      - build-windows:
-          filters:
-            branches:
-              ignore: main
 
   # Release - run on version tags only
   release:
