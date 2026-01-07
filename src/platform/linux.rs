@@ -358,10 +358,8 @@ WantedBy=default.target
             ));
         }
 
-        if let Some(service_path) = systemd_service_path() {
-            if service_path.exists() {
-                fs::remove_file(&service_path)?;
-            }
+        if let Some(service_path) = systemd_service_path().filter(|p| p.exists()) {
+            fs::remove_file(&service_path)?;
         }
 
         let _ = Command::new("systemctl")

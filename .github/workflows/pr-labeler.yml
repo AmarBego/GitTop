@@ -189,7 +189,7 @@ jobs:
             const issue_number = context.issue.number;
             const labelName = "security/sensitive-files";
             const labelColor = "ff6600"; // orange
-            const labelDescription = "PR modifies workflow or config files - requires manual review";
+            const labelDescription = "PR modifies workflow or config files";
 
             // Fetch changed files
             const files = await github.paginate(github.rest.pulls.listFiles, {

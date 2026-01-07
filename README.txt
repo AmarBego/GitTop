@@ -21,13 +21,13 @@ FEATURES
 
 CONFIGURATION
 -------------
-Settings are stored in:
+Settings and logs are stored in:
   Windows: %APPDATA%\GitTop
   Linux:   ~/.config/GitTop
 
 LINKS
 -----
-Homepage:     https://github.com/AmarBego/GitTop
+Homepage:     https://amarbego.github.io/GitTop/
 Releases:     https://github.com/AmarBego/GitTop/releases
 Issues:       https://github.com/AmarBego/GitTop/issues
 

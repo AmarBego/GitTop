@@ -1,6 +1,6 @@
 app-id: io.github.AmarBego.GitTop
 runtime: org.freedesktop.Platform
-runtime-version: '24.08'
+runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
@@ -8,33 +8,35 @@ command: gittop
 
 finish-args:
   - --share=network
+  - --share=ipc
   - --socket=wayland
   - --socket=fallback-x11
-  - --share=ipc
+  - --device=dri
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
   - --talk-name=org.freedesktop.secrets
-  - --device=dri
-  - --filesystem=xdg-config/gittop:create
-  - --filesystem=xdg-cache/gittop:create
-  - --filesystem=xdg-data/gittop:create
 
 build-options:
+  env:
+    CARGO_HOME: /run/build/gittop/cargo
   append-path: /usr/lib/sdk/rust-stable/bin
 
 modules:
   - name: gittop
     buildsystem: simple
+
     build-commands:
-      - cargo --offline build --release --verbose
+      - mv cargo/config cargo/config.toml
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo build --release --offline
       - install -Dm755 target/release/gittop /app/bin/gittop
-      - sed -i "s/^Icon=.*/Icon=io.github.AmarBego.GitTop/" src/platform/resources/gittop.desktop
-      - install -Dm644 src/platform/resources/gittop.desktop /app/share/applications/io.github.AmarBego.GitTop.desktop
+      - cp src/platform/resources/gittop.desktop io.github.AmarBego.GitTop.desktop
+      - desktop-file-install --dir=/app/share/applications --set-icon=io.github.AmarBego.GitTop io.github.AmarBego.GitTop.desktop
       - install -Dm644 assets/images/GitTop-256x256.png /app/share/icons/hicolor/256x256/apps/io.github.AmarBego.GitTop.png
       - install -Dm644 packaging/flatpak/io.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/io.github.AmarBego.GitTop.metainfo.xml
+      - install -Dm644 LICENSE.md /app/share/licenses/io.github.AmarBego.GitTop/LICENSE
+
     sources:
-      - type: git
-        url: https://github.com/AmarBego/GitTop.git
-        tag: v0.2.1
-        commit: 0000000000000000000000000000000000000000
+      - type: dir
+        path: ../../
       - generated-sources.json
