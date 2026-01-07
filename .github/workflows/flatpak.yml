@@ -80,7 +80,6 @@ jobs:
     name: Build Flatpak Bundle
     needs: check
     runs-on: ubuntu-latest
-    # Use privileged container with Flatpak pre-installed
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
       options: --privileged
@@ -93,85 +92,26 @@ jobs:
         with:
           ref: ${{ needs.check.outputs.tag }}
 
-      - name: Install Rust
+      - name: Install flatpak-cargo-generator dependencies
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          source "$HOME/.cargo/env"
+          pip3 install tomlkit aiohttp
 
-          echo "::group::Generate Cargo Vendor Sources"
-          rustc --version
-
-      - name: Generate Cargo vendor sources and modified manifest
+      - name: Generate cargo sources
         run: |
-          source "$HOME/.cargo/env"
-
-          echo "::group::Generate Cargo Vendor Sources"
-          # Generate cargo vendor in the root directory (where Cargo.toml is)
-          cargo vendor vendor
-
-          # Create cargo config in the root
-          mkdir -p .cargo
-          cat > .cargo/config.toml << 'EOF'
-          [source.crates-io]
-          replace-with = "vendored-sources"
-
-          [source.vendored-sources]
-          directory = "vendor"
-          EOF
-
-          echo "Vendor directory created with $(ls vendor | wc -l) crates"
+          echo "::group::Download flatpak-cargo-generator"
+          curl -sL https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py -o flatpak-cargo-generator.py
           echo "::endgroup::"
 
-          echo "::group::Create Modified Manifest"
-          # Create a modified manifest that uses local sources instead of git
-          cat > packaging/flatpak/flatpak-github-action-modified-io.github.AmarBego.GitTop.yml << 'EOF'
-          app-id: io.github.AmarBego.GitTop
-          runtime: org.freedesktop.Platform
-          runtime-version: '24.08'
-          sdk: org.freedesktop.Sdk
-          sdk-extensions:
-            - org.freedesktop.Sdk.Extension.rust-stable
-          command: gittop
-
-          finish-args:
-            - --share=network
-            - --socket=wayland
-            - --socket=fallback-x11
-            - --share=ipc
-            - --talk-name=org.kde.StatusNotifierWatcher
-            - --talk-name=org.freedesktop.Notifications
-            - --talk-name=org.freedesktop.secrets
-            - --device=dri
-            - --filesystem=xdg-config/gittop:create
-            - --filesystem=xdg-cache/gittop:create
-            - --filesystem=xdg-data/gittop:create
-
-          build-options:
-            append-path: /usr/lib/sdk/rust-stable/bin
-
-          modules:
-            - name: gittop
-              buildsystem: simple
-              build-commands:
-                - cargo --offline build --release --verbose
-                - install -Dm755 target/release/gittop /app/bin/gittop
-                - sed -i "s/^Icon=.*/Icon=io.github.AmarBego.GitTop/" src/platform/resources/gittop.desktop
-                - install -Dm644 src/platform/resources/gittop.desktop /app/share/applications/io.github.AmarBego.GitTop.desktop
-                - install -Dm644 assets/images/GitTop-256x256.png /app/share/icons/hicolor/256x256/apps/io.github.AmarBego.GitTop.png
-                - install -Dm644 packaging/flatpak/io.github.AmarBego.GitTop.metainfo.xml /app/share/metainfo/io.github.AmarBego.GitTop.metainfo.xml
-              sources:
-                - type: dir
-                  path: ../../
-          EOF
-
-          echo "Modified manifest created"
+          echo "::group::Generate cargo sources"
+          python3 flatpak-cargo-generator.py Cargo.lock -o packaging/flatpak/generated-sources.json
+          echo "Generated sources with $(grep -c '"url"' packaging/flatpak/generated-sources.json) crates"
           echo "::endgroup::"
 
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: gittop-${{ needs.check.outputs.version }}-linux-x86_64.flatpak
-          manifest-path: packaging/flatpak/flatpak-github-action-modified-io.github.AmarBego.GitTop.yml
+          manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.ci.yml
           cache-key: flatpak-builder-${{ github.sha }}
           upload-artifact: false
 

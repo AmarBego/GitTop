@@ -1,5 +1,6 @@
 *.flatpak
 build-dir/
+builddir/
 repo/
 .flatpak-builder/
 vendor/
