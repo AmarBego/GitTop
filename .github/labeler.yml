@@ -2,127 +2,127 @@
 
 # CI/CD
 CI:
-  - changed-files:
-      - any-glob-to-any-file:
-          - ".github/workflows/ci.yml"
-          - ".github/workflows/pr-labeler.yml"
+- changed-files:
+  - any-glob-to-any-file:
+    - .github/workflows/ci.yml
+    - .github/workflows/pr-labeler.yml
 
 # Documentation
 Docs:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "**/*.md"
-          - "**/*.txt"
-          - "README*"
-          - "LICENSE*"
-          - ".github/ISSUE_TEMPLATE/**"
-          - ".github/pull_request_template.md"
-          - ".github/workflows/docs.yml"
+- changed-files:
+  - any-glob-to-any-file:
+    - '**/*.md'
+    - '**/*.txt'
+    - README*
+    - LICENSE*
+    - .github/ISSUE_TEMPLATE/**
+    - .github/pull_request_template.md
+    - .github/workflows/docs.yml
 
 # Web
 Web:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "www/**"
+- changed-files:
+  - any-glob-to-any-file:
+    - www/**
 
 # Dependencies
 Dependencies:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "Cargo.toml"
-          - "Cargo.lock"
+- changed-files:
+  - any-glob-to-any-file:
+    - Cargo.toml
+    - Cargo.lock
 
 # Core
 Core:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/main.rs"
-          - "src/cache/**"
-          - "src/specs/**"
-          - "src/diagnostics.rs"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/main.rs
+    - src/cache/**
+    - src/specs/**
+    - src/diagnostics.rs
 
 # GitHub API/Auth
 GitHub:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/github/**"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/github/**
 
 # Platform / System Integration
 Platform:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/platform/**"
-          - "src/tray.rs"
-          - "src/ui/handlers/platform.rs"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/platform/**
+    - src/tray.rs
+    - src/ui/handlers/platform.rs
 
 # Rules Engine
 Rules:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/ui/screens/settings/rule_engine/**"
-          - "src/ui/features/account_rules/**"
-          - "src/ui/features/org_rules/**"
-          - "src/ui/features/type_rules/**"
-          - "src/ui/features/rule_overview/**"
-          - "src/ui/screens/notifications/engine.rs"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/ui/screens/settings/rule_engine/**
+    - src/ui/features/account_rules/**
+    - src/ui/features/org_rules/**
+    - src/ui/features/type_rules/**
+    - src/ui/features/rule_overview/**
+    - src/ui/screens/notifications/engine.rs
 
 # Settings & Preferences
 Settings:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/settings.rs"
-          - "src/ui/screens/settings/screen.rs"
-          - "src/ui/screens/settings/messages.rs"
-          - "src/ui/screens/settings/components.rs"
-          - "src/ui/screens/settings/mod.rs"
-          - "src/ui/features/general_settings/**"
-          - "src/ui/features/network_proxy/**"
-          - "src/ui/features/account_management/**"
-          - "src/ui/features/power_mode/**"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/settings.rs
+    - src/ui/screens/settings/screen.rs
+    - src/ui/screens/settings/messages.rs
+    - src/ui/screens/settings/components.rs
+    - src/ui/screens/settings/mod.rs
+    - src/ui/features/general_settings/**
+    - src/ui/features/network_proxy/**
+    - src/ui/features/account_management/**
+    - src/ui/features/power_mode/**
 
 # Notifications
 Notifications:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/ui/screens/notifications/helper.rs"
-          - "src/ui/screens/notifications/screen.rs"
-          - "src/ui/screens/notifications/processing.rs"
-          - "src/ui/screens/notifications/messages.rs"
-          - "src/ui/screens/notifications/desktop_notify.rs"
-          - "src/ui/screens/notifications/components/**"
-          - "src/ui/screens/notifications/mod.rs"
-          - "src/ui/features/notification_details/**"
-          - "src/ui/features/notification_list/**"
-          - "src/ui/features/sidebar/**"
-          - "src/ui/features/bulk_actions/**"
-          - "src/ui/features/thread_actions/**"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/ui/screens/notifications/helper.rs
+    - src/ui/screens/notifications/screen.rs
+    - src/ui/screens/notifications/processing.rs
+    - src/ui/screens/notifications/messages.rs
+    - src/ui/screens/notifications/desktop_notify.rs
+    - src/ui/screens/notifications/components/**
+    - src/ui/screens/notifications/mod.rs
+    - src/ui/features/notification_details/**
+    - src/ui/features/notification_list/**
+    - src/ui/features/sidebar/**
+    - src/ui/features/bulk_actions/**
+    - src/ui/features/thread_actions/**
 
 # UI Shell & Shared UI
 UI:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "src/ui/app.rs"
-          - "src/ui/context.rs"
-          - "src/ui/effects.rs"
-          - "src/ui/handlers/mod.rs"
-          - "src/ui/handlers/navigation.rs"
-          - "src/ui/routing.rs"
-          - "src/ui/state.rs"
-          - "src/ui/icons.rs"
-          - "src/ui/theme.rs"
-          - "src/ui/screens/login.rs"
-          - "src/ui/screens/mod.rs"
-          - "src/ui/features/mod.rs"
+- changed-files:
+  - any-glob-to-any-file:
+    - src/ui/app.rs
+    - src/ui/context.rs
+    - src/ui/effects.rs
+    - src/ui/handlers/mod.rs
+    - src/ui/handlers/navigation.rs
+    - src/ui/routing.rs
+    - src/ui/state.rs
+    - src/ui/icons.rs
+    - src/ui/theme.rs
+    - src/ui/screens/login.rs
+    - src/ui/screens/mod.rs
+    - src/ui/features/mod.rs
 
 # Packaging
 Packaging:
-  - changed-files:
-      - any-glob-to-any-file:
-          - "packaging/**"
-          - "build.rs"
-          - ".github/workflows/aur.yml"
-          - ".github/workflows/chocolatey.yml"
-          - ".github/workflows/flatpak.yml"
-          - ".github/workflows/release.yml"
-          - ".github/workflows/scoop.yml"
-          - ".github/workflows/winget.yml"
+- changed-files:
+  - any-glob-to-any-file:
+    - packaging/**
+    - build.rs
+    - .github/workflows/aur.yml
+    - .github/workflows/chocolatey.yml
+    - .github/workflows/flatpak.yml
+    - .github/workflows/release.yml
+    - .github/workflows/scoop.yml
+    - .github/workflows/winget.yml
