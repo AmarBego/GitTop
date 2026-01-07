@@ -21,7 +21,7 @@ FEATURES
 
 CONFIGURATION
 -------------
-Settings are stored in:
+Settings and logs are stored in:
   Windows: %APPDATA%\GitTop
   Linux:   ~/.config/GitTop
 
