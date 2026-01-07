@@ -66,74 +66,61 @@ jobs:
         with:
           ref: ${{ needs.check-labels.outputs.head_sha }}
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: prek
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev libssl-dev
 
-      - name: Run prek
-        id: run_prek
-        shell: bash
+      - uses: j178/prek-action@v1
+        id: prek
         continue-on-error: true
-        run: |
-          set -o pipefail
-          prek run --all-files 2>&1 | tee prek.log
+        with:
+          install-only: false
+          extra-args: "--all-files"
 
-      - name: Parse prek output
-        id: prek_summary
-        if: always()
+      - name: Create result artifact
         shell: bash
         run: |
-          python3 - <<'PY'
-          import os
-          import re
-          import json
-          from pathlib import Path
+          # Capture failed hooks from prek output
+          # prek outputs "Failed" next to failing hook names
+          FAILED_HOOKS=""
+          PREK_OUTPUT=""
 
-          log_path = Path("prek.log")
-          failed = []
-          passed = []
-          pattern = re.compile(r"^(?P<name>.+?)\.{3,}(?P<status>Passed|Failed)\s*$")
+          if [ "${{ steps.prek.outcome }}" == "failure" ]; then
+            # Get the prek output from the step
+            PREK_OUTPUT=$(cat <<'PREK_OUTPUT_EOF'
+          ${{ steps.prek.outputs.output || '' }}
+          PREK_OUTPUT_EOF
+            )
+            
+            # Try to extract failed hook names from common patterns
+            # prek typically shows hook name followed by failure status
+            if [ -n "$PREK_OUTPUT" ]; then
+              FAILED_HOOKS=$(echo "$PREK_OUTPUT" | grep -E "(Failed|failed|FAILED)" | head -10 || true)
+            fi
+          fi
 
-          if log_path.exists():
-              for line in log_path.read_text(errors="ignore").splitlines():
-                  match = pattern.match(line.strip())
-                  if not match:
-                      continue
-                  name = match.group("name").strip()
-                  status = match.group("status")
-                  if status == "Failed":
-                      failed.append(name)
-                  else:
-                      passed.append(name)
+          # Escape for JSON
+          PREK_OUTPUT_ESCAPED=$(echo "$PREK_OUTPUT" | head -100 | jq -Rs . | sed 's/^"//;s/"$//')
+          FAILED_HOOKS_ESCAPED=$(echo "$FAILED_HOOKS" | jq -Rs . | sed 's/^"//;s/"$//')
 
-          # Write to GITHUB_OUTPUT
-          output_path = os.environ.get("GITHUB_OUTPUT")
-          if output_path:
-              with open(output_path, "a", encoding="utf-8") as output:
-                  output.write(f"failed_steps={','.join(failed)}\n")
-                  output.write(f"passed_steps={','.join(passed)}\n")
-                  output.write(f"total_steps={len(failed) + len(passed)}\n")
-
-          # Write result to artifact file
-          result = {
-              "pr_number": int(os.environ.get("PR_NUMBER", 0)),
-              "failed": len(failed) > 0,
-              "failed_steps": failed,
-              "passed_steps": passed
+          cat > prek-result.json << EOF
+          {
+            "pr_number": ${{ needs.check-labels.outputs.pr_number }},
+            "failed": ${{ steps.prek.outcome == 'failure' }},
+            "failed_steps": [],
+            "output": "$PREK_OUTPUT_ESCAPED",
+            "failed_summary": "$FAILED_HOOKS_ESCAPED"
           }
-          Path("prek-result.json").write_text(json.dumps(result))
-          PY
-        env:
-          PR_NUMBER: ${{ needs.check-labels.outputs.pr_number }}
+          EOF
 
-      - name: Upload prek result
-        if: always()
+      - name: Upload result
         uses: actions/upload-artifact@v4
         with:
           name: prek-result
           path: prek-result.json
           retention-days: 1
 
-      - name: Fail job if prek failed
-        if: steps.run_prek.outcome == 'failure'
+      - name: Fail if prek failed
+        if: steps.prek.outcome == 'failure'
         run: exit 1

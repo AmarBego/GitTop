@@ -130,15 +130,45 @@ jobs:
             const existingComment = comments.find(c => (c.body || "").includes(commentMarker));
 
             if (failed) {
-              const failureLine = failedSteps.length
-                ? `Failed hooks: ${failedSteps.join(", ")}.`
-                : "prek checks failed.";
-              const commentBody = [
-                failureLine,
-                `Logs: ${runUrl}`,
-                "Fix the issue(s) and push to rerun checks.",
-                commentMarker
-              ].join("\n");
+              const failedSummary = result.failed_summary || "";
+              const prekOutput = result.output || "";
+              
+              let failureLine = failedSteps.length
+                ? `**Failed hooks:** ${failedSteps.join(", ")}`
+                : "**prek checks failed.**";
+              
+              // Build comment body with actual output
+              const commentParts = [failureLine];
+              
+              // Add parsed failure summary if available
+              if (failedSummary.trim()) {
+                commentParts.push("");
+                commentParts.push("**Summary:**");
+                commentParts.push("```");
+                commentParts.push(failedSummary.trim().substring(0, 1000));
+                commentParts.push("```");
+              }
+              
+              // Add truncated output if available
+              if (prekOutput.trim()) {
+                commentParts.push("");
+                commentParts.push("<details>");
+                commentParts.push("<summary>Full output (click to expand)</summary>");
+                commentParts.push("");
+                commentParts.push("```");
+                // Limit to 3000 chars to avoid huge comments
+                commentParts.push(prekOutput.trim().substring(0, 3000));
+                commentParts.push("```");
+                commentParts.push("</details>");
+              }
+              
+              commentParts.push("");
+              commentParts.push(`[View full logs](${runUrl})`);
+              commentParts.push("");
+              commentParts.push("Fix the issue(s) and push to rerun checks.");
+              commentParts.push(commentMarker);
+              
+              const commentBody = commentParts.join("\n");
 
               if (existingComment) {
                 await github.rest.issues.updateComment({
