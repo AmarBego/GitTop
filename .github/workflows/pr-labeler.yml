@@ -214,23 +214,28 @@ jobs:
                 }
               }
             }
-
-            if (needsLabel && currentLabels.includes(prekFailureLabel)) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner,
-                  repo,
-                  issue_number,
-                  name: prekFailureLabel
-                });
-              } catch (error) {
-                if (error.status !== 404) {
-                  throw error;
+            // Always remove prek labels to give prek-labeler a clean slate
+            const prekLabels = ["triage/prek-failed", "triage/prek-success"];
+            for (const label of prekLabels) {
+              if (currentLabels.includes(label)) {
+                try {
+                  console.log(`Removing prek label '${label}' for clean slate.`);
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number,
+                    name: label
+                  });
+                } catch (error) {
+                  if (error.status !== 404) {
+                    throw error;
+                  }
                 }
               }
             }
 
-            if (needsLabel && existingPrekComment) {
+            // Also remove prek comment if exists
+            if (existingPrekComment) {
               try {
                 await github.rest.issues.deleteComment({
                   owner,
