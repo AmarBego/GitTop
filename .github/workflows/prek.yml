@@ -66,74 +66,12 @@ jobs:
         with:
           ref: ${{ needs.check-labels.outputs.head_sha }}
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: prek
-
-      - name: Run prek
-        id: run_prek
-        shell: bash
-        continue-on-error: true
+      - name: Install system dependencies
         run: |
-          set -o pipefail
-          prek run --all-files 2>&1 | tee prek.log
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev libssl-dev
 
-      - name: Parse prek output
-        id: prek_summary
-        if: always()
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import os
-          import re
-          import json
-          from pathlib import Path
-
-          log_path = Path("prek.log")
-          failed = []
-          passed = []
-          pattern = re.compile(r"^(?P<name>.+?)\.{3,}(?P<status>Passed|Failed)\s*$")
-
-          if log_path.exists():
-              for line in log_path.read_text(errors="ignore").splitlines():
-                  match = pattern.match(line.strip())
-                  if not match:
-                      continue
-                  name = match.group("name").strip()
-                  status = match.group("status")
-                  if status == "Failed":
-                      failed.append(name)
-                  else:
-                      passed.append(name)
-
-          # Write to GITHUB_OUTPUT
-          output_path = os.environ.get("GITHUB_OUTPUT")
-          if output_path:
-              with open(output_path, "a", encoding="utf-8") as output:
-                  output.write(f"failed_steps={','.join(failed)}\n")
-                  output.write(f"passed_steps={','.join(passed)}\n")
-                  output.write(f"total_steps={len(failed) + len(passed)}\n")
-
-          # Write result to artifact file
-          result = {
-              "pr_number": int(os.environ.get("PR_NUMBER", 0)),
-              "failed": len(failed) > 0,
-              "failed_steps": failed,
-              "passed_steps": passed
-          }
-          Path("prek-result.json").write_text(json.dumps(result))
-          PY
-        env:
-          PR_NUMBER: ${{ needs.check-labels.outputs.pr_number }}
-
-      - name: Upload prek result
-        if: always()
-        uses: actions/upload-artifact@v4
+      - uses: j178/prek-action@v1
         with:
-          name: prek-result
-          path: prek-result.json
-          retention-days: 1
-
-      - name: Fail job if prek failed
-        if: steps.run_prek.outcome == 'failure'
-        run: exit 1
+          install-only: false
+          extra-args: "--all-files"
