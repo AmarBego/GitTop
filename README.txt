@@ -27,7 +27,7 @@ Settings and logs are stored in:
 
 LINKS
 -----
-Homepage:     https://github.com/AmarBego/GitTop
+Homepage:     https://amarbego.github.io/GitTop/
 Releases:     https://github.com/AmarBego/GitTop/releases
 Issues:       https://github.com/AmarBego/GitTop/issues
 
