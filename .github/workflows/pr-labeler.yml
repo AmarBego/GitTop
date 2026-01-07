@@ -7,7 +7,10 @@ jobs:
   triage:
     permissions:
       contents: read
+      issues: write
       pull-requests: write
+    outputs:
+      incomplete: ${{ steps.template_check.outputs.incomplete }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/labeler@v4
@@ -16,6 +19,7 @@ jobs:
           sync-labels: true
 
       - name: Check for incomplete template
+        id: template_check
         uses: actions/github-script@v7
         with:
           script: |
@@ -26,6 +30,9 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const issue_number = context.issue.number;
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const incompleteCommentMarker = "<!-- gittop:triage-incomplete -->";
+            const prekCommentMarker = "<!-- gittop:prek-failed -->";
 
             // Ensure label exists with correct properties
             try {
@@ -64,6 +71,15 @@ jobs:
             const needsLabel = incompleteMarkers.some(m => normalizedBody.includes(m));
             const currentLabels = context.payload.pull_request.labels.map(l => l.name);
             const hasLabel = currentLabels.includes(labelName);
+            const prekFailureLabel = "triage/prek-failed";
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+            const existingIncompleteComment = comments.find(c => (c.body || "").includes(incompleteCommentMarker));
+            const existingPrekComment = comments.find(c => (c.body || "").includes(prekCommentMarker));
 
             if (needsLabel && !hasLabel) {
               console.log(`Found incomplete template marker in PR body. Adding label '${labelName}'.`);
@@ -87,5 +103,155 @@ jobs:
                 if (error.status !== 404) {
                   throw error;
                 }
+              }
+            }
+
+            if (needsLabel) {
+              const commentBody = [
+                "Thanks for the PR! The template isn't fully filled out yet, so checks are paused.",
+                "Please complete the missing sections in the PR description and edit the PR; checks will rerun automatically.",
+                `Run: ${runUrl}`,
+                incompleteCommentMarker
+              ].join("\\n");
+              if (existingIncompleteComment) {
+                await github.rest.issues.updateComment({
+                  owner,
+                  repo,
+                  comment_id: existingIncompleteComment.id,
+                  body: commentBody
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner,
+                  repo,
+                  issue_number,
+                  body: commentBody
+                });
+              }
+            } else if (existingIncompleteComment) {
+              try {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: existingIncompleteComment.id
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+            if (needsLabel && currentLabels.includes(prekFailureLabel)) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number,
+                  name: prekFailureLabel
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+            if (needsLabel && existingPrekComment) {
+              try {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: existingPrekComment.id
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+            core.setOutput("incomplete", needsLabel ? "true" : "false");
+
+      - name: Check for sensitive file changes
+        id: sensitive_files_check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.issue.number;
+            const issue_number = context.issue.number;
+            const labelName = "security/sensitive-files";
+            const labelColor = "ff6600"; // orange
+            const labelDescription = "PR modifies workflow or config files - requires manual review";
+
+            // Fetch changed files
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100
+            });
+
+            const sensitivePatterns = [
+              /^\.github\//,
+              /^\.pre-commit-config\.yaml$/,
+              /^prek\.toml$/,
+              /^build\.rs$/,
+              /^\.cargo\//
+            ];
+
+            const sensitiveFiles = files
+              .map(f => f.filename)
+              .filter(filename => sensitivePatterns.some(pattern => pattern.test(filename)));
+
+            const hasSensitive = sensitiveFiles.length > 0;
+            const currentLabels = context.payload.pull_request.labels.map(l => l.name);
+            const hasLabel = currentLabels.includes(labelName);
+
+            // Ensure label exists
+            try {
+              await github.rest.issues.createLabel({
+                owner,
+                repo,
+                name: labelName,
+                color: labelColor,
+                description: labelDescription
+              });
+            } catch (error) {
+              if (error.status === 422) {
+                try {
+                  await github.rest.issues.updateLabel({
+                    owner,
+                    repo,
+                    name: labelName,
+                    color: labelColor,
+                    description: labelDescription
+                  });
+                } catch (e) {}
+              }
+            }
+
+            // Add or remove label
+            if (hasSensitive && !hasLabel) {
+              console.log(`Sensitive files detected: ${sensitiveFiles.join(", ")}. Adding label.`);
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: [labelName]
+              });
+            } else if (!hasSensitive && hasLabel) {
+              console.log("No sensitive files. Removing label.");
+              try {
+                await github.rest.issues.removeLabel({
+                  owner,
+                  repo,
+                  issue_number,
+                  name: labelName
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
               }
             }
