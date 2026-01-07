@@ -25,6 +25,11 @@ pub fn update_account_rule(
             if let Some(rule) = rules.account_rules.iter_mut().find(|r| r.id == id) {
                 rule.enabled = enabled;
                 let _ = rules.save();
+                tracing::info!(
+                    rule_id = %id,
+                    enabled,
+                    "Account rule enabled state updated"
+                );
             }
         }
 
@@ -36,6 +41,11 @@ pub fn update_account_rule(
                     rule.active_days.insert(day);
                 }
                 let _ = rules.save();
+                tracing::info!(
+                    rule_id = %id,
+                    day = ?day,
+                    "Account rule schedule day toggled"
+                );
             }
         }
 
@@ -46,6 +56,12 @@ pub fn update_account_rule(
                 rule.start_time = start;
                 rule.end_time = end;
                 let _ = rules.save();
+                tracing::debug!(
+                    rule_id = %id,
+                    has_start = start.is_some(),
+                    has_end = end.is_some(),
+                    "Account rule time window updated"
+                );
             }
         }
 
@@ -61,6 +77,11 @@ pub fn update_account_rule(
             if let Some(rule) = rules.account_rules.iter_mut().find(|r| r.id == id) {
                 rule.outside_behavior = behavior;
                 let _ = rules.save();
+                tracing::info!(
+                    rule_id = %id,
+                    behavior = ?behavior,
+                    "Account rule outside-schedule behavior updated"
+                );
             }
         }
     }

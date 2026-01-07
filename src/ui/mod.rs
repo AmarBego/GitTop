@@ -5,7 +5,7 @@ pub mod features;
 mod handlers;
 pub mod icons;
 pub(crate) mod routing;
-mod screens;
+pub mod screens;
 pub mod state;
 pub mod theme;
 

@@ -6,6 +6,8 @@
 use keyring::Entry;
 use thiserror::Error;
 
+use super::redaction::redact_secrets;
+
 /// Service name for keyring storage.
 const SERVICE_NAME: &str = "gittop";
 
@@ -19,7 +21,8 @@ pub enum KeyringError {
 /// Creates a keyring entry for a specific username.
 fn get_entry(username: &str) -> Result<Entry, KeyringError> {
     let key = format!("gittop-{}", username);
-    Entry::new(SERVICE_NAME, &key).map_err(|e| KeyringError::Internal(e.to_string()))
+    Entry::new(SERVICE_NAME, &key)
+        .map_err(|e| KeyringError::Internal(redact_secrets(&e.to_string())))
 }
 
 /// Saves a token for a specific account.
@@ -27,7 +30,7 @@ pub fn save_token(username: &str, token: &str) -> Result<(), KeyringError> {
     let entry = get_entry(username)?;
     entry
         .set_password(token)
-        .map_err(|e| KeyringError::Internal(e.to_string()))?;
+        .map_err(|e| KeyringError::Internal(redact_secrets(&e.to_string())))?;
     Ok(())
 }
 
@@ -37,7 +40,7 @@ pub fn load_token(username: &str) -> Result<Option<String>, KeyringError> {
     match entry.get_password() {
         Ok(token) => Ok(Some(token)),
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(KeyringError::Internal(e.to_string())),
+        Err(e) => Err(KeyringError::Internal(redact_secrets(&e.to_string()))),
     }
 }
 
@@ -47,6 +50,6 @@ pub fn delete_token(username: &str) -> Result<(), KeyringError> {
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
-        Err(e) => Err(KeyringError::Internal(e.to_string())),
+        Err(e) => Err(KeyringError::Internal(redact_secrets(&e.to_string()))),
     }
 }

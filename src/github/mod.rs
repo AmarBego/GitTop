@@ -4,6 +4,7 @@ pub mod auth;
 pub mod client;
 pub mod keyring;
 pub mod proxy_keyring;
+pub mod redaction;
 pub mod session;
 pub mod subject_details;
 pub mod types;

@@ -12,6 +12,7 @@ pub fn update(
         PowerModeMessage::Toggle(enabled) => {
             settings.power_mode = enabled;
             let _ = settings.save();
+            tracing::info!(enabled, "Power mode updated");
             Task::none()
         }
         PowerModeMessage::OpenRuleEngine => Task::none(),

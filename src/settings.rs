@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -193,21 +194,67 @@ impl AppSettings {
 
     /// Load settings from disk, or return defaults.
     pub fn load() -> Self {
-        Self::settings_path()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
+        let Some(path) = Self::settings_path() else {
+            tracing::warn!("Settings directory not available; using defaults");
+            return Self::default();
+        };
+
+        match fs::read_to_string(&path) {
+            Ok(content) => match serde_json::from_str(&content) {
+                Ok(settings) => settings,
+                Err(e) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        error = %e,
+                        "Failed to parse settings; using defaults"
+                    );
+                    Self::default()
+                }
+            },
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                tracing::debug!(path = %path.display(), "Settings file not found; using defaults");
+                Self::default()
+            }
+            Err(e) => {
+                tracing::error!(
+                    path = %path.display(),
+                    error = %e,
+                    "Failed to read settings; using defaults"
+                );
+                Self::default()
+            }
+        }
     }
 
     pub fn save(&self) -> Result<(), std::io::Error> {
         let path = Self::settings_path().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::NotFound, "No config directory")
+            let err = std::io::Error::new(std::io::ErrorKind::NotFound, "No config directory");
+            tracing::error!(error = %err, "Unable to resolve settings path");
+            err
         })?;
 
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+        if let Some(parent) = path.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            tracing::error!(
+                path = %parent.display(),
+                error = %e,
+                "Failed to create settings directory"
+            );
+            return Err(e);
         }
-        fs::write(path, serde_json::to_string_pretty(self)?)
+
+        let content = serde_json::to_string_pretty(self).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize settings");
+            std::io::Error::other(e)
+        })?;
+
+        if let Err(e) = fs::write(&path, content) {
+            tracing::error!(path = %path.display(), error = %e, "Failed to save settings");
+            return Err(e);
+        }
+
+        Ok(())
     }
 
     pub fn set_active_account(&mut self, username: &str) {

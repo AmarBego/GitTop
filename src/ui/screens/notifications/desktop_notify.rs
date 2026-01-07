@@ -10,8 +10,15 @@ pub fn send_desktop_notifications(
     let batch = DesktopNotificationBatch::from_processed(processed, seen_timestamps);
 
     if batch.is_empty() {
+        tracing::debug!("No desktop notifications to send");
         return;
     }
+
+    tracing::debug!(
+        priority = batch.priority.len(),
+        regular = batch.regular.len(),
+        "Sending desktop notifications"
+    );
 
     // Send priority notifications individually
     for p in &batch.priority {
@@ -23,7 +30,7 @@ pub fn send_desktop_notifications(
         let url = notif.url.as_ref().map(|u| api_url_to_web_url(u));
         let body = format!("{}\n{}", notif.title, notif.reason.label());
         if let Err(e) = crate::platform::notify(&title, &body, url.as_deref()) {
-            eprintln!("Failed to send notification: {}", e);
+            tracing::warn!(error = %e, "Failed to send desktop notification");
         }
     }
 
@@ -39,7 +46,7 @@ pub fn send_desktop_notifications(
         let body = format!("{}\n{}", notif.title, notif.reason.label());
 
         if let Err(e) = crate::platform::notify(&title, &body, url.as_deref()) {
-            eprintln!("Failed to send notification: {}", e);
+            tracing::warn!(error = %e, "Failed to send desktop notification");
         }
     } else {
         let title = format!("{} new GitHub notifications", batch.regular.len());
@@ -58,7 +65,7 @@ pub fn send_desktop_notifications(
         };
 
         if let Err(e) = crate::platform::notify(&title, &body, None) {
-            eprintln!("Failed to send notification: {}", e);
+            tracing::warn!(error = %e, "Failed to send desktop notification");
         }
     }
 

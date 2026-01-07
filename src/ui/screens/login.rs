@@ -1,8 +1,9 @@
 //! Login screen - Personal Access Token entry.
 
-use iced::widget::{Space, button, column, container, text, text_input, toggler};
+use iced::widget::{Space, button, column, container, row, text, text_input, toggler};
 use iced::{Alignment, Element, Fill, Length, Task};
 
+use crate::diagnostics::CrashNotice;
 use crate::github::{GitHubClient, UserInfo, auth, proxy_keyring};
 use crate::settings::AppSettings;
 use crate::ui::theme;
@@ -17,6 +18,7 @@ pub struct LoginScreen {
     proxy_url: String,
     proxy_username: String,
     proxy_password: String,
+    crash_notice: Option<CrashNotice>,
 }
 
 #[derive(Debug, Clone)]
@@ -33,6 +35,7 @@ pub enum LoginMessage {
     ProxyUsernameChanged(String),
     ProxyPasswordChanged(String),
     SubmitProxySettings,
+    DismissCrashNotice,
 }
 
 impl LoginScreen {
@@ -58,6 +61,7 @@ impl LoginScreen {
             proxy_url: proxy.url.clone(),
             proxy_username,
             proxy_password,
+            crash_notice: crate::diagnostics::load_crash_notice(),
         }
     }
 
@@ -166,27 +170,43 @@ impl LoginScreen {
                 self.showing_proxy_settings = false;
                 Task::none()
             }
+            LoginMessage::DismissCrashNotice => {
+                crate::diagnostics::clear_crash_notice();
+                self.crash_notice = None;
+                Task::none()
+            }
         }
     }
 
     fn save_proxy_settings(&self) {
         let settings = self.build_proxy_settings();
+        let url_set = !settings.proxy.url.is_empty();
 
         // Save or delete credentials from keyring based on whether they're empty
         if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
             // Delete credentials if both are empty
-            let _ = proxy_keyring::delete_proxy_credentials(&self.proxy_url);
+            if let Err(e) = proxy_keyring::delete_proxy_credentials(&self.proxy_url) {
+                tracing::warn!(error = %e, "Failed to delete proxy credentials");
+            }
         } else {
             // Save credentials if at least one is not empty
-            let _ = proxy_keyring::save_proxy_credentials(
+            if let Err(e) = proxy_keyring::save_proxy_credentials(
                 &self.proxy_url,
                 &self.proxy_username,
                 &self.proxy_password,
-            );
+            ) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         }
 
         // Save settings to disk
         let _ = settings.save();
+        tracing::info!(
+            enabled = settings.proxy.enabled,
+            url_set,
+            has_credentials = settings.proxy.has_credentials,
+            "Proxy settings updated from login screen"
+        );
     }
 
     pub fn view(&self) -> Element<'_, LoginMessage> {
@@ -200,6 +220,7 @@ impl LoginScreen {
     fn login_view(&self) -> Element<'_, LoginMessage> {
         let p = theme::palette();
 
+        let crash_notice = self.view_crash_notice();
         let logo = text("GitTop").size(32).color(p.text_primary);
 
         let tagline = text("Runs lighter than your IDE's status bar.")
@@ -277,14 +298,16 @@ impl LoginScreen {
         .align_x(Alignment::Center)
         .width(Length::Fixed(320.0));
 
-        let content = column![
-            logo,
-            Space::new().height(8),
-            tagline,
-            Space::new().height(48),
-            form,
-        ]
-        .align_x(Alignment::Center);
+        let mut content = column![].align_x(Alignment::Center);
+        if let Some(notice) = crash_notice {
+            content = content.push(notice).push(Space::new().height(24));
+        }
+        content = content
+            .push(logo)
+            .push(Space::new().height(8))
+            .push(tagline)
+            .push(Space::new().height(48))
+            .push(form);
 
         container(content)
             .width(Fill)
@@ -392,5 +415,57 @@ impl LoginScreen {
             .padding(32)
             .style(theme::app_container)
             .into()
+    }
+
+    fn view_crash_notice(&self) -> Option<Element<'_, LoginMessage>> {
+        let notice = self.crash_notice.as_ref()?;
+        let p = theme::palette();
+        let report_path = notice.report_path.display().to_string();
+        let logs_path = notice
+            .log_dir
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "Unavailable".to_string());
+
+        let content = column![
+            text("Previous crash detected")
+                .size(14)
+                .color(p.text_primary),
+            Space::new().height(4),
+            text("Please file an issue and attach these files:")
+                .size(12)
+                .color(p.text_secondary),
+            Space::new().height(4),
+            text(format!("Crash report: {}", report_path))
+                .size(11)
+                .color(p.text_secondary),
+            text(format!("Logs: {}", logs_path))
+                .size(11)
+                .color(p.text_secondary),
+            Space::new().height(8),
+            row![
+                button(text("Dismiss").size(12))
+                    .style(theme::ghost_button)
+                    .on_press(LoginMessage::DismissCrashNotice)
+                    .padding([4, 12])
+            ],
+        ]
+        .spacing(2);
+
+        Some(
+            container(content)
+                .padding(12)
+                .width(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_control)),
+                    border: iced::Border {
+                        radius: 6.0.into(),
+                        width: 1.0,
+                        color: p.border_subtle,
+                    },
+                    ..Default::default()
+                })
+                .into(),
+        )
     }
 }

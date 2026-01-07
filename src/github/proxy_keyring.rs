@@ -8,6 +8,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use thiserror::Error;
 
+use super::redaction::redact_secrets;
+
 /// Service name for keyring storage.
 const SERVICE_NAME: &str = "gittop";
 
@@ -31,7 +33,8 @@ fn hash_proxy_url(proxy_url: &str) -> String {
 /// Creates a keyring entry for proxy credentials.
 fn get_entry(proxy_url: &str) -> Result<Entry, ProxyKeyringError> {
     let key = hash_proxy_url(proxy_url);
-    Entry::new(SERVICE_NAME, &key).map_err(|e| ProxyKeyringError::Internal(e.to_string()))
+    Entry::new(SERVICE_NAME, &key)
+        .map_err(|e| ProxyKeyringError::Internal(redact_secrets(&e.to_string())))
 }
 
 /// Saves proxy credentials to secure storage.
@@ -50,7 +53,7 @@ pub fn save_proxy_credentials(
     let credentials = format!("{}:{}", username, password);
     entry
         .set_password(&credentials)
-        .map_err(|e| ProxyKeyringError::Internal(e.to_string()))?;
+        .map_err(|e| ProxyKeyringError::Internal(redact_secrets(&e.to_string())))?;
     Ok(())
 }
 
@@ -76,7 +79,7 @@ pub fn load_proxy_credentials(
             }
         }
         Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(ProxyKeyringError::Internal(e.to_string())),
+        Err(e) => Err(ProxyKeyringError::Internal(redact_secrets(&e.to_string()))),
     }
 }
 
@@ -89,6 +92,6 @@ pub fn delete_proxy_credentials(proxy_url: &str) -> Result<(), ProxyKeyringError
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
-        Err(e) => Err(ProxyKeyringError::Internal(e.to_string())),
+        Err(e) => Err(ProxyKeyringError::Internal(redact_secrets(&e.to_string()))),
     }
 }
