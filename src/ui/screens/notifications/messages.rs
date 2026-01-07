@@ -42,6 +42,8 @@ pub enum NotificationMessage {
     List(NotificationListMessage),
     /// Navigation messages (handled by parent App).
     Navigation(NavigationMessage),
+    /// Dismiss crash report notice banner.
+    DismissCrashNotice,
 }
 
 #[derive(Debug, Clone)]

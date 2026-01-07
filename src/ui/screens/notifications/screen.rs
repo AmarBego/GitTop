@@ -12,7 +12,7 @@
 //! - `handle_refresh_complete()` - refresh result processing
 //!   These are documented as technical debt and should be extracted when the patterns stabilize.
 
-use iced::widget::row;
+use iced::widget::{Space, button, column, container, row, text};
 use iced::{Element, Fill, Task};
 
 use super::desktop_notify;
@@ -32,6 +32,7 @@ use crate::ui::features::sidebar::{self, SidebarState, SidebarViewArgs, view as 
 use crate::ui::features::thread_actions::{ThreadActionState, update_thread_action};
 use crate::ui::screens::settings::rule_engine::RuleAction;
 use crate::ui::state;
+use crate::{diagnostics, diagnostics::CrashNotice};
 
 use std::collections::HashMap;
 
@@ -48,6 +49,7 @@ pub struct NotificationsScreen {
     pub sidebar_state: SidebarState,
     pub is_loading: bool,
     pub error_message: Option<String>,
+    crash_notice: Option<CrashNotice>,
 
     // === Feature States ===
     pub thread_actions: ThreadActionState,
@@ -74,6 +76,7 @@ impl NotificationsScreen {
             notification_details: NotificationDetailsState::new(),
             seen_notification_timestamps: HashMap::new(),
             list_state: notification_list::NotificationListState::new(),
+            crash_notice: diagnostics::load_crash_notice(),
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -181,6 +184,11 @@ impl NotificationsScreen {
             NotificationMessage::Sidebar(msg) => self.update_sidebar(msg),
             NotificationMessage::SidebarAction(action) => self.handle_sidebar_action(action),
             NotificationMessage::Navigation(_msg) => Task::none(),
+            NotificationMessage::DismissCrashNotice => {
+                diagnostics::clear_crash_notice();
+                self.crash_notice = None;
+                Task::none()
+            }
         }
     }
 
@@ -322,8 +330,10 @@ impl NotificationsScreen {
         icon_theme: IconTheme,
         power_mode: bool,
     ) -> Element<'_, NotificationMessage> {
-        if power_mode {
-            iced::widget::column![
+        let banner = self.view_crash_notice();
+
+        let mut content = if power_mode {
+            column![
                 crate::ui::features::bulk_actions::view(
                     &self.bulk_actions,
                     self.processing
@@ -350,11 +360,8 @@ impl NotificationsScreen {
                     power_mode,
                 })
             ]
-            .width(Fill)
-            .height(Fill)
-            .into()
         } else {
-            iced::widget::column![
+            column![
                 super::components::header::view(
                     &self.processing.filtered_notifications,
                     self.is_loading,
@@ -377,10 +384,13 @@ impl NotificationsScreen {
                     power_mode,
                 })
             ]
-            .width(Fill)
-            .height(Fill)
-            .into()
+        };
+
+        if let Some(banner) = banner {
+            content = column![banner, Space::new().height(12), content];
         }
+
+        content.width(Fill).height(Fill).into()
     }
 
     pub fn selected_notification(&self) -> Option<&NotificationView> {
@@ -496,5 +506,57 @@ impl NotificationsScreen {
         message: crate::ui::features::sidebar::SidebarMessage,
     ) -> Task<NotificationMessage> {
         sidebar::update(&mut self.sidebar_state, message).map(NotificationMessage::SidebarAction)
+    }
+
+    fn view_crash_notice(&self) -> Option<Element<'_, NotificationMessage>> {
+        let notice = self.crash_notice.as_ref()?;
+        let p = crate::ui::theme::palette();
+        let report_path = notice.report_path.display().to_string();
+        let logs_path = notice
+            .log_dir
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "Unavailable".to_string());
+
+        let content = column![
+            text("Previous crash detected")
+                .size(13)
+                .color(p.text_primary),
+            Space::new().height(4),
+            text("Please file an issue and attach these files:")
+                .size(11)
+                .color(p.text_secondary),
+            Space::new().height(4),
+            text(format!("Crash report: {}", report_path))
+                .size(11)
+                .color(p.text_secondary),
+            text(format!("Logs: {}", logs_path))
+                .size(11)
+                .color(p.text_secondary),
+            Space::new().height(8),
+            row![
+                button(text("Dismiss").size(12))
+                    .style(crate::ui::theme::ghost_button)
+                    .on_press(NotificationMessage::DismissCrashNotice)
+                    .padding([4, 12])
+            ],
+        ]
+        .spacing(2);
+
+        Some(
+            container(content)
+                .padding(12)
+                .width(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_control)),
+                    border: iced::Border {
+                        radius: 6.0.into(),
+                        width: 1.0,
+                        color: p.border_subtle,
+                    },
+                    ..Default::default()
+                })
+                .into(),
+        )
     }
 }

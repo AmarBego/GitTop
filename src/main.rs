@@ -4,6 +4,7 @@
 //! No browser engine required. Pure Rust. Pure performance.
 
 mod cache;
+mod diagnostics;
 mod github;
 mod platform;
 mod settings;
@@ -45,7 +46,7 @@ fn init_logging() {
     let crate_target = env!("CARGO_PKG_NAME");
     let crate_target_lc = crate_target.to_lowercase();
     let env_value = std::env::var("RUST_LOG").ok();
-    let log_dir = log_directory();
+    let log_dir = diagnostics::log_directory();
     let mut log_dir_error: Option<(PathBuf, String)> = None;
     let mut file_logging_enabled = false;
 
@@ -172,10 +173,6 @@ fn env_mentions_target(env_value: Option<&str>, target: &str) -> bool {
     })
 }
 
-fn log_directory() -> Option<PathBuf> {
-    dirs::config_dir().map(|p| p.join("GitTop").join("logs"))
-}
-
 fn prune_old_logs(dir: &Path, max_files: usize) {
     if max_files == 0 {
         return;
@@ -263,6 +260,7 @@ fn main() -> iced::Result {
     unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
 
     init_logging();
+    diagnostics::install_panic_hook();
     log_startup_diagnostics();
 
     // Parse CLI arguments (e.g., --mock-notifications 1000)
@@ -286,5 +284,9 @@ fn main() -> iced::Result {
         }
     };
 
-    platform::run_app()
+    let result = platform::run_app();
+    if let Err(e) = result.as_ref() {
+        diagnostics::write_fatal_error(e);
+    }
+    result
 }
