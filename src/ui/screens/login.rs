@@ -171,22 +171,33 @@ impl LoginScreen {
 
     fn save_proxy_settings(&self) {
         let settings = self.build_proxy_settings();
+        let url_set = !settings.proxy.url.is_empty();
 
         // Save or delete credentials from keyring based on whether they're empty
         if self.proxy_username.is_empty() && self.proxy_password.is_empty() {
             // Delete credentials if both are empty
-            let _ = proxy_keyring::delete_proxy_credentials(&self.proxy_url);
+            if let Err(e) = proxy_keyring::delete_proxy_credentials(&self.proxy_url) {
+                tracing::warn!(error = %e, "Failed to delete proxy credentials");
+            }
         } else {
             // Save credentials if at least one is not empty
-            let _ = proxy_keyring::save_proxy_credentials(
+            if let Err(e) = proxy_keyring::save_proxy_credentials(
                 &self.proxy_url,
                 &self.proxy_username,
                 &self.proxy_password,
-            );
+            ) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         }
 
         // Save settings to disk
         let _ = settings.save();
+        tracing::info!(
+            enabled = settings.proxy.enabled,
+            url_set,
+            has_credentials = settings.proxy.has_credentials,
+            "Proxy settings updated from login screen"
+        );
     }
 
     pub fn view(&self) -> Element<'_, LoginMessage> {

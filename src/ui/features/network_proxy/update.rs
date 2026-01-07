@@ -61,7 +61,9 @@ fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSet
         // Delete credentials for old URL to prevent orphaned data
         if old_url_set {
             tracing::debug!("Deleting credentials for old proxy URL");
-            let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+            if let Err(e) = proxy_keyring::delete_proxy_credentials(&old_url) {
+                tracing::warn!(error = %e, "Failed to delete proxy credentials");
+            }
         }
 
         // Save credentials for new URL if provided
@@ -69,13 +71,17 @@ fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSet
             tracing::debug!("Saving credentials for new proxy URL");
             let username = state.username.as_str();
             let password = state.password.as_str();
-            let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            if let Err(e) = proxy_keyring::save_proxy_credentials(&new_url, username, password) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         }
     }
     // Case 2: URL unchanged - only handle credential changes
     else if state.username.is_empty() && state.password.is_empty() {
         tracing::debug!("Proxy credentials cleared; deleting from keyring");
-        let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+        if let Err(e) = proxy_keyring::delete_proxy_credentials(&old_url) {
+            tracing::warn!(error = %e, "Failed to delete proxy credentials");
+        }
     } else {
         // Check if credentials actually changed
         let should_save = if let Ok(Some((saved_username, saved_password))) =
@@ -91,7 +97,9 @@ fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSet
             tracing::debug!("Proxy credentials changed; saving to keyring");
             let username = state.username.as_str();
             let password = state.password.as_str();
-            let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            if let Err(e) = proxy_keyring::save_proxy_credentials(&new_url, username, password) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         } else {
             tracing::debug!("Proxy credentials unchanged; skipping keyring write");
         }

@@ -10,8 +10,15 @@ pub fn send_desktop_notifications(
     let batch = DesktopNotificationBatch::from_processed(processed, seen_timestamps);
 
     if batch.is_empty() {
+        tracing::debug!("No desktop notifications to send");
         return;
     }
+
+    tracing::debug!(
+        priority = batch.priority.len(),
+        regular = batch.regular.len(),
+        "Sending desktop notifications"
+    );
 
     // Send priority notifications individually
     for p in &batch.priority {

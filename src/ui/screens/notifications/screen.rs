@@ -30,6 +30,7 @@ use crate::ui::features::notification_details::{
 use crate::ui::features::notification_list::{self, ListArgs, NotificationListMessage};
 use crate::ui::features::sidebar::{self, SidebarState, SidebarViewArgs, view as view_sidebar};
 use crate::ui::features::thread_actions::{ThreadActionState, update_thread_action};
+use crate::ui::screens::settings::rule_engine::RuleAction;
 use crate::ui::state;
 
 use std::collections::HashMap;
@@ -123,6 +124,10 @@ impl NotificationsScreen {
             NotificationMessage::Refresh => {
                 self.is_loading = true;
                 self.error_message = None;
+                tracing::debug!(
+                    show_all = self.sidebar_state.show_all,
+                    "Refreshing notifications"
+                );
                 self.fetch_notifications()
             }
             NotificationMessage::RefreshComplete(result) => self.handle_refresh_complete(result),
@@ -420,6 +425,35 @@ impl NotificationsScreen {
                 self.processing
                     .rebuild_groups(&mut self.sidebar_state, &self.user.login);
 
+                let mut show_count = 0usize;
+                let mut silent_count = 0usize;
+                let mut important_count = 0usize;
+                for item in &self.processing.processed_notifications {
+                    match item.action {
+                        RuleAction::Show => show_count += 1,
+                        RuleAction::Silent => silent_count += 1,
+                        RuleAction::Important => important_count += 1,
+                        RuleAction::Hide => {}
+                    }
+                }
+                let filtered_count = self.processing.filtered_notifications.len();
+                let processed_count = self.processing.processed_notifications.len();
+                let hidden_count = filtered_count.saturating_sub(processed_count);
+
+                tracing::info!(
+                    fetched = self.processing.all_notifications.len(),
+                    filtered = filtered_count,
+                    processed = processed_count,
+                    hidden = hidden_count,
+                    show = show_count,
+                    silent = silent_count,
+                    important = important_count,
+                    mock_notifications = mock_count,
+                    show_all = self.sidebar_state.show_all,
+                    rules_enabled = self.processing.rules.enabled,
+                    "Notifications refreshed"
+                );
+
                 let is_hidden = state::is_hidden();
                 let should_notify = is_hidden || !state::is_focused();
 
@@ -451,6 +485,7 @@ impl NotificationsScreen {
             }
             Err(e) => {
                 self.error_message = Some(e.to_string());
+                tracing::error!(error = %e, "Failed to refresh notifications");
             }
         }
         Task::none()
