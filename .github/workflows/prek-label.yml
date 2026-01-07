@@ -9,6 +9,8 @@ on:
 jobs:
   label:
     name: Update Prek Labels
+    # Run on both success and failure since we now always upload artifacts
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
     runs-on: ubuntu-latest
     permissions:
       actions: read
