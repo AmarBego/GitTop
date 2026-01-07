@@ -4,6 +4,7 @@ use keyring::Entry;
 use thiserror::Error;
 
 use super::client::{GitHubClient, GitHubError};
+use super::redaction::redact_secrets;
 use super::types::UserInfo;
 
 /// Service name for keyring storage.
@@ -22,7 +23,8 @@ pub enum AuthError {
 
 /// Creates a new keyring entry.
 fn get_entry() -> Result<Entry, AuthError> {
-    Entry::new(SERVICE_NAME, ACCOUNT_NAME).map_err(|e| AuthError::Keyring(e.to_string()))
+    Entry::new(SERVICE_NAME, ACCOUNT_NAME)
+        .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))
 }
 
 /// Saves the token to secure storage.
@@ -30,7 +32,7 @@ pub fn save_token(token: &str) -> Result<(), AuthError> {
     let entry = get_entry()?;
     entry
         .set_password(token)
-        .map_err(|e| AuthError::Keyring(e.to_string()))?;
+        .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))?;
     Ok(())
 }
 
@@ -40,7 +42,7 @@ pub fn delete_token() -> Result<(), AuthError> {
     match entry.delete_credential() {
         Ok(()) => Ok(()),
         Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
-        Err(e) => Err(AuthError::Keyring(e.to_string())),
+        Err(e) => Err(AuthError::Keyring(redact_secrets(&e.to_string()))),
     }
 }
 
@@ -64,7 +66,7 @@ pub async fn authenticate(
     // Load proxy credentials from keyring if settings indicate they exist
     let (username, password) = if proxy_settings.has_credentials {
         super::proxy_keyring::load_proxy_credentials(&proxy_settings.url)
-            .map_err(|e| AuthError::Keyring(e.to_string()))?
+            .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))?
             .map(|(u, p)| (Some(u), Some(p)))
             .unwrap_or((None, None))
     } else {

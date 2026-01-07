@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use super::client::{GitHubClient, GitHubError};
 use super::keyring::{self, KeyringError};
+use super::redaction::redact_secrets;
 use super::types::UserInfo;
 use thiserror::Error;
 
@@ -66,16 +67,17 @@ impl SessionManager {
                 }
                 Err(GitHubError::Request(msg)) => {
                     // Connection/network error - keep account, report network issue
-                    return Err(SessionError::NetworkError(msg));
+                    return Err(SessionError::NetworkError(redact_secrets(&msg)));
                 }
                 Err(GitHubError::Api { status, message }) => {
                     // API error that's NOT from GitHub auth:
                     // - 407 = Proxy authentication required
                     // - Other statuses could be proxy/network issues
                     // Don't delete token for these
+                    let safe_message = redact_secrets(&message);
                     return Err(SessionError::NetworkError(format!(
                         "API error (status {}): {}",
-                        status, message
+                        status, safe_message
                     )));
                 }
                 Err(GitHubError::RateLimited) => {
@@ -105,13 +107,21 @@ impl SessionManager {
 
     /// Remove an account (also deletes from keyring).
     pub fn remove_account(&mut self, username: &str) -> Result<(), SessionError> {
-        self.sessions.remove(username);
+        let was_primary = self.primary.as_deref() == Some(username);
+        let removed = self.sessions.remove(username).is_some();
         keyring::delete_token(username)?;
 
         // If we removed the primary, pick a new one
         if self.primary.as_deref() == Some(username) {
             self.primary = self.sessions.keys().next().cloned();
         }
+
+        tracing::info!(
+            removed_from_session = removed,
+            was_primary,
+            remaining_accounts = self.sessions.len(),
+            "Account removed from session"
+        );
 
         Ok(())
     }
@@ -177,9 +187,10 @@ impl SessionManager {
             let new_client = GitHubClient::new_with_proxy(&token, proxy_settings)?;
             session.client = new_client;
 
-            eprintln!(
-                "[PROXY] Rebuilt client for user '{}' with proxy enabled={}",
-                session.username, proxy_settings.enabled
+            tracing::debug!(
+                username = %session.username,
+                proxy_enabled = proxy_settings.enabled,
+                "Rebuilt GitHub client with proxy settings"
             );
         }
         Ok(())

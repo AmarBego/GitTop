@@ -7,6 +7,7 @@ use chrono::{Datelike, Local, NaiveTime, Weekday};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -278,21 +279,67 @@ impl NotificationRuleSet {
 
     /// Load rules from disk, or return defaults.
     pub fn load() -> Self {
-        Self::rules_path()
-            .and_then(|path| fs::read_to_string(path).ok())
-            .and_then(|content| serde_json::from_str(&content).ok())
-            .unwrap_or_default()
+        let Some(path) = Self::rules_path() else {
+            tracing::warn!("Rules directory not available; using defaults");
+            return Self::default();
+        };
+
+        match fs::read_to_string(&path) {
+            Ok(content) => match serde_json::from_str(&content) {
+                Ok(rules) => rules,
+                Err(e) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        error = %e,
+                        "Failed to parse rules; using defaults"
+                    );
+                    Self::default()
+                }
+            },
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                tracing::debug!(path = %path.display(), "Rules file not found; using defaults");
+                Self::default()
+            }
+            Err(e) => {
+                tracing::error!(
+                    path = %path.display(),
+                    error = %e,
+                    "Failed to read rules; using defaults"
+                );
+                Self::default()
+            }
+        }
     }
 
     /// Save rules to disk.
     pub fn save(&self) -> Result<(), std::io::Error> {
-        if let Some(path) = Self::rules_path() {
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            let content = serde_json::to_string_pretty(self)?;
-            fs::write(path, content)?;
+        let Some(path) = Self::rules_path() else {
+            let err = std::io::Error::new(std::io::ErrorKind::NotFound, "No config directory");
+            tracing::error!(error = %err, "Unable to resolve rules path");
+            return Err(err);
+        };
+
+        if let Some(parent) = path.parent()
+            && let Err(e) = fs::create_dir_all(parent)
+        {
+            tracing::error!(
+                path = %parent.display(),
+                error = %e,
+                "Failed to create rules directory"
+            );
+            return Err(e);
         }
+
+        let content = serde_json::to_string_pretty(self).map_err(|e| {
+            tracing::error!(error = %e, "Failed to serialize rules");
+            std::io::Error::other(e)
+        })?;
+
+        if let Err(e) = fs::write(&path, content) {
+            tracing::error!(path = %path.display(), error = %e, "Failed to save rules");
+            return Err(e);
+        }
+
         Ok(())
     }
 

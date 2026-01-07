@@ -65,13 +65,17 @@ pub fn go_to_notifications(
     };
 
     if proxy_changed || needs_rebuild {
-        eprintln!(
-            "[PROXY] Rebuilding clients (settings_changed: {}, needs_rebuild: {})",
-            proxy_changed, needs_rebuild
+        tracing::info!(
+            settings_changed = proxy_changed,
+            needs_rebuild,
+            "Rebuilding GitHub clients with updated proxy settings"
         );
 
         if let Err(e) = ctx.sessions.rebuild_clients_with_proxy(&settings.proxy) {
-            eprintln!("[PROXY] Failed to rebuild clients: {}", e);
+            tracing::error!(
+                error = %e,
+                "Failed to rebuild GitHub clients with updated proxy settings"
+            );
         }
     }
 

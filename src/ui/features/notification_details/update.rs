@@ -56,7 +56,7 @@ pub fn update_notification_details(
                         state.details = Some(details);
                     }
                     Err(e) => {
-                        eprintln!("[ERROR] Failed to fetch notification details: {}", e);
+                        tracing::error!(error = %e, "Failed to fetch notification details");
                         state.details = None;
                     }
                 }

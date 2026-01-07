@@ -19,10 +19,12 @@ pub fn update(
             let token = state.token_input.clone();
             if let Err(e) = crate::github::auth::validate_token_format(&token) {
                 state.status = SubmissionStatus::Error(e.to_string());
+                tracing::warn!(error = %e, "Token format validation failed");
                 return Task::none();
             }
 
             state.status = SubmissionStatus::Validating;
+            tracing::info!("Account validation requested");
 
             Task::perform(
                 async move {
@@ -52,9 +54,12 @@ pub fn update(
                         "Account '{}' added successfully!",
                         username
                     ));
+                    tracing::info!(account_count = settings.accounts.len(), "Account added");
                 }
                 Err(error) => {
+                    let error_msg = error.clone();
                     state.status = SubmissionStatus::Error(error);
+                    tracing::warn!(error = %error_msg, "Account validation failed");
                 }
             }
             Task::none()
@@ -63,6 +68,7 @@ pub fn update(
             settings.remove_account(&username);
             let _ = settings.save();
             let _ = keyring::delete_token(&username);
+            tracing::info!(account_count = settings.accounts.len(), "Account removed");
             Task::none()
         }
     }

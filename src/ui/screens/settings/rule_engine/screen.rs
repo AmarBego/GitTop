@@ -77,6 +77,14 @@ impl RuleEngineScreen {
             RuleEngineMessage::ToggleEnabled(enabled) => {
                 self.rules.enabled = enabled;
                 let _ = self.rules.save();
+                tracing::info!(
+                    enabled = self.rules.enabled,
+                    account_rules = self.rules.account_rules.len(),
+                    org_rules = self.rules.org_rules.len(),
+                    type_rules = self.rules.type_rules.len(),
+                    active_rules = self.rules.active_rule_count(),
+                    "Rule engine enabled state updated"
+                );
                 Task::none()
             }
 

@@ -21,19 +21,31 @@ pub fn update_type_rule(
                 rule.enabled = enabled;
             }
             let _ = rules.save();
+            tracing::info!(
+                rule_id = %id,
+                enabled,
+                "Type rule enabled state updated"
+            );
         }
 
         TypeRuleMessage::Delete(id) => {
             rules.type_rules.retain(|r| r.id != id);
             let _ = rules.save();
+            tracing::info!(rule_id = %id, "Type rule deleted");
         }
 
         TypeRuleMessage::Duplicate(id) => {
             if let Some(rule) = rules.type_rules.iter().find(|r| r.id == id).cloned() {
                 let mut new_rule = rule;
                 new_rule.id = uuid::Uuid::new_v4().to_string();
+                let new_id = new_rule.id.clone();
                 rules.type_rules.push(new_rule);
                 let _ = rules.save();
+                tracing::info!(
+                    source_rule_id = %id,
+                    new_rule_id = %new_id,
+                    "Type rule duplicated"
+                );
             }
         }
 
@@ -73,11 +85,26 @@ pub fn update_type_rule(
             );
             rule.action = state.action;
 
+            let account_scoped = rule.account.is_some();
+            let rule_id = rule.id.clone();
+            let action = rule.action;
+            let priority = rule.priority;
+            let notification_type = rule.notification_type.clone();
+
             rules.type_rules.push(rule);
             let _ = rules.save();
 
             // Reset form
             state.reset_form();
+
+            tracing::info!(
+                rule_id = %rule_id,
+                notification_type = %notification_type,
+                action = ?action,
+                priority,
+                account_scoped,
+                "Type rule added"
+            );
         }
     }
 

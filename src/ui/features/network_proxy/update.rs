@@ -38,6 +38,9 @@ pub fn update(
 fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSettings) {
     let old_url = settings.proxy.url.clone();
     let new_url = state.url.clone();
+    let url_changed = old_url != new_url;
+    let old_url_set = !old_url.is_empty();
+    let new_url_set = !new_url.is_empty();
 
     // Sync all proxy settings from temp fields
     settings.proxy.enabled = state.enabled;
@@ -47,30 +50,38 @@ fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSet
     settings.proxy.has_credentials = !state.username.is_empty() || !state.password.is_empty();
 
     // Case 1: URL changed - handle both old and new URLs
-    if old_url != new_url {
-        eprintln!(
-            "[PROXY] URL changed: '{}' -> '{}' (enabled: {})",
-            old_url, new_url, state.enabled
+    if url_changed {
+        tracing::info!(
+            old_url_set,
+            new_url_set,
+            enabled = state.enabled,
+            "Proxy URL changed"
         );
 
         // Delete credentials for old URL to prevent orphaned data
-        if !old_url.is_empty() {
-            eprintln!("[PROXY] Deleting credentials for old proxy URL");
-            let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+        if old_url_set {
+            tracing::debug!("Deleting credentials for old proxy URL");
+            if let Err(e) = proxy_keyring::delete_proxy_credentials(&old_url) {
+                tracing::warn!(error = %e, "Failed to delete proxy credentials");
+            }
         }
 
         // Save credentials for new URL if provided
         if !state.username.is_empty() && !state.password.is_empty() {
-            eprintln!("[PROXY] Saving credentials for new proxy URL");
+            tracing::debug!("Saving credentials for new proxy URL");
             let username = state.username.as_str();
             let password = state.password.as_str();
-            let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            if let Err(e) = proxy_keyring::save_proxy_credentials(&new_url, username, password) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         }
     }
     // Case 2: URL unchanged - only handle credential changes
     else if state.username.is_empty() && state.password.is_empty() {
-        eprintln!("[PROXY] Credentials cleared, deleting from keyring");
-        let _ = proxy_keyring::delete_proxy_credentials(&old_url);
+        tracing::debug!("Proxy credentials cleared; deleting from keyring");
+        if let Err(e) = proxy_keyring::delete_proxy_credentials(&old_url) {
+            tracing::warn!(error = %e, "Failed to delete proxy credentials");
+        }
     } else {
         // Check if credentials actually changed
         let should_save = if let Ok(Some((saved_username, saved_password))) =
@@ -83,18 +94,22 @@ fn update_proxy_credentials(state: &mut NetworkProxyState, settings: &mut AppSet
         };
 
         if should_save {
-            eprintln!("[PROXY] Credentials changed, saving to keyring");
+            tracing::debug!("Proxy credentials changed; saving to keyring");
             let username = state.username.as_str();
             let password = state.password.as_str();
-            let _ = proxy_keyring::save_proxy_credentials(&new_url, username, password);
+            if let Err(e) = proxy_keyring::save_proxy_credentials(&new_url, username, password) {
+                tracing::warn!(error = %e, "Failed to save proxy credentials");
+            }
         } else {
-            eprintln!("[PROXY] Credentials unchanged, skipping keyring write");
+            tracing::debug!("Proxy credentials unchanged; skipping keyring write");
         }
     }
 
-    eprintln!(
-        "[PROXY] Settings saved: enabled={}, url='{}', has_credentials={}",
-        settings.proxy.enabled, settings.proxy.url, settings.proxy.has_credentials
+    tracing::info!(
+        enabled = settings.proxy.enabled,
+        url_set = new_url_set,
+        has_credentials = settings.proxy.has_credentials,
+        "Proxy settings saved"
     );
 
     // Signal that clients need rebuild when leaving settings
