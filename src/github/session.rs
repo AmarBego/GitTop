@@ -177,9 +177,10 @@ impl SessionManager {
             let new_client = GitHubClient::new_with_proxy(&token, proxy_settings)?;
             session.client = new_client;
 
-            eprintln!(
-                "[PROXY] Rebuilt client for user '{}' with proxy enabled={}",
-                session.username, proxy_settings.enabled
+            tracing::debug!(
+                username = %session.username,
+                proxy_enabled = proxy_settings.enabled,
+                "Rebuilt GitHub client with proxy settings"
             );
         }
         Ok(())

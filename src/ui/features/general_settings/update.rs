@@ -70,7 +70,7 @@ pub fn update(
                     state.start_on_boot_enabled = new_state;
                 }
                 Err(e) => {
-                    eprintln!("[START_ON_BOOT] Failed: {}", e);
+                    tracing::error!(error = %e, "Failed to update start-on-boot setting");
                     // Re-query actual state to ensure UI reflects reality
                     state.start_on_boot_enabled = crate::platform::on_boot::is_enabled();
                 }

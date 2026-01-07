@@ -76,7 +76,11 @@ impl App {
                                 network_error = Some(msg);
                             }
                             Err(e) => {
-                                eprintln!("Failed to restore {}: {}", account.username, e);
+                                tracing::warn!(
+                                    username = %account.username,
+                                    error = %e,
+                                    "Failed to restore saved session"
+                                );
                                 failed_accounts.push(account.username.clone());
                             }
                         }

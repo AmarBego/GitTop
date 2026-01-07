@@ -53,7 +53,7 @@ path = "src/main.rs"
 [dependencies]
 # Iced GUI framework - using software renderer (tiny-skia) for minimal memory footprint
 # Base features shared across all platforms
-iced = { version = "0.14.0-dev", default-features = false, features = [
+iced = { version = "0.14.0", default-features = false, features = [
     "tiny-skia",
     "tokio",
     "image",
@@ -114,6 +114,13 @@ image = { version = "0.25", default-features = false, features = [
 
 # Single instance (Windows named mutex)
 single-instance = "0.3"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = [
+    "fmt",
+    "env-filter",
+] }
 
 # =============================================================================
 # Platform-specific dependencies

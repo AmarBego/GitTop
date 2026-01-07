@@ -32,11 +32,23 @@ fn parse_cli_args() {
     }
 }
 
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_target(false)
+        .try_init();
+}
+
 fn main() -> iced::Result {
     // Force OpenGL backend for wgpu to minimize memory footprint
     // OpenGL uses ~42MB vs Vulkan's ~164MB or DX12's ~133MB
     // Safety: This is called at program start before any threads are spawned
     unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
+
+    init_logging();
 
     // Parse CLI arguments (e.g., --mock-notifications 1000)
     parse_cli_args();
@@ -54,7 +66,7 @@ fn main() -> iced::Result {
     let _tray = match tray::TrayManager::new() {
         Ok(t) => Some(t),
         Err(e) => {
-            eprintln!("Tray unavailable: {e}");
+            tracing::warn!(error = %e, "Tray unavailable");
             None
         }
     };
