@@ -95,12 +95,15 @@ jobs:
           VERSION="${{ needs.check.outputs.version }}"
 
           echo "::group::Create source tarball"
-          # Create tarball excluding git and build artifacts
+          # Create tarball in a temp location, then move to workspace
+          # The action needs the tarball inside the workspace (Docker mount)
+          mkdir -p /tmp/ppa-build
           tar --exclude='.git' \
               --exclude='target' \
               --exclude='*.tar.gz' \
-              -czf "../gittop_${VERSION}.orig.tar.gz" .
-          ls -la ../gittop_*.tar.gz
+              -czf "/tmp/ppa-build/gittop_${VERSION}.orig.tar.gz" .
+          mv "/tmp/ppa-build/gittop_${VERSION}.orig.tar.gz" "./gittop_${VERSION}.orig.tar.gz"
+          ls -la ./gittop_*.tar.gz
           echo "::endgroup::"
 
       - name: Publish to PPA
@@ -109,7 +112,7 @@ jobs:
           repository: amarbego/gittop
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-          tarball: ../gittop_${{ needs.check.outputs.version }}.orig.tar.gz
+          tarball: ./gittop_${{ needs.check.outputs.version }}.orig.tar.gz
           debian_dir: packaging/ppa/debian
           deb_email: begovicamar@proton.me
           deb_fullname: AmarBego
