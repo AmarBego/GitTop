@@ -5,6 +5,12 @@ on:
     workflows: ["Release"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v0.4.0)"
+        required: true
+        type: string
 
 jobs:
   check:
@@ -13,7 +19,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
@@ -21,6 +27,7 @@ jobs:
 
     steps:
       - name: Download release metadata
+        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           name: release-meta
@@ -31,10 +38,19 @@ jobs:
       - name: Read release info
         id: release
         run: |
-          TAG=$(cat release-meta/tag)
-          IS_PRERELEASE=$(cat release-meta/is_prerelease)
-          if [[ "$TAG" == *"-"* ]]; then
-            IS_PRERELEASE="true"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            if [[ "$TAG" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          else
+            TAG=$(cat release-meta/tag)
+            IS_PRERELEASE=$(cat release-meta/is_prerelease)
+            if [[ "$TAG" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            fi
           fi
           VERSION="${TAG#v}"
 
@@ -95,15 +111,26 @@ jobs:
           VERSION="${{ needs.check.outputs.version }}"
 
           echo "::group::Create source tarball"
-          # Create tarball in a temp location, then move to workspace
-          # The action needs the tarball inside the workspace (Docker mount)
-          mkdir -p /tmp/ppa-build
-          tar --exclude='.git' \
-              --exclude='target' \
-              --exclude='*.tar.gz' \
-              -czf "/tmp/ppa-build/gittop_${VERSION}.orig.tar.gz" .
-          mv "/tmp/ppa-build/gittop_${VERSION}.orig.tar.gz" "./gittop_${VERSION}.orig.tar.gz"
-          ls -la ./gittop_*.tar.gz
+          # The action requires a top-level directory in the tarball
+          # otherwise `cd ./*/` in the build script fails with "too many arguments"
+          PKG_DIR="gittop-${VERSION}"
+          mkdir -p "$PKG_DIR"
+
+          # Copy project files to the package directory
+          # Using rsync to exclude unwanted files
+          rsync -av --exclude='.git' \
+                    --exclude='target' \
+                    --exclude='*.tar.gz' \
+                    --exclude="$PKG_DIR" \
+                    . "$PKG_DIR"/
+
+          # Create the tarball
+          tar -czf "gittop_${VERSION}.orig.tar.gz" "$PKG_DIR"
+
+          # Verification
+          ls -la gittop_*.tar.gz
+          echo "Tarball contents (top 5 lines):"
+          tar -tf "gittop_${VERSION}.orig.tar.gz" | head -n 5
           echo "::endgroup::"
 
       - name: Publish to PPA
@@ -116,7 +143,7 @@ jobs:
           debian_dir: packaging/ppa/debian
           deb_email: begovicamar@proton.me
           deb_fullname: AmarBego
-          series: noble jammy
+          series: "noble jammy"
 
       - name: Generate Job Summary
         if: success()
