@@ -88,5 +88,5 @@ You can simulate a notification (e.g., "Mentioned in Repo X") and GitTop will sh
 ## Ready to try it?
 
 <p class="buttons" style="justify-content: flex-start;">
-  <a href="/#installation" class="button primary">Download GitTop</a>
+  <a href="/GitTop/#installation" class="button primary">Download GitTop</a>
 </p>

@@ -41,5 +41,5 @@ While strict filtering rules are always running in the background, Power Mode pu
 ## Ready to try it?
 
 <p class="buttons" style="justify-content: flex-start;">
-  <a href="/#installation" class="button primary">Download GitTop</a>
+  <a href="/GitTop/#installation" class="button primary">Download GitTop</a>
 </p>

@@ -37,5 +37,5 @@ For users on older hardware or those who simply crave efficiency, GitTop include
 ## Ready to try it?
 
 <p class="buttons" style="justify-content: flex-start;">
-  <a href="/#installation" class="button primary">Download GitTop</a>
+  <a href="/GitTop/#installation" class="button primary">Download GitTop</a>
 </p>
