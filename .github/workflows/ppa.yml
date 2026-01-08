@@ -97,7 +97,7 @@ jobs:
           # Update changelog with proper version format per series
           # The publish-ppa-package action will handle series-specific versions
           cat > packaging/ppa/debian/changelog << EOF
-          gittop (${VERSION}-0ubuntu1) UNRELEASED; urgency=medium
+          gittop (${VERSION}-0ubuntu1) noble; urgency=medium
 
             * Release ${VERSION}
 
