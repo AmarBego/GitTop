@@ -135,6 +135,9 @@ pub struct AppSettings {
     pub show_details_panel: bool,
     #[serde(default)]
     pub proxy: ProxySettings,
+    /// Check for updates on startup (opt-in, default: false)
+    #[serde(default)]
+    pub check_for_updates: bool,
 }
 
 fn default_minimize_to_tray() -> bool {
@@ -182,6 +185,7 @@ impl Default for AppSettings {
             power_mode: false,
             show_details_panel: true,
             proxy: ProxySettings::default(),
+            check_for_updates: false,
         }
     }
 }
