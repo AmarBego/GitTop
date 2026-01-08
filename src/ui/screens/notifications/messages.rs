@@ -44,6 +44,10 @@ pub enum NotificationMessage {
     Navigation(NavigationMessage),
     /// Dismiss crash report notice banner.
     DismissCrashNotice,
+    /// Dismiss update available banner for this session.
+    DismissUpdateBanner,
+    /// Open the GitHub release page for the new version.
+    OpenReleasePage,
 }
 
 #[derive(Debug, Clone)]

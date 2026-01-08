@@ -3,6 +3,7 @@ pub enum GeneralMessage {
     ChangeTheme(crate::settings::AppTheme),
     ToggleIconTheme(bool),
     ToggleMinimizeToTray(bool),
+    ToggleCheckForUpdates(bool),
     SetNotificationFontScale(f32),
     SetSidebarFontScale(f32),
     SetSidebarWidth(f32),

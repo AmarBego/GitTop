@@ -40,6 +40,8 @@ pub enum App {
 pub enum Message {
     // -- Lifecycle --
     RestoreComplete(SessionManager, Option<String>),
+    /// Update check completed
+    UpdateCheckResult(Option<crate::update_checker::UpdateInfo>),
 
     // -- UI Screens --
     Login(LoginMessage),
@@ -118,6 +120,12 @@ impl App {
             Message::Tick => return self.handle_tick(),
             Message::TrayPoll => return self.handle_tray_poll(),
             Message::WindowEvent(id, event) => return self.handle_window_event(*id, event.clone()),
+            Message::UpdateCheckResult(info) => {
+                if let Some(screen) = self.notification_screen_mut() {
+                    screen.update_info = info.clone();
+                }
+                return Task::none();
+            }
             _ => {}
         }
 
@@ -292,12 +300,23 @@ impl App {
                     notif_screen.error_message = Some(format!("Network error: {}", error));
                 }
 
-                let ctx = AppContext::new(settings, sessions);
+                let ctx = AppContext::new(settings.clone(), sessions);
                 *self = App::Authenticated(
                     Box::new(Screen::Notifications(Box::new(notif_screen))),
                     ctx,
                 );
-                return task.map(Message::Notifications);
+
+                // Spawn update check if enabled
+                let update_task = if settings.check_for_updates {
+                    Task::perform(
+                        crate::update_checker::check_for_update(),
+                        Message::UpdateCheckResult,
+                    )
+                } else {
+                    Task::none()
+                };
+
+                return Task::batch([task.map(Message::Notifications), update_task]);
             }
 
             let settings = AppSettings::load();

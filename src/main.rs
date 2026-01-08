@@ -11,6 +11,7 @@ mod settings;
 mod specs;
 mod tray;
 mod ui;
+mod update_checker;
 
 use single_instance::SingleInstance;
 use std::path::{Path, PathBuf};
