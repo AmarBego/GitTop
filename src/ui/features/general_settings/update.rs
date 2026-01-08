@@ -56,6 +56,12 @@ pub fn update(
             tracing::debug!(width = clamped, "Sidebar width updated");
             Task::none()
         }
+        GeneralMessage::ToggleCheckForUpdates(enabled) => {
+            settings.check_for_updates = enabled;
+            persist_settings(settings);
+            tracing::info!(enabled, "Check for updates setting updated");
+            Task::none()
+        }
         GeneralMessage::ToggleStartOnBoot(enabled) => {
             tracing::info!(enabled, "Start-on-boot toggle requested");
             // Perform the operation asynchronously and report result

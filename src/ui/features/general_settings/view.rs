@@ -27,6 +27,8 @@ pub fn view(
         view_minimize_to_tray(settings),
         Space::new().height(8),
         view_start_on_boot(state.start_on_boot_enabled),
+        Space::new().height(8),
+        view_check_for_updates(settings),
         Space::new().height(24),
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
@@ -112,6 +114,22 @@ fn view_start_on_boot(start_on_boot_enabled: bool) -> Element<'static, GeneralMe
         desc,
         start_on_boot_enabled,
         GeneralMessage::ToggleStartOnBoot,
+    )
+}
+
+fn view_check_for_updates(settings: &AppSettings) -> Element<'static, GeneralMessage> {
+    let enabled = settings.check_for_updates;
+    let desc = if enabled {
+        "Checks GitHub for new releases on startup (Does NOT auto-update)"
+    } else {
+        "No update checks (Default)"
+    };
+
+    toggle_card(
+        "Check for Updates",
+        desc,
+        enabled,
+        GeneralMessage::ToggleCheckForUpdates,
     )
 }
 

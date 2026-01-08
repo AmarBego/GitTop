@@ -1,6 +1,6 @@
 [package]
 name = "GitTop"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["AmarBego"]
@@ -90,6 +90,9 @@ chrono = { version = "0.4", default-features = false, features = [
 # Error handling
 thiserror = "2"
 
+# Semantic versioning for update checker
+semver = "1"
+
 # Open URLs in browser
 open = "5"
 
@@ -117,10 +120,7 @@ single-instance = "0.3"
 
 # Logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [
-    "fmt",
-    "env-filter",
-] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tracing-appender = "0.2"
 
 # =============================================================================

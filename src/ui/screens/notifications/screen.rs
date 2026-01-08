@@ -50,6 +50,8 @@ pub struct NotificationsScreen {
     pub is_loading: bool,
     pub error_message: Option<String>,
     crash_notice: Option<CrashNotice>,
+    pub update_info: Option<crate::update_checker::UpdateInfo>,
+    update_banner_dismissed: bool,
 
     // === Feature States ===
     pub thread_actions: ThreadActionState,
@@ -77,6 +79,8 @@ impl NotificationsScreen {
             seen_notification_timestamps: HashMap::new(),
             list_state: notification_list::NotificationListState::new(),
             crash_notice: diagnostics::load_crash_notice(),
+            update_info: None,
+            update_banner_dismissed: false,
         };
         let task = screen.fetch_notifications();
         (screen, task)
@@ -187,6 +191,16 @@ impl NotificationsScreen {
             NotificationMessage::DismissCrashNotice => {
                 diagnostics::clear_crash_notice();
                 self.crash_notice = None;
+                Task::none()
+            }
+            NotificationMessage::DismissUpdateBanner => {
+                self.update_banner_dismissed = true;
+                Task::none()
+            }
+            NotificationMessage::OpenReleasePage => {
+                if let Some(ref info) = self.update_info {
+                    let _ = open::that(&info.release_url);
+                }
                 Task::none()
             }
         }
@@ -330,8 +344,6 @@ impl NotificationsScreen {
         icon_theme: IconTheme,
         power_mode: bool,
     ) -> Element<'_, NotificationMessage> {
-        let banner = self.view_crash_notice();
-
         let mut content = if power_mode {
             column![
                 crate::ui::features::bulk_actions::view(
@@ -386,8 +398,19 @@ impl NotificationsScreen {
             ]
         };
 
-        if let Some(banner) = banner {
-            content = column![banner, Space::new().height(12), content];
+        // Add banners at top if present
+        let crash_banner = self.view_crash_notice();
+        let update_banner = self.view_update_banner();
+
+        if crash_banner.is_some() || update_banner.is_some() {
+            let banners: Vec<_> = [crash_banner, update_banner]
+                .into_iter()
+                .flatten()
+                .collect();
+            let banner_col = banners
+                .into_iter()
+                .fold(column![].spacing(8), |col, banner| col.push(banner));
+            content = column![banner_col, Space::new().height(12), content];
         }
 
         content.width(Fill).height(Fill).into()
@@ -553,6 +576,52 @@ impl NotificationsScreen {
                         radius: 6.0.into(),
                         width: 1.0,
                         color: p.border_subtle,
+                    },
+                    ..Default::default()
+                })
+                .into(),
+        )
+    }
+
+    fn view_update_banner(&self) -> Option<Element<'_, NotificationMessage>> {
+        if self.update_banner_dismissed {
+            return None;
+        }
+        let info = self.update_info.as_ref()?;
+        let p = crate::ui::theme::palette();
+
+        let content = row![
+            text(format!(
+                "🎉 v{} available (you have {}) — update via package manager or releases",
+                info.latest, info.current
+            ))
+            .size(13)
+            .color(p.text_primary),
+            Space::new().width(Fill),
+            button(text("View Release").size(12))
+                .style(crate::ui::theme::ghost_button)
+                .on_press(NotificationMessage::OpenReleasePage)
+                .padding([4, 12]),
+            Space::new().width(8),
+            button(text("✕").size(12))
+                .style(crate::ui::theme::ghost_button)
+                .on_press(NotificationMessage::DismissUpdateBanner)
+                .padding([4, 8]),
+        ]
+        .align_y(iced::Alignment::Center);
+
+        Some(
+            container(content)
+                .padding(12)
+                .width(Fill)
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(iced::Color::from_rgb(
+                        0.15, 0.28, 0.18,
+                    ))),
+                    border: iced::Border {
+                        radius: 6.0.into(),
+                        width: 1.0,
+                        color: iced::Color::from_rgb(0.25, 0.40, 0.28),
                     },
                     ..Default::default()
                 })
