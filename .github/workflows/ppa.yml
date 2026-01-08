@@ -81,7 +81,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main # TEMPORARY: revert to ${{ needs.check.outputs.tag }} after build succeeds
+          ref: ${{ needs.check.outputs.tag }}
 
       - name: Cache cargo registry
         uses: actions/cache@v4
