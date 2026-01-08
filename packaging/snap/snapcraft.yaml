@@ -1,4 +1,5 @@
 name: gittop
+title: GitTop
 version: git
 summary: Lightweight desktop client for GitHub notifications
 description: |
@@ -11,6 +12,12 @@ description: |
   - Smart Rules: Powerful engine for priorities and hiding noisy notifications
   - Cross platform: Native experience on Windows and Linux
   - Dual Mode: Minimalist by default, Power Mode for advanced features
+
+license: AGPL-3.0-only
+contact: https://github.com/AmarBego/GitTop/issues
+issues: https://github.com/AmarBego/GitTop/issues
+source-code: https://github.com/AmarBego/GitTop
+website: https://amarbego.github.io/GitTop/
 
 grade: stable
 confinement: strict
@@ -44,21 +51,9 @@ parts:
       - pkg-config
       - libssl-dev
       - libdbus-1-dev
-      - libxkbcommon-dev
-      - libwayland-dev
-      - libxcb1-dev
-      - libxcb-render0-dev
-      - libxcb-shape0-dev
-      - libxcb-xfixes0-dev
     stage-packages:
       - libssl3
       - libdbus-1-3
-      - libxkbcommon0
-      - libwayland-client0
-      - libxcb1
-      - libxcb-render0
-      - libxcb-shape0
-      - libxcb-xfixes0
     override-build: |
       craftctl default
       # Install desktop file

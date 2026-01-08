@@ -1,114 +1,119 @@
 name: Snap Distribution
 
 on:
-    workflow_run:
-        workflows: ["Release"]
-        types:
-            - completed
-    workflow_dispatch:
-        inputs:
-            tag:
-                description: "Release tag (e.g., v0.4.0)"
-                required: true
-                type: string
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g., v0.4.0)"
+        required: true
+        type: string
 
 jobs:
-    check:
-        name: Check Release Status
-        runs-on: ubuntu-latest
-        permissions:
-            actions: read
-            contents: read
-        if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-        outputs:
-            should_build: ${{ steps.check.outputs.should_build }}
-            tag: ${{ steps.release.outputs.tag }}
-            version: ${{ steps.release.outputs.version }}
+  check:
+    name: Check Release Status
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
 
-        steps:
-            - name: Download release metadata
-              if: github.event_name == 'workflow_run'
-              uses: actions/download-artifact@v4
-              with:
-                  name: release-meta
-                  path: release-meta
-                  github-token: ${{ github.token }}
-                  run-id: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Download release metadata
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: release-meta
+          path: release-meta
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
 
-            - name: Read release info
-              id: release
-              run: |
-                  if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-                    TAG="${{ inputs.tag }}"
-                    if [[ "$TAG" == *"-"* ]]; then
-                      IS_PRERELEASE="true"
-                    else
-                      IS_PRERELEASE="false"
-                    fi
-                  else
-                    TAG=$(cat release-meta/tag)
-                    IS_PRERELEASE=$(cat release-meta/is_prerelease)
-                    if [[ "$TAG" == *"-"* ]]; then
-                      IS_PRERELEASE="true"
-                    fi
-                  fi
-                  VERSION="${TAG#v}"
+      - name: Read release info
+        id: release
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            if [[ "$TAG" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          else
+            TAG=$(cat release-meta/tag)
+            IS_PRERELEASE=$(cat release-meta/is_prerelease)
+            if [[ "$TAG" == *"-"* ]]; then
+              IS_PRERELEASE="true"
+            fi
+          fi
+          VERSION="${TAG#v}"
 
-                  echo "tag=$TAG" >> $GITHUB_OUTPUT
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
-                  echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
 
-            - name: Determine if should run
-              id: check
-              run: |
-                  if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
-                    echo "should_build=false" >> $GITHUB_OUTPUT
-                    echo "::notice::Skipping Snap publish for prerelease: ${{ steps.release.outputs.tag }}"
-                  else
-                    echo "should_build=true" >> $GITHUB_OUTPUT
-                  fi
+      - name: Determine if should run
+        id: check
+        run: |
+          if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "::notice::Skipping Snap publish for prerelease: ${{ steps.release.outputs.tag }}"
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          fi
 
-    snap:
-        name: Build and Publish Snap
-        needs: check
-        runs-on: ubuntu-latest
-        permissions:
-            actions: read
-            contents: read
-        if: ${{ needs.check.outputs.should_build == 'true' }}
+  snap:
+    name: Build and Publish Snap
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ needs.check.outputs.should_build == 'true' }}
 
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  ref: main # TEMPORARY: revert to ${{ needs.check.outputs.tag }} after testing
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # TEMPORARY: revert to ${{ needs.check.outputs.tag }} after testing
 
-            - name: Build Snap
-              uses: snapcore/action-build@v1
-              id: build
+      - name: Setup snap directory
+        run: |
+          mkdir -p snap
+          cp packaging/snap/snapcraft.yaml snap/snapcraft.yaml
 
-            - name: Publish to Snap Store
-              uses: snapcore/action-publish@v1
-              env:
-                  SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
-              with:
-                  snap: ${{ steps.build.outputs.snap }}
-                  release: stable
+      - name: Build Snap
+        uses: snapcore/action-build@v1
+        id: build
 
-            - name: Generate Job Summary
-              if: success()
-              run: |
-                  echo "### Snap Publish Complete :rocket:" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
-                  echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-                  echo "| Version | ${{ needs.check.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
-                  echo "| Snap | ${{ steps.build.outputs.snap }} |" >> $GITHUB_STEP_SUMMARY
-                  echo "| Channel | stable |" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "**Install with:**" >> $GITHUB_STEP_SUMMARY
-                  echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-                  echo "sudo snap install gittop" >> $GITHUB_STEP_SUMMARY
-                  echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+      - name: Publish to Snap Store
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_TOKEN }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: stable
 
-            - uses: kesin11/actions-timeline@v2
+      - name: Generate Job Summary
+        if: success()
+        run: |
+          echo "### Snap Publish Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | ${{ needs.check.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Snap | ${{ steps.build.outputs.snap }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Channel | stable |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Install with:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "sudo snap install gittop" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - uses: kesin11/actions-timeline@v2
