@@ -7,7 +7,7 @@ export DEB_BUILD_OPTIONS = nocheck
 	dh $@
 
 override_dh_auto_build:
-	cargo build --release --locked
+	cargo-1.85 build --release --locked
 
 override_dh_auto_install:
 	install -Dm755 target/release/gittop $(CURDIR)/debian/gittop/usr/bin/gittop
@@ -16,7 +16,7 @@ override_dh_auto_install:
 	install -Dm644 LICENSE.md $(CURDIR)/debian/gittop/usr/share/doc/gittop/LICENSE.md
 
 override_dh_auto_clean:
-	cargo clean || true
+	cargo-1.85 clean || true
 	rm -rf $(CARGO_HOME)
 
 override_dh_auto_test:

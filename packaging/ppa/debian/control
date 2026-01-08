@@ -3,8 +3,8 @@ Section: utils
 Priority: optional
 Maintainer: AmarBego <begovicamar@proton.me>
 Build-Depends: debhelper (>= 12),
-               cargo,
-               rustc,
+               cargo-1.85,
+               rustc-1.85,
                pkg-config
 Standards-Version: 4.6.2
 Homepage: https://github.com/AmarBego/GitTop
