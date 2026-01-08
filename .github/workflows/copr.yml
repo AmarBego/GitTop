@@ -1,0 +1,129 @@
+name: COPR Distribution
+
+on:
+    workflow_run:
+        workflows: ["Release"]
+        types:
+            - completed
+
+jobs:
+    check:
+        name: Check Release Status
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        outputs:
+            should_build: ${{ steps.check.outputs.should_build }}
+            tag: ${{ steps.release.outputs.tag }}
+            version: ${{ steps.release.outputs.version }}
+
+        steps:
+            - name: Download release metadata
+              uses: actions/download-artifact@v4
+              with:
+                  name: release-meta
+                  path: release-meta
+                  github-token: ${{ github.token }}
+                  run-id: ${{ github.event.workflow_run.id }}
+
+            - name: Read release info
+              id: release
+              run: |
+                  TAG=$(cat release-meta/tag)
+                  IS_PRERELEASE=$(cat release-meta/is_prerelease)
+                  if [[ "$TAG" == *"-"* ]]; then
+                    IS_PRERELEASE="true"
+                  fi
+                  VERSION="${TAG#v}"
+
+                  echo "tag=$TAG" >> $GITHUB_OUTPUT
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+                  echo "Release: $TAG (v$VERSION), Prerelease: $IS_PRERELEASE"
+
+            - name: Determine if should run
+              id: check
+              run: |
+                  if [ "${{ steps.release.outputs.is_prerelease }}" == "true" ]; then
+                    echo "should_build=false" >> $GITHUB_OUTPUT
+                    echo "::notice::Skipping COPR upload for prerelease: ${{ steps.release.outputs.tag }}"
+                  else
+                    echo "should_build=true" >> $GITHUB_OUTPUT
+                  fi
+
+    copr:
+        name: Upload to COPR
+        needs: check
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+        if: ${{ needs.check.outputs.should_build == 'true' }}
+
+        steps:
+            - name: Download RPM from release
+              run: |
+                  VERSION="${{ needs.check.outputs.version }}"
+                  TAG="${{ needs.check.outputs.tag }}"
+                  URL="https://github.com/AmarBego/GitTop/releases/download/${TAG}/gittop-${VERSION}-linux-x86_64.rpm"
+
+                  echo "::group::Downloading RPM"
+                  curl -L -o "gittop-${VERSION}.rpm" "$URL"
+                  ls -la *.rpm
+                  echo "::endgroup::"
+
+            - name: Verify RPM integrity
+              run: |
+                  VERSION="${{ needs.check.outputs.version }}"
+                  echo "::group::Verify RPM"
+                  rpm -Kv "gittop-${VERSION}.rpm" || echo "Note: Unsigned RPM (expected for GitHub releases)"
+                  rpm -qip "gittop-${VERSION}.rpm"
+                  echo "::endgroup::"
+
+            - name: Install copr-cli
+              run: |
+                  pip install copr-cli
+
+            - name: Configure copr-cli
+              run: |
+                  mkdir -p ~/.config
+                  cat > ~/.config/copr <<EOF
+                  [copr-cli]
+                  copr_url = https://copr.fedorainfracloud.org
+                  username = ${{ secrets.COPR_USERNAME }}
+                  token = ${{ secrets.COPR_API_TOKEN }}
+                  EOF
+
+            - name: Verify COPR credentials
+              run: |
+                  echo "::group::Verify COPR authentication"
+                  copr-cli whoami
+                  echo "::endgroup::"
+
+            - name: Upload to COPR
+              run: |
+                  VERSION="${{ needs.check.outputs.version }}"
+
+                  echo "::group::Upload RPM to COPR"
+                  copr-cli build amarbego/gittop "gittop-${VERSION}.rpm"
+                  echo "::endgroup::"
+
+            - name: Generate Job Summary
+              if: success()
+              run: |
+                  echo "### COPR Upload Complete :rocket:" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+                  echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Version | ${{ needs.check.outputs.version }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| COPR Project | [amarbego/gittop](https://copr.fedorainfracloud.org/coprs/amarbego/gittop/) |" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Install with:**" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+                  echo "sudo dnf copr enable amarbego/gittop" >> $GITHUB_STEP_SUMMARY
+                  echo "sudo dnf install gittop" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+            - uses: kesin11/actions-timeline@v2

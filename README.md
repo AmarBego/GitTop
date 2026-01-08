@@ -86,6 +86,19 @@ yay -S gittop-bin
 paru -S gittop-bin
 ```
 
+**Fedora (COPR):**
+```bash
+sudo dnf copr enable amarbego/gittop
+sudo dnf install gittop
+```
+
+**Ubuntu (PPA):**
+```bash
+sudo add-apt-repository ppa:amarbego/gittop
+sudo apt update
+sudo apt install gittop
+```
+
 **Manual:** Download `gittop-linux-x86_64.tar.gz` from releases:
 ```bash
 tar xzf gittop-linux-x86_64.tar.gz

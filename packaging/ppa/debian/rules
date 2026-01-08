@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+export CARGO_HOME = $(CURDIR)/debian/cargo
+export DEB_BUILD_OPTIONS = nocheck
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -Dm755 target/release/gittop $(CURDIR)/debian/gittop/usr/bin/gittop
+	install -Dm644 src/platform/resources/gittop.desktop $(CURDIR)/debian/gittop/usr/share/applications/gittop.desktop
+	install -Dm644 assets/images/GitTop-256x256.png $(CURDIR)/debian/gittop/usr/share/icons/hicolor/256x256/apps/gittop.png
+	install -Dm644 LICENSE.md $(CURDIR)/debian/gittop/usr/share/doc/gittop/LICENSE.md
+
+override_dh_auto_clean:
+	cargo clean || true
+	rm -rf $(CARGO_HOME)
+
+override_dh_auto_test:
+	# Skip tests during package build

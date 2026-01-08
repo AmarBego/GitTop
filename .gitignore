@@ -9,7 +9,6 @@ packaging/chocolatey/*.nupkg
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
