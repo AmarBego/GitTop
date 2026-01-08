@@ -81,10 +81,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: ${{ needs.check.outputs.tag }}
-
-            - name: Copy snapcraft.yaml to root
-              run: cp packaging/snap/snapcraft.yaml snap/snapcraft.yaml
+                  ref: main # TEMPORARY: revert to ${{ needs.check.outputs.tag }} after testing
 
             - name: Build Snap
               uses: snapcore/action-build@v1
