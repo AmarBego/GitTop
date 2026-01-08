@@ -43,7 +43,7 @@
 
 ### Windows
 
-**Installer (recommended):**
+**Installer**
 - [Download EXE installer](https://github.com/AmarBego/GitTop/releases/latest) Wizard-based setup with optional startup integration
 
 **Winget**
