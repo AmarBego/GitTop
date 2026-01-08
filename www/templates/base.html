@@ -4,11 +4,11 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta name="description" content="{{ config.description }}">
-		<meta name="theme-color" content="#0d1117">
+		<meta name="theme-color" content="#0a0a0f">
 		<title>{{ config.title }} | {{ page.title | default(value=section.title) | default(value="Home") }}</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="{{ get_url(path="style.css") }}">
 	</head>
 	<body>
@@ -48,6 +48,53 @@
 			
 			mobileMenuBtn?.addEventListener('click', () => {
 				navLinks.classList.toggle('open');
+			});
+
+			// Copy button for code blocks
+			document.addEventListener('DOMContentLoaded', () => {
+				document.querySelectorAll('.install-method pre').forEach(pre => {
+					// Create wrapper
+					const wrapper = document.createElement('div');
+					wrapper.className = 'code-block';
+					pre.parentNode.insertBefore(wrapper, pre);
+					wrapper.appendChild(pre);
+					
+					// Create copy button
+					const copyBtn = document.createElement('button');
+					copyBtn.className = 'copy-btn';
+					copyBtn.innerHTML = `
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+							<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+						</svg>
+						Copy
+					`;
+					
+					copyBtn.addEventListener('click', async () => {
+						const code = pre.querySelector('code')?.textContent || pre.textContent;
+						await navigator.clipboard.writeText(code.trim());
+						copyBtn.innerHTML = `
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polyline points="20 6 9 17 4 12"></polyline>
+							</svg>
+							Copied!
+						`;
+						copyBtn.classList.add('copied');
+						
+						setTimeout(() => {
+							copyBtn.innerHTML = `
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+									<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+								</svg>
+								Copy
+							`;
+							copyBtn.classList.remove('copied');
+						}, 2000);
+					});
+					
+					wrapper.appendChild(copyBtn);
+				});
 			});
 		</script>
 	</body>

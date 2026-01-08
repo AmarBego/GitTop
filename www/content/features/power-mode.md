@@ -1,5 +1,6 @@
 +++
-title = "Power Mode"
+title = "🚀 Power Mode"
+description = "Transform GitTop from a simple notifier into a full-featured triage center."
 weight = 3
 +++
 
@@ -36,3 +37,9 @@ Triage faster than ever.
 While strict filtering rules are always running in the background, Power Mode puts the [Rule Engine](/features/rules/) front and center, giving you quick access to tweak your filters as you work.
 
 > **Pro Tip:** If you configure complex Rules in Power Mode but prefer the Minimal aesthetic, you can switch Power Mode **OFF**. Your rules will continue to run silently in the background!
+
+## Ready to try it?
+
+<p class="buttons" style="justify-content: flex-start;">
+  <a href="/#installation" class="button primary">Download GitTop</a>
+</p>

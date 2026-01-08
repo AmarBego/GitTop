@@ -1,18 +1,24 @@
-// Color palette
-$primary: #f93f29;
-$primary-light: #ff5a47;
-$accent: #58a6ff;
-$text: #e6edf3;
-$text-muted: #8b949e;
-$bg: #0d1117;
-$bg-secondary: #161b22;
-$bg-tertiary: #21262d;
-$border: #30363d;
-$border-light: #3d444d;
+// Modern Color palette with vibrant gradients
+$primary: #ff4d4d;
+$primary-light: #ff6b6b;
+$primary-dark: #e63946;
+$accent: #00d4ff;
+$accent-secondary: #7c3aed;
+$accent-tertiary: #06ffa5;
+$text: #f1f5f9;
+$text-muted: #94a3b8;
+$bg: #0a0a0f;
+$bg-secondary: #12121a;
+$bg-tertiary: #1a1a24;
+$border: rgba(255, 255, 255, 0.08);
+$border-light: rgba(255, 255, 255, 0.12);
+$glow-primary: rgba(255, 77, 77, 0.5);
+$glow-accent: rgba(0, 212, 255, 0.4);
 
 // Typography
 html {
-  scroll-padding-top: 80px; // Account for fixed header when clicking anchor links
+  scroll-padding-top: 80px;
+  scroll-behavior: smooth;
 }
 
 body {
@@ -22,7 +28,11 @@ body {
   margin: 0;
   line-height: 1.6;
   min-height: 100vh;
-  padding-top: 64px; // Account for fixed header
+  padding-top: 64px;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba($accent-secondary, 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba($primary, 0.08), transparent);
+  background-attachment: fixed;
 }
 
 a {
@@ -42,9 +52,19 @@ a {
   left: 0;
   right: 0;
   z-index: 1000;
-  background: $bg-secondary;
-  backdrop-filter: blur(12px);
+  background: rgba($bg-secondary, 0.8);
+  backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid $border;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba($accent, 0.3), rgba($primary, 0.3), transparent);
+  }
 }
 
 .nav-container {
@@ -64,10 +84,11 @@ a {
   font-weight: 700;
   font-size: 1.25rem;
   color: white;
-  transition: opacity 0.2s ease;
+  transition: all 0.3s ease;
 
   &:hover {
-    opacity: 0.8;
+    opacity: 0.9;
+    text-shadow: 0 0 20px rgba(white, 0.3);
   }
 }
 
@@ -79,26 +100,48 @@ a {
 
 .nav-link {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: 8px;
   color: $text-muted;
   font-weight: 500;
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  position: relative;
 
   &:hover {
     color: white;
-    background: $bg-tertiary;
+    background: rgba(white, 0.05);
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    padding: 1px;
+    background: linear-gradient(135deg, transparent 40%, rgba($accent, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover::before {
+    opacity: 1;
   }
 }
 
 .nav-github {
   border: 1px solid $border;
+  background: rgba(white, 0.02);
 
   &:hover {
-    border-color: $border-light;
+    border-color: rgba($accent, 0.4);
+    background: rgba($accent, 0.05);
   }
 }
 
@@ -143,20 +186,21 @@ a {
 // Hero Section
 .hero {
   text-align: center;
-  padding: 6rem 1.5rem;
-  background: linear-gradient(180deg, $bg-secondary 0%, $bg 100%);
+  padding: 8rem 1.5rem 6rem;
   position: relative;
   overflow: hidden;
 
+  // Subtle gradient background
   &::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 800px;
-    height: 400px;
-    background: radial-gradient(ellipse, rgba($primary, 0.15) 0%, transparent 70%);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba($primary, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 80% 20%, rgba($accent, 0.05) 0%, transparent 40%);
     pointer-events: none;
   }
 }
@@ -165,89 +209,108 @@ a {
   width: 140px;
   height: 140px;
   margin-bottom: 1.5rem;
-  filter: drop-shadow(0 0 40px rgba($primary, 0.3));
-  animation: float 6s ease-in-out infinite;
+  filter: drop-shadow(0 4px 20px rgba($primary, 0.25));
 }
 
 .showcase {
   text-align: center;
-  padding: 2rem 1.5rem;
-  background: $bg-secondary;
-}
+  padding: 4rem 2rem 5rem;
+  background: linear-gradient(180deg, $bg 0%, $bg-secondary 50%, $bg 100%);
+  position: relative;
 
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-10px);
+  img {
+    max-width: 900px;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid $border;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
   }
 }
+
+
 
 .hero h1 {
-  font-size: 4rem;
+  font-size: 4.5rem;
   margin: 0 0 1rem;
   color: white;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, white 0%, rgba(white, 0.8) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hero-title {
   max-width: 600px;
   width: 100%;
   height: auto;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 10px 40px rgba(0, 0, 0, 0.3));
 }
 
 .tagline {
-  font-size: 1.35rem;
+  font-size: 1.4rem;
   color: $text-muted;
-  margin-bottom: 2.5rem;
-  max-width: 600px;
+  margin-bottom: 3rem;
+  max-width: 650px;
   margin-left: auto;
   margin-right: auto;
+  position: relative;
+  z-index: 1;
+  line-height: 1.7;
 }
 
 // Buttons
 .buttons {
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   justify-content: center;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
 }
 
 .button {
-  padding: 0.875rem 1.75rem;
-  border-radius: 8px;
+  padding: 1rem 2rem;
+  border-radius: 12px;
   font-weight: 600;
   font-size: 1rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
+  gap: 0.6rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 
   &.primary {
     background: linear-gradient(135deg, $primary 0%, $primary-light 100%);
     color: white;
-    box-shadow: 0 4px 14px rgba($primary, 0.4);
+    box-shadow: 0 4px 16px rgba($primary, 0.3);
 
     &:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba($primary, 0.5);
+      box-shadow: 0 6px 24px rgba($primary, 0.35);
+    }
+
+    &:active {
+      transform: translateY(0);
     }
   }
 
   &.secondary {
-    background: $bg-tertiary;
+    background: rgba(white, 0.03);
     color: $text;
     border: 1px solid $border;
+    backdrop-filter: blur(10px);
 
     &:hover {
-      background: $border;
-      border-color: $border-light;
+      background: rgba(white, 0.06);
+      border-color: rgba($accent, 0.3);
+      transform: translateY(-2px);
     }
   }
 }
@@ -258,83 +321,129 @@ a {
   flex-wrap: wrap;
   justify-content: center;
   gap: 1.5rem;
-  padding: 5rem 2rem;
-  max-width: 1200px;
+  padding: 6rem 2rem;
+  max-width: 1300px;
   margin: 0 auto;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba($accent-secondary, 0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
 }
 
 .feature {
-  flex: 1 1 300px;
+  flex: 1 1 320px;
   max-width: 400px;
-  background: linear-gradient(135deg, rgba($bg-secondary, 0.8) 0%, rgba($bg-tertiary, 0.4) 100%);
-  padding: 2rem;
-  border-radius: 12px;
+  background: rgba($bg-secondary, 0.6);
+  padding: 2.25rem;
+  border-radius: 16px;
   border: 1px solid $border;
-  backdrop-filter: blur(8px);
-  transition: all 0.3s ease;
+  backdrop-filter: blur(20px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 
   &:hover {
     transform: translateY(-4px);
-    border-color: $border-light;
+    border-color: rgba($primary, 0.3);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 
     .feature-icon {
-      background: rgba($primary, 0.2);
-      border-color: $primary;
+      background: rgba($primary, 0.1);
+      border-color: rgba($primary, 0.3);
     }
   }
 
   h3 {
     color: white;
     margin: 0 0 0.75rem;
-    font-size: 1.25rem;
-    font-weight: 600;
+    font-size: 1.3rem;
+    font-weight: 700;
+    position: relative;
+    z-index: 1;
   }
 
   p {
     color: $text-muted;
     margin: 0;
-    line-height: 1.7;
+    line-height: 1.75;
+    position: relative;
+    z-index: 1;
   }
 }
 
 .feature-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  background: rgba($border, 0.3);
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(white, 0.03);
   border: 1px solid $border;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 1rem;
-  transition: all 0.3s ease;
+  margin-bottom: 1.25rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
 
   svg {
     stroke: $primary;
   }
-
 }
 
 // Why Section
 .why-section {
-  padding: 5rem 2rem;
+  padding: 5rem 2rem 6rem;
   max-width: 900px;
   margin: 0 auto;
   text-align: center;
+  position: relative;
+
+  // Top separator
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, $border-light, transparent);
+  }
+
+  // Bottom separator
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, $border-light, transparent);
+  }
 
   h2 {
     font-size: 2.5rem;
     color: white;
-    margin: 0 0 1rem;
+    margin: 0 0 1.5rem;
     font-weight: 700;
   }
 
   p {
     color: $text-muted;
-    font-size: 1.15rem;
+    font-size: 1.25rem;
     max-width: 700px;
     margin: 0 auto;
+    line-height: 1.8;
   }
 }
 
@@ -543,5 +652,199 @@ a {
     h1 {
       font-size: 1.75rem;
     }
+  }
+}
+
+// Installation Section
+.installation-section {
+  padding: 5rem 2rem 6rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+
+  >p {
+    text-align: center;
+    color: $text-muted;
+    margin: 0 0 3rem;
+    font-size: 1.1rem;
+
+    a {
+      color: $accent;
+      transition: color 0.2s ease;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+
+  h2 {
+    text-align: center;
+    font-size: 2.5rem;
+    color: white;
+    margin: 0 0 1rem;
+    font-weight: 700;
+  }
+}
+
+.os-tabs {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.os-column {
+  flex: 1;
+  min-width: 320px;
+  max-width: 500px;
+  background: rgba($bg-secondary, 0.6);
+  border: 1px solid $border;
+  border-radius: 20px;
+  padding: 2.5rem;
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(white, 0.1), transparent);
+  }
+
+  &:hover {
+    border-color: $border-light;
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: white;
+    font-size: 1.5rem;
+    margin: 0 0 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid $border;
+    font-weight: 700;
+
+    svg {
+      color: $primary;
+    }
+  }
+}
+
+.install-method {
+  margin-bottom: 2rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  h4 {
+    color: $text;
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    &::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: $primary;
+      border-radius: 50%;
+    }
+  }
+
+  p {
+    margin: 0;
+  }
+
+  pre {
+    background: rgba($bg-tertiary, 0.8);
+    border: 1px solid $border;
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin: 0;
+    overflow-x: auto;
+    position: relative;
+    transition: all 0.3s ease;
+
+    &:hover {
+      border-color: rgba($accent, 0.3);
+      background: rgba($bg-tertiary, 0.95);
+    }
+
+    code {
+      font-family: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', Consolas, monospace;
+      font-size: 0.875rem;
+      color: $accent;
+      line-height: 1.6;
+    }
+  }
+}
+
+// Code block with copy button
+.code-block {
+  position: relative;
+
+  .copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(white, 0.05);
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    color: $text-muted;
+    font-size: 0.75rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    &:hover {
+      background: rgba(white, 0.1);
+      border-color: rgba($accent, 0.4);
+      color: white;
+    }
+
+    &.copied {
+      background: rgba($accent-tertiary, 0.2);
+      border-color: $accent-tertiary;
+      color: $accent-tertiary;
+    }
+  }
+
+  &:hover .copy-btn {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .os-tabs {
+    flex-direction: column;
+  }
+
+  .installation-section {
+    padding: 3rem 1rem;
   }
 }

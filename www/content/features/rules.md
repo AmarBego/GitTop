@@ -1,5 +1,6 @@
 +++
-title = "Smart Rules"
+title = "⚡ Smart Rules"
+description = "Build filters to show, silence, suppress, or prioritize notifications. You control the signal-to-noise ratio."
 weight = 2
 +++
 
@@ -83,3 +84,9 @@ With all these rules, what happens when they conflict? GitTop follows a strict l
 
 Unsure why a notification was hidden? In the Rule Engine settings, use the **Explain Decision** tab.
 You can simulate a notification (e.g., "Mentioned in Repo X") and GitTop will show you exactly which rules matched and which one won.
+
+## Ready to try it?
+
+<p class="buttons" style="justify-content: flex-start;">
+  <a href="/#installation" class="button primary">Download GitTop</a>
+</p>

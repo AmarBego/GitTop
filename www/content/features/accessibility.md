@@ -1,9 +1,8 @@
 +++
-title = "Accessibility"
+title = "🎨 Accessibility"
+description = "Six themes, scalable fonts, and icon options. GitTop adapts to your eyes and your hardware."
 weight = 4
 +++
-
-## Your App, Your Rules
 
 GitTop is designed to fit into your workflow, not the other way around. Whether you need high contrast for visibility, specific fonts for readability, or just want to match your system theme, we've got you covered.
 
@@ -34,3 +33,9 @@ For users on older hardware or those who simply crave efficiency, GitTop include
 *   **Emoji:** Replaces all UI icons with native system emojis.
     *   **Why?** Performance maximalists that think 10MB is too much.
     *   **Bonus:** It gives the app a fun, retro-terminal feel.
+
+## Ready to try it?
+
+<p class="buttons" style="justify-content: flex-start;">
+  <a href="/#installation" class="button primary">Download GitTop</a>
+</p>

@@ -1,13 +1,12 @@
 +++
-title = "Multi-Account"
+title = "🔐 Multi-Account"
+description = "Manage work and personal GitHub accounts in isolated contexts. Switch instantly, never mix."
 weight = 1
 +++
 
-## Context Switching, perfected.
-
 GitTop is built for the developer who wears multiple hats. Whether you're a freelancer with three clients, a maintainer with a bot account, or just keeping your day job separate from your side hustle, we handle the context switching for you.
 
-### One App, Distinct Contexts
+## One App, Distinct Contexts
 
 We do not believe in a "Unified Inbox". Mingling your work alerts with your hobby projects is a recipe for burnout.
 
@@ -40,3 +39,9 @@ Process notifications for your main account, then switch to `@my-project-bot` to
 
 ### The Professional
 Keep your `dotfiles` issues separate from `quarterly-planning`. Use the [Rule Engine](/features/rules/) to define strict boundaries for when each account is allowed to notify you.
+
+## Ready to try it?
+
+<p class="buttons" style="justify-content: flex-start;">
+  <a href="/#installation" class="button primary">Download GitTop</a>
+</p>

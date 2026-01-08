@@ -6,6 +6,31 @@
   />
 </p>
 
+<p align="center">
+  <a href="#windows">
+    <img src="https://img.shields.io/badge/Winget-Supported-00D2FF?style=flat-square&logo=windows&logoColor=white" alt="Winget">
+  </a>
+  <a href="#windows">
+    <img src="https://img.shields.io/badge/Chocolatey-Supported-795548?style=flat-square&logo=chocolatey&logoColor=white" alt="Chocolatey">
+  </a>
+  <a href="#windows">
+    <img src="https://img.shields.io/badge/Scoop-Supported-404040?style=flat-square&logo=windows&logoColor=white" alt="Scoop">
+  </a>
+  <br/>
+  <a href="#linux">
+    <img src="https://img.shields.io/badge/Flatpak-Supported-4A90D9?style=flat-square&logo=flathub&logoColor=white" alt="Flatpak">
+  </a>
+  <a href="#linux">
+    <img src="https://img.shields.io/badge/AUR-Supported-1793D1?style=flat-square&logo=arch-linux&logoColor=white" alt="AUR">
+  </a>
+  <a href="#linux">
+    <img src="https://img.shields.io/badge/COPR-Supported-294172?style=flat-square&logo=fedora&logoColor=white" alt="COPR">
+  </a>
+  <a href="#linux">
+    <img src="https://img.shields.io/badge/PPA-Supported-E95420?style=flat-square&logo=ubuntu&logoColor=white" alt="PPA">
+  </a>
+</p>
+
 <h1></h1>
 
 <img
@@ -28,6 +53,7 @@
   <a href="https://amarbego.github.io/GitTop/">
     <img src="https://img.shields.io/badge/Read_the_Docs-FF5A47?style=for-the-badge&logo=googledocs&logoColor=white" alt="Read the Docs">
   </a>
+  
 </p>
 
 <img
