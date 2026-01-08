@@ -2,7 +2,7 @@ Source: gittop
 Section: utils
 Priority: optional
 Maintainer: AmarBego <begovicamar@proton.me>
-Build-Depends: debhelper (>= 13),
+Build-Depends: debhelper (>= 12),
                cargo,
                rustc,
                pkg-config
