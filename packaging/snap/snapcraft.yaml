@@ -1,0 +1,67 @@
+name: gittop
+version: git
+summary: Lightweight desktop client for GitHub notifications
+description: |
+  GitTop is a lightweight desktop client for GitHub notifications.
+  Why spin up a browser just to check your GitHub notifications?
+
+  Features:
+  - Super lean: ~5-15MB RAM whilst in use (1-2MB in tray)
+  - Multi-account: Seamless support for multiple GitHub accounts
+  - Smart Rules: Powerful engine for priorities and hiding noisy notifications
+  - Cross platform: Native experience on Windows and Linux
+  - Dual Mode: Minimalist by default, Power Mode for advanced features
+
+grade: stable
+confinement: strict
+base: core24
+
+platforms:
+  amd64:
+
+apps:
+  gittop:
+    command: bin/gittop
+    desktop: share/applications/gittop.desktop
+    extensions: [gnome]
+    plugs:
+      - network
+      - network-status
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - unity7
+      - gsettings
+      - home
+      - password-manager-service
+
+parts:
+  gittop:
+    plugin: rust
+    source: .
+    build-packages:
+      - pkg-config
+      - libssl-dev
+      - libdbus-1-dev
+      - libxkbcommon-dev
+      - libwayland-dev
+      - libxcb1-dev
+      - libxcb-render0-dev
+      - libxcb-shape0-dev
+      - libxcb-xfixes0-dev
+    stage-packages:
+      - libssl3
+      - libdbus-1-3
+      - libxkbcommon0
+      - libwayland-client0
+      - libxcb1
+      - libxcb-render0
+      - libxcb-shape0
+      - libxcb-xfixes0
+    override-build: |
+      craftctl default
+      # Install desktop file
+      install -Dm644 src/platform/resources/gittop.desktop $CRAFT_PART_INSTALL/share/applications/gittop.desktop
+      # Install icon
+      install -Dm644 assets/images/GitTop-256x256.png $CRAFT_PART_INSTALL/share/icons/hicolor/256x256/apps/gittop.png

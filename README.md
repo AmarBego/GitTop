@@ -27,7 +27,7 @@
     <img src="https://img.shields.io/badge/COPR-Supported-294172?style=flat-square&logo=fedora&logoColor=white" alt="COPR">
   </a>
   <a href="#linux">
-    <img src="https://img.shields.io/badge/PPA-Supported-E95420?style=flat-square&logo=ubuntu&logoColor=white" alt="PPA">
+    <img src="https://img.shields.io/badge/Snap-Supported-82BEA0?style=flat-square&logo=snapcraft&logoColor=white" alt="Snap">
   </a>
 </p>
 
@@ -118,11 +118,9 @@ sudo dnf copr enable amarbego/gittop
 sudo dnf install gittop
 ```
 
-**Ubuntu (PPA):**
+**Ubuntu/Debian (Snap):**
 ```bash
-sudo add-apt-repository ppa:amarbego/gittop
-sudo apt update
-sudo apt install gittop
+sudo snap install gittop
 ```
 
 **Manual:** Download `gittop-linux-x86_64.tar.gz` from releases:

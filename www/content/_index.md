@@ -115,10 +115,8 @@ scoop install gittop</code></pre>
 sudo dnf install gittop</code></pre>
       </div>
       <div class="install-method">
-        <h4>Ubuntu (PPA)</h4>
-        <pre><code>sudo add-apt-repository ppa:amarbego/gittop
-sudo apt update
-sudo apt install gittop</code></pre>
+        <h4>Ubuntu/Debian (Snap)</h4>
+        <pre><code>sudo snap install gittop</code></pre>
       </div>
     </div>
   </div>

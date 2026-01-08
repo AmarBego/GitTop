@@ -9,7 +9,7 @@ license = "AGPL-3.0-only"
 
 [package.metadata.deb]
 maintainer = "AmarBego <begovicamar@proton.me>"
-copyright = "2024, AmarBego"
+copyright = "2026, AmarBego"
 license-file = ["LICENSE.md", "4"]
 depends = "$auto"
 section = "utils"
