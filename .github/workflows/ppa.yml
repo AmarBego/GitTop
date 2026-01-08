@@ -124,6 +124,9 @@ jobs:
                     --exclude="$PKG_DIR" \
                     . "$PKG_DIR"/
 
+          # Ensure debian directory is at the root so it's detected
+          cp -r packaging/ppa/debian "$PKG_DIR/"
+
           # Create the tarball
           tar -czf "gittop_${VERSION}.orig.tar.gz" "$PKG_DIR"
 
