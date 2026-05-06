@@ -155,7 +155,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
     "wayland",
     "x11",
 ] }
-notify-rust = "4"
+notify-rust = { version = "4", default-features = false, features = ["zbus"] }
 keyring = { version = "3", default-features = false, features = ["linux-native"] }
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
@@ -166,7 +166,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
     "wayland",
     "x11",
 ] }
-notify-rust = "4"
+notify-rust = { version = "4", default-features = false, features = ["zbus"] }
 keyring = { version = "3", default-features = false, features = ["linux-native"] }
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
