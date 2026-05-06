@@ -101,6 +101,7 @@ impl_icons! {
     fn icon_pull_request(icondata_lu::LuGitPullRequest, "⇄");
     fn icon_release(icondata_lu::LuTag, "◆");
     fn icon_discussion(icondata_lu::LuMessageCircle, "💬");
+    fn icon_info(icondata_lu::LuInfo, "ℹ");
     fn icon_check_suite(icondata_lu::LuCircleCheck, "✓");
     fn icon_commit(icondata_lu::LuGitCommitHorizontal, "◉");
     fn icon_security(icondata_lu::LuShieldAlert, "⚠");

@@ -319,6 +319,32 @@ impl GitHubClient {
         Ok(response.json().await?)
     }
 
+    /// Fetches all comments for an Issue or Pull Request.
+    ///
+    /// Takes the `subject_url` (which points to an issue or pull request)
+    /// and fetches the comments timeline.
+    pub async fn get_comments(
+        &self,
+        subject_url: &str,
+    ) -> Result<Vec<super::subject_details::CommentDetails>, GitHubError> {
+        // If it's a pull request URL, replace "pulls" with "issues" to get the standard comments
+        let issues_url = subject_url.replace("/pulls/", "/issues/");
+        let url = format!("{}/comments", issues_url);
+
+        let response = self.client.get(&url).send().await?;
+
+        let status = response.status();
+        if status.as_u16() == 404 {
+            return Err(GitHubError::Api {
+                status: 404,
+                message: "Comments not found".to_string(),
+            });
+        }
+
+        let response = Self::handle_response(response).await?;
+        Ok(response.json().await?)
+    }
+
     /// Fetches notification subject details based on type.
     ///
     /// This is the high-level method that determines what to fetch based on:
@@ -489,6 +515,68 @@ impl GitHubClient {
             answer_chosen: discussion["answerChosenAt"].as_str().is_some(),
             comments_count: discussion["comments"]["totalCount"].as_u64().unwrap_or(0),
         })
+    }
+
+    /// Lists all available labels for a repository.
+    pub async fn list_repo_labels(
+        &self,
+        owner: &str,
+        repo: &str,
+    ) -> Result<Vec<super::subject_details::Label>, GitHubError> {
+        let url = format!("{}/repos/{}/{}/labels", GITHUB_API_URL, owner, repo);
+        let response = self.client.get(&url).send().await?;
+        let response = Self::handle_response(response).await?;
+        Ok(response.json().await?)
+    }
+
+    /// Adds labels to a PR (or issue).
+    pub async fn add_pr_labels(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        labels: &[String],
+    ) -> Result<Vec<super::subject_details::Label>, GitHubError> {
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}/labels",
+            GITHUB_API_URL, owner, repo, pr_number
+        );
+        let body = serde_json::json!({ "labels": labels });
+        let response = self.client.post(&url).json(&body).send().await?;
+        let response = Self::handle_response(response).await?;
+        Ok(response.json().await?)
+    }
+
+    /// Removes a label from a PR (or issue).
+    pub async fn remove_pr_label(
+        &self,
+        owner: &str,
+        repo: &str,
+        pr_number: u64,
+        label_name: &str,
+    ) -> Result<(), GitHubError> {
+        let url = format!(
+            "{}/repos/{}/{}/issues/{}/labels/{}",
+            GITHUB_API_URL, owner, repo, pr_number, label_name
+        );
+        let response = self.client.delete(&url).send().await?;
+        Self::handle_response(response).await.map(|_| ())
+    }
+
+    /// Fetches check runs for a specific commit SHA.
+    pub async fn get_check_runs(
+        &self,
+        owner: &str,
+        repo: &str,
+        ref_sha: &str,
+    ) -> Result<super::subject_details::CheckRunsResponse, GitHubError> {
+        let url = format!(
+            "{}/repos/{}/{}/commits/{}/check-runs",
+            GITHUB_API_URL, owner, repo, ref_sha
+        );
+        let response = self.client.get(&url).send().await?;
+        let response = Self::handle_response(response).await?;
+        Ok(response.json().await?)
     }
 
     /// Returns the token for storage purposes.

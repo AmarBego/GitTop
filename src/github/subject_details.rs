@@ -12,11 +12,31 @@ pub struct User {
     pub login: String,
 }
 
+/// Pull Request head info
+#[derive(Debug, Clone, Deserialize)]
+pub struct PullRequestHead {
+    pub sha: String,
+}
+
 /// Issue/PR label
 #[derive(Debug, Clone, Deserialize)]
 pub struct Label {
     pub name: String,
     pub color: String,
+}
+
+/// Check run status and conclusion
+#[derive(Debug, Clone, Deserialize)]
+pub struct CheckRun {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+}
+
+/// Response for check runs API
+#[derive(Debug, Clone, Deserialize)]
+pub struct CheckRunsResponse {
+    pub check_runs: Vec<CheckRun>,
 }
 
 /// Fetched content for an Issue
@@ -43,6 +63,8 @@ pub struct PullRequestDetails {
     #[serde(default)]
     pub merged: bool,
     #[serde(default)]
+    pub labels: Vec<Label>,
+    #[serde(default)]
     pub additions: u64,
     #[serde(default)]
     pub deletions: u64,
@@ -51,6 +73,7 @@ pub struct PullRequestDetails {
     #[serde(default)]
     pub commits: u64,
     pub user: User,
+    pub head: PullRequestHead,
 }
 
 /// Fetched content for a Comment

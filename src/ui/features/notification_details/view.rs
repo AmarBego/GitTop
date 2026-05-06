@@ -1,27 +1,38 @@
-//! Details Panel widget - Contextual information for the selected notification.
-//!
-//! Displays fetched Issue/PR/Comment content inline when a notification is
-//! clicked in power mode.
-
-use iced::widget::{Space, button, column, container, row, scrollable, text};
+use iced::widget::{Space, button, column, container, row, scrollable, text, text_input};
 use iced::{Alignment, Color, Element, Fill, Length};
 
 use crate::github::NotificationView;
 use crate::github::subject_details::{
-    CommentDetails, DiscussionDetails, IssueDetails, NotificationSubjectDetail, PullRequestDetails,
+    CheckRun, CommentDetails, DiscussionDetails, IssueDetails, Label, NotificationSubjectDetail,
+    PullRequestDetails,
 };
 use crate::settings::IconTheme;
 use crate::ui::features::notification_details::NotificationDetailsMessage;
 use crate::ui::features::thread_actions::ThreadActionMessage;
 use crate::ui::screens::notifications::messages::NotificationMessage;
 use crate::ui::{icons, theme};
+use std::collections::HashSet;
 
-/// View the details panel for a selected notification.
+#[derive(Debug, Clone, Copy)]
+pub struct LabelViewArgs<'a> {
+    pub input: &'a str,
+    pub available: &'a [Label],
+    pub loading: bool,
+    pub pending_ops: &'a HashSet<String>,
+    pub error: Option<&'a str>,
+    pub check_runs: &'a [CheckRun],
+    pub checks_loading: bool,
+    pub comments: Option<&'a [CommentDetails]>,
+    pub comments_loading: bool,
+    pub comments_error: Option<&'a str>,
+}
+
 pub fn view<'a>(
     notification: Option<&'a NotificationView>,
     details: Option<&'a NotificationSubjectDetail>,
     is_loading: bool,
     icon_theme: IconTheme,
+    label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
     let p = theme::palette();
 
@@ -29,7 +40,7 @@ pub fn view<'a>(
         view_loading(&p)
     } else if let Some(notif) = notification {
         if let Some(detail) = details {
-            view_details(notif, detail, icon_theme, &p)
+            view_details(notif, detail, icon_theme, &p, label_args)
         } else {
             view_notification_header(notif, &p, icon_theme)
         }
@@ -106,10 +117,15 @@ fn view_details<'a>(
     detail: &'a NotificationSubjectDetail,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
+    label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
     let content: Element<'a, NotificationMessage> = match detail {
-        NotificationSubjectDetail::Issue(issue) => view_issue(issue, notif, icon_theme, p),
-        NotificationSubjectDetail::PullRequest(pr) => view_pull_request(pr, notif, icon_theme, p),
+        NotificationSubjectDetail::Issue(issue) => {
+            view_issue(issue, notif, icon_theme, p, label_args)
+        }
+        NotificationSubjectDetail::PullRequest(pr) => {
+            view_pull_request(pr, notif, icon_theme, p, label_args)
+        }
         NotificationSubjectDetail::Comment {
             comment,
             context_title,
@@ -137,6 +153,7 @@ fn view_issue<'a>(
     notif: &'a NotificationView,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
+    label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
     let state_color = if issue.state == "open" {
         p.accent_success
@@ -208,6 +225,15 @@ fn view_issue<'a>(
     );
     col = col.push(Space::new().height(16));
     col = col.push(view_action_buttons(&notif.id, notif.unread, icon_theme));
+    col = col.push(Space::new().height(24));
+    col = col.push(view_comments_section(
+        notif.url.as_deref().unwrap_or(""),
+        label_args.comments,
+        label_args.comments_loading,
+        label_args.comments_error,
+        *p,
+        icon_theme,
+    ));
 
     col.padding(24).into()
 }
@@ -217,6 +243,7 @@ fn view_pull_request<'a>(
     notif: &'a NotificationView,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
+    label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
     let state_color = if pr.merged {
         p.accent_purple
@@ -239,6 +266,9 @@ fn view_pull_request<'a>(
     let text_muted = p.text_muted;
     let accent_success = p.accent_success;
     let accent_danger = p.accent_danger;
+
+    let (owner, repo) = split_repo_full_name(&notif.repo_full_name);
+    let pr_number = pr.number;
 
     let mut col = column![
         row![
@@ -282,6 +312,59 @@ fn view_pull_request<'a>(
         col = col.push(Space::new().height(16));
     }
 
+    if !pr.labels.is_empty() {
+        let mut label_rows = column![].spacing(4);
+        let mut current_row = row![].spacing(4);
+        let mut row_count = 0;
+
+        for label in &pr.labels {
+            let is_pending = label_args.pending_ops.contains(&label.name);
+            let label_element = view_pr_label(
+                &label.name,
+                &label.color,
+                is_pending,
+                owner.to_string(),
+                repo.to_string(),
+                pr_number,
+            );
+            current_row = current_row.push(label_element);
+            row_count += 1;
+            if row_count >= 4 {
+                label_rows = label_rows.push(current_row);
+                current_row = row![].spacing(4);
+                row_count = 0;
+            }
+        }
+        if row_count > 0 {
+            label_rows = label_rows.push(current_row);
+        }
+        col = col.push(label_rows);
+        col = col.push(Space::new().height(16));
+    }
+
+    // Add Label UI
+    col = col.push(view_label_editor(
+        label_args, &pr.labels, owner, repo, pr_number, p, icon_theme,
+    ));
+    col = col.push(Space::new().height(16));
+
+    // Add Checks UI
+    col = col.push(view_checks(
+        label_args.check_runs,
+        label_args.checks_loading,
+        owner,
+        repo,
+        &pr.head.sha,
+        p,
+        icon_theme,
+    ));
+    col = col.push(Space::new().height(16));
+
+    if let Some(err) = label_args.error {
+        col = col.push(text(err).size(11).color(p.accent_danger));
+        col = col.push(Space::new().height(8));
+    }
+
     col = col.push(
         row![
             view_stat_badge(format!("+{}", pr.additions), accent_success),
@@ -300,8 +383,245 @@ fn view_pull_request<'a>(
     );
     col = col.push(Space::new().height(16));
     col = col.push(view_action_buttons(&notif.id, notif.unread, icon_theme));
+    col = col.push(Space::new().height(24));
+    col = col.push(view_comments_section(
+        notif.url.as_deref().unwrap_or(""),
+        label_args.comments,
+        label_args.comments_loading,
+        label_args.comments_error,
+        *p,
+        icon_theme,
+    ));
 
     col.padding(24).into()
+}
+
+fn view_checks<'a>(
+    check_runs: &'a [CheckRun],
+    loading: bool,
+    owner: &str,
+    repo: &str,
+    sha: &str,
+    p: &theme::ThemePalette,
+    icon_theme: IconTheme,
+) -> Element<'a, NotificationMessage> {
+    let mut col = column![].spacing(8);
+
+    let refresh_area: Element<'a, NotificationMessage> = if loading {
+        text("Refreshing...").size(10).color(p.text_muted).into()
+    } else {
+        button(text("Refresh").size(10))
+            .padding([2, 8])
+            .style(theme::ghost_button)
+            .on_press(NotificationMessage::Details(
+                NotificationDetailsMessage::RefreshChecks(
+                    owner.to_string(),
+                    repo.to_string(),
+                    sha.to_string(),
+                ),
+            ))
+            .into()
+    };
+
+    let header = row![
+        text("Checks").size(12).color(p.text_muted),
+        Space::new().width(Fill),
+        refresh_area,
+    ]
+    .align_y(Alignment::Center);
+
+    col = col.push(header);
+
+    if check_runs.is_empty() {
+        if !loading {
+            col = col.push(text("No checks found").size(11).color(p.text_muted));
+        }
+    } else {
+        let mut runs_col = column![].spacing(4);
+        for run in check_runs {
+            let icon = match run.conclusion.as_deref() {
+                Some("success") => icons::icon_check(12.0, p.accent_success, icon_theme),
+                Some("failure") => icons::icon_x(12.0, p.accent_danger, icon_theme),
+                Some("neutral") => icons::icon_info(12.0, p.text_muted, icon_theme),
+                _ => {
+                    if run.status == "in_progress" {
+                        icons::icon_refresh(12.0, p.accent_warning, icon_theme)
+                    } else {
+                        icons::icon_unknown(12.0, p.text_muted, icon_theme)
+                    }
+                }
+            };
+
+            runs_col = runs_col.push(
+                row![
+                    icon,
+                    Space::new().width(8),
+                    text(&run.name).size(11).color(p.text_secondary),
+                    Space::new().width(Fill),
+                    text(&run.status).size(10).color(p.text_muted),
+                ]
+                .align_y(Alignment::Center),
+            );
+        }
+        col = col.push(runs_col);
+    }
+
+    col.into()
+}
+
+fn view_label_editor<'a>(
+    label_args: LabelViewArgs<'a>,
+    current_labels: &[Label],
+    owner: &'a str,
+    repo: &'a str,
+    pr_number: u64,
+    p: &theme::ThemePalette,
+    _icon_theme: IconTheme,
+) -> Element<'a, NotificationMessage> {
+    let input = label_args.input;
+    let available_labels = label_args.available;
+    let loading = label_args.loading;
+
+    let current_names: HashSet<&str> = current_labels.iter().map(|l| l.name.as_str()).collect();
+    let suggestions: Vec<&Label> = available_labels
+        .iter()
+        .filter(|l| !current_names.contains(l.name.as_str()))
+        .collect();
+
+    let text_muted = p.text_muted;
+    let bg_control = p.bg_control;
+    let border_subtle = p.border_subtle;
+
+    let mut col = column![].spacing(6);
+
+    col = col.push(text("Labels").size(12).color(text_muted));
+
+    let owner_string = owner.to_string();
+    let repo_string = repo.to_string();
+
+    col = col.push(
+        text_input("Add a label...", input)
+            .on_input(|text| {
+                NotificationMessage::Details(NotificationDetailsMessage::SetLabelInput(text))
+            })
+            .on_submit({
+                let owner = owner_string.clone();
+                let repo = repo_string.clone();
+                NotificationMessage::Details(NotificationDetailsMessage::SubmitLabelFromInput(
+                    owner, repo, pr_number,
+                ))
+            })
+            .padding([6, 10])
+            .size(12),
+    );
+
+    if !input.trim().is_empty() || loading {
+        if loading {
+            col = col.push(text("Loading labels...").size(11).color(text_muted));
+        } else if !suggestions.is_empty() {
+            let filtered: Vec<&&Label> = if input.trim().is_empty() {
+                suggestions.iter().take(8).collect()
+            } else {
+                let lower = input.trim().to_lowercase();
+                suggestions
+                    .iter()
+                    .filter(|l| l.name.to_lowercase().contains(&lower))
+                    .take(8)
+                    .collect()
+            };
+
+            if !filtered.is_empty() {
+                let mut sug_col = column![].spacing(2);
+                for label in filtered {
+                    let name = label.name.clone();
+                    let owner = owner_string.clone();
+                    let repo = repo_string.clone();
+                    sug_col = sug_col.push(
+                        button(
+                            row![
+                                view_label_swatch(&label.name, &label.color),
+                                Space::new().width(6),
+                                text(&label.name).size(11),
+                            ]
+                            .align_y(Alignment::Center),
+                        )
+                        .style(theme::ghost_button)
+                        .padding([4, 8])
+                        .on_press(NotificationMessage::Details(
+                            NotificationDetailsMessage::SubmitAddLabel(
+                                owner, repo, pr_number, name,
+                            ),
+                        )),
+                    );
+                }
+                col = col.push(container(sug_col).padding(8).width(Fill).style(move |_| {
+                    container::Style {
+                        background: Some(iced::Background::Color(bg_control)),
+                        border: iced::Border {
+                            radius: 6.0.into(),
+                            width: 1.0,
+                            color: border_subtle,
+                        },
+                        ..Default::default()
+                    }
+                }));
+            }
+        }
+    }
+
+    col.into()
+}
+
+fn view_pr_label<'a>(
+    name: &'a str,
+    color: &'a str,
+    is_pending: bool,
+    owner: String,
+    repo: String,
+    pr_number: u64,
+) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
+    let parsed = parse_hex_color(color).unwrap_or(p.text_muted);
+    let opacity = if is_pending { 0.5 } else { 1.0 };
+
+    button(
+        row![
+            text(name)
+                .size(10)
+                .color(Color::from_rgba(parsed.r, parsed.g, parsed.b, opacity,)),
+            Space::new().width(4),
+            text("×").size(10).color(Color::from_rgba(
+                parsed.r,
+                parsed.g,
+                parsed.b,
+                opacity * 0.7,
+            )),
+        ]
+        .align_y(Alignment::Center),
+    )
+    .style(move |_, _| button::Style {
+        background: Some(iced::Background::Color(Color::from_rgba(
+            parsed.r,
+            parsed.g,
+            parsed.b,
+            0.15 * opacity,
+        ))),
+        border: iced::Border {
+            radius: 4.0.into(),
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+    .padding([2, 6])
+    .on_press(NotificationMessage::Details(
+        NotificationDetailsMessage::RemoveLabel(
+            owner.clone(),
+            repo.clone(),
+            pr_number,
+            name.to_string(),
+        ),
+    ))
+    .into()
 }
 
 fn view_comment<'a>(
@@ -362,8 +682,6 @@ fn view_discussion<'a>(
     let accent_success = p.accent_success;
     let bg_control = p.bg_control;
     let border_subtle = p.border_subtle;
-
-    // Build category display with emoji
     let category_label = discussion
         .category
         .as_ref()
@@ -376,15 +694,12 @@ fn view_discussion<'a>(
         })
         .unwrap_or_else(|| "Discussion".to_string());
 
-    // Start building the column
     let mut col = column![
-        // Repo name
         text(&notif.repo_full_name).size(11).color(text_muted),
         Space::new().height(6),
     ]
     .width(Fill);
 
-    // Header row with icon and category
     let mut header_row = row![
         icons::icon_discussion(14.0, accent, icon_theme),
         Space::new().width(8),
@@ -393,7 +708,6 @@ fn view_discussion<'a>(
     .spacing(0)
     .align_y(Alignment::Center);
 
-    // Add answered badge if applicable
     if discussion.answer_chosen {
         header_row = header_row.push(Space::new().width(8));
         header_row = header_row.push(
@@ -417,12 +731,9 @@ fn view_discussion<'a>(
 
     col = col.push(header_row);
     col = col.push(Space::new().height(8));
-
-    // Title
     col = col.push(text(&discussion.title).size(16).color(text_primary));
     col = col.push(Space::new().height(4));
 
-    // Author
     if let Some(author) = &discussion.author {
         col = col.push(
             text(format!("Started by @{}", author))
@@ -432,7 +743,6 @@ fn view_discussion<'a>(
     }
     col = col.push(Space::new().height(16));
 
-    // Body
     if let Some(body) = &discussion.body
         && !body.is_empty()
     {
@@ -454,7 +764,6 @@ fn view_discussion<'a>(
         col = col.push(Space::new().height(16));
     }
 
-    // Comments count
     if discussion.comments_count > 0 {
         col = col.push(
             text(format!("{} comments", discussion.comments_count))
@@ -464,7 +773,6 @@ fn view_discussion<'a>(
         col = col.push(Space::new().height(16));
     }
 
-    // Action buttons
     col = col.push(view_action_buttons(&notif.id, notif.unread, icon_theme));
     col.padding(24).into()
 }
@@ -543,11 +851,6 @@ fn view_unsupported<'a>(
     .into()
 }
 
-// =============================================================================
-// Helper widgets
-// =============================================================================
-
-/// Action buttons row with Mark as Read, Delete, and Open in GitHub
 fn view_action_buttons(
     notification_id: &str,
     is_unread: bool,
@@ -559,7 +862,6 @@ fn view_action_buttons(
 
     let mut buttons_row = row![].spacing(8);
 
-    // Mark as Read button (only show if unread)
     if is_unread {
         buttons_row = buttons_row.push(view_action_button(
             "Mark as Read",
@@ -569,7 +871,6 @@ fn view_action_buttons(
         ));
     }
 
-    // Delete/Done button (removes from GitHub inbox)
     buttons_row = buttons_row.push(view_action_button(
         "Delete",
         p.accent_danger,
@@ -577,7 +878,6 @@ fn view_action_buttons(
         NotificationMessage::Thread(ThreadActionMessage::MarkAsDone(id_for_done)),
     ));
 
-    // Open in GitHub button
     buttons_row = buttons_row.push(view_open_in_github_button(icon_theme));
 
     buttons_row.into()
@@ -663,12 +963,30 @@ fn view_open_in_github_button(icon_theme: IconTheme) -> Element<'static, Notific
     .into()
 }
 
-/// Simple open button for basic views (backward compat)
 fn view_open_button(icon_theme: IconTheme) -> Element<'static, NotificationMessage> {
     view_open_in_github_button(icon_theme)
 }
 
 fn view_label<'a>(name: &'a str, hex_color: &str) -> Element<'a, NotificationMessage> {
+    let p = theme::palette();
+    let color = parse_hex_color(hex_color).unwrap_or(p.text_muted);
+
+    container(text(name).size(10).color(color))
+        .padding([2, 6])
+        .style(move |_| container::Style {
+            background: Some(iced::Background::Color(Color::from_rgba(
+                color.r, color.g, color.b, 0.15,
+            ))),
+            border: iced::Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .into()
+}
+
+fn view_label_swatch<'a>(name: &'a str, hex_color: &str) -> Element<'a, NotificationMessage> {
     let p = theme::palette();
     let color = parse_hex_color(hex_color).unwrap_or(p.text_muted);
 
@@ -720,4 +1038,82 @@ fn truncate_text(text: &str, max_len: usize) -> std::borrow::Cow<'_, str> {
     } else {
         std::borrow::Cow::Owned(format!("{}...", &text[..max_len]))
     }
+}
+
+fn split_repo_full_name(full_name: &str) -> (&str, &str) {
+    let mut parts = full_name.splitn(2, '/');
+    match (parts.next(), parts.next()) {
+        (Some(owner), Some(repo)) => (owner, repo),
+        _ => (full_name, ""),
+    }
+}
+
+fn view_comments_section<'a>(
+    subject_url: &str,
+    comments: Option<&'a [CommentDetails]>,
+    loading: bool,
+    error: Option<&'a str>,
+    p: theme::ThemePalette,
+    icon_theme: IconTheme,
+) -> Element<'a, NotificationMessage> {
+    let mut col = column![].spacing(8);
+
+    col = col.push(text("Comments").size(14).color(p.text_primary));
+
+    if let Some(err) = error {
+        col = col.push(text(err).size(12).color(p.accent_danger));
+    }
+
+    match comments {
+        Some(comment_list) => {
+            if comment_list.is_empty() {
+                col = col.push(text("No comments yet.").size(12).color(p.text_muted));
+            } else {
+                let mut comments_col = column![].spacing(16);
+                for comment in comment_list {
+                    let body = truncate_text(&comment.body, 1000);
+                    comments_col = comments_col.push(
+                        container(column![
+                            row![
+                                icons::icon_at(12.0, p.text_secondary, icon_theme),
+                                Space::new().width(4),
+                                text(&comment.user.login).size(12).color(p.text_secondary),
+                            ]
+                            .align_y(Alignment::Center),
+                            Space::new().height(6),
+                            text(body).size(13).color(p.text_primary),
+                        ])
+                        .padding(12)
+                        .width(Fill)
+                        .style(move |_| container::Style {
+                            background: Some(iced::Background::Color(p.bg_control)),
+                            border: iced::Border {
+                                radius: 6.0.into(),
+                                color: p.border_subtle,
+                                width: 1.0,
+                            },
+                            ..Default::default()
+                        }),
+                    );
+                }
+                col = col.push(comments_col);
+            }
+        }
+        None => {
+            if loading {
+                col = col.push(text("Loading comments...").size(12).color(p.text_muted));
+            } else {
+                col = col.push(
+                    button(text("Load Comments").size(12))
+                        .padding([6, 12])
+                        .style(theme::ghost_button)
+                        .on_press(NotificationMessage::Details(
+                            NotificationDetailsMessage::LoadComments(subject_url.to_string()),
+                        )),
+                );
+            }
+        }
+    }
+
+    col.into()
 }
