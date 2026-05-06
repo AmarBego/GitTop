@@ -124,7 +124,7 @@ jobs:
           sed -i "s/%{_version}/${VERSION}/g" packaging/copr/gittop.spec
 
           # Download source tarball
-          SOURCE_URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-x86_64.tar.gz"
+          SOURCE_URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-gnu-x86_64.tar.gz"
           echo "Downloading source from: $SOURCE_URL"
           wget -q "$SOURCE_URL"
 

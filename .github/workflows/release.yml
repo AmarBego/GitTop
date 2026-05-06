@@ -96,8 +96,17 @@ jobs:
             target/installer/*.exe
 
   build-linux:
-    name: Build Linux
+    name: Build Linux (${{ matrix.target }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-unknown-linux-gnu, x86_64-unknown-linux-musl]
+        include:
+          - target: x86_64-unknown-linux-gnu
+            libc: gnu
+          - target: x86_64-unknown-linux-musl
+            libc: musl
     permissions:
       contents: read
     steps:
@@ -122,7 +131,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ env.TARGET_LINUX }}
+          targets: ${{ matrix.target }}
 
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
@@ -131,6 +140,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libglib2.0-dev libgtk-3-dev
+          if [ "${{ matrix.libc }}" = "musl" ]; then
+            sudo apt-get install -y musl-tools
+          fi
 
       - name: Install packaging tools
         uses: taiki-e/install-action@v2
@@ -140,22 +152,21 @@ jobs:
       - name: Build release
         env:
           SCCACHE_GHA_ENABLED: "true"
-          SCCACHE_GHA_CACHE_PREFIX: "sccache-linux"
+          SCCACHE_GHA_CACHE_PREFIX: "sccache-linux-${{ matrix.libc }}"
           RUSTC_WRAPPER: "sccache"
-        run: cargo build --release --target ${{ env.TARGET_LINUX }}
+        run: cargo build --release --target ${{ matrix.target }}
 
       - name: Generate packages
         run: |
           # Inject the dynamic version from the tag into Cargo.toml so packaging tools use it
-          # This handles prereleases (e.g., 0.3.0-alpha.7) correctly
           sed -i 's/^version = ".*"/version = "${{ steps.version.outputs.version }}"/' Cargo.toml
 
           # Ensure binary is in the expected location for packaging tools
           mkdir -p target/release
-          cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} target/release/
+          cp target/${{ matrix.target }}/release/${{ env.APP_NAME }} target/release/
 
           # Generate .deb
-          cargo deb --no-build --target ${{ env.TARGET_LINUX }}
+          cargo deb --no-build --target ${{ matrix.target }}
 
           # Generate .rpm
           cargo generate-rpm
@@ -163,48 +174,46 @@ jobs:
           # Move packages to a staging area
           mkdir -p dist
 
-          # Name format: gittop-{version}-linux-x86_64.{deb,rpm}
-
           # Handle .deb
-          for file in target/${{ env.TARGET_LINUX }}/debian/*.deb target/debian/*.deb; do
+          for file in target/${{ matrix.target }}/debian/*.deb target/debian/*.deb; do
             [ -e "$file" ] || continue
-            # Standardize name
-            mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.deb"
+            mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-${{ matrix.libc }}-x86_64.deb"
             break
           done
 
           # Handle .rpm
           for file in target/generate-rpm/*.rpm; do
             [ -e "$file" ] || continue
-             mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-x86_64.rpm"
+             mv "$file" "dist/gittop-${{ steps.version.outputs.version }}-linux-${{ matrix.libc }}-x86_64.rpm"
              break
           done
 
       - name: Package Linux release
         run: |
           echo "::group::Prepare Staging Directory"
-          mkdir -p gittop-${{ steps.version.outputs.version }}-linux-x86_64
-          cp target/${{ env.TARGET_LINUX }}/release/${{ env.APP_NAME }} gittop-${{ steps.version.outputs.version }}-linux-x86_64/
-          cp LICENSE.md gittop-${{ steps.version.outputs.version }}-linux-x86_64/
-          cp README.txt gittop-${{ steps.version.outputs.version }}-linux-x86_64/
-          cp src/platform/resources/gittop.desktop gittop-${{ steps.version.outputs.version }}-linux-x86_64/
-          cp assets/images/GitTop-256x256.png gittop-${{ steps.version.outputs.version }}-linux-x86_64/gittop.png
-          chmod +x gittop-${{ steps.version.outputs.version }}-linux-x86_64/${{ env.APP_NAME }}
+          staging_dir="gittop-${{ steps.version.outputs.version }}-linux-${{ matrix.libc }}-x86_64"
+          mkdir -p "$staging_dir"
+          cp target/${{ matrix.target }}/release/${{ env.APP_NAME }} "$staging_dir/"
+          cp LICENSE.md "$staging_dir/"
+          cp README.txt "$staging_dir/"
+          cp src/platform/resources/gittop.desktop "$staging_dir/"
+          cp assets/images/GitTop-256x256.png "$staging_dir/gittop.png"
+          chmod +x "$staging_dir/${{ env.APP_NAME }}"
           echo "::endgroup::"
 
           echo "::group::Create Tarball"
           tar --sort=name \
               --owner=0 --group=0 --numeric-owner \
-              -czf gittop-${{ steps.version.outputs.version }}-linux-x86_64.tar.gz \
-              gittop-${{ steps.version.outputs.version }}-linux-x86_64
+              -czf "$staging_dir.tar.gz" \
+              "$staging_dir"
           echo "::endgroup::"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-x86_64
+          name: linux-${{ matrix.libc }}-x86_64
           path: |
-            gittop-*-linux-x86_64.tar.gz
+            gittop-*-linux-${{ matrix.libc }}-x86_64.tar.gz
             dist/*.deb
             dist/*.rpm
 
@@ -234,9 +243,12 @@ jobs:
           sha256sum \
             artifacts/windows-x86_64/gittop-*-windows-x86_64.zip \
             artifacts/windows-x86_64/target/installer/*.exe \
-            artifacts/linux-x86_64/gittop-*-linux-x86_64.tar.gz \
-            artifacts/linux-x86_64/dist/*.deb \
-            artifacts/linux-x86_64/dist/*.rpm \
+            artifacts/linux-gnu-x86_64/gittop-*-linux-gnu-x86_64.tar.gz \
+            artifacts/linux-gnu-x86_64/dist/*.deb \
+            artifacts/linux-gnu-x86_64/dist/*.rpm \
+            artifacts/linux-musl-x86_64/gittop-*-linux-musl-x86_64.tar.gz \
+            artifacts/linux-musl-x86_64/dist/*.deb \
+            artifacts/linux-musl-x86_64/dist/*.rpm \
             | sort > SHA256SUMS.txt
 
       - name: Create GitHub Release
@@ -249,9 +261,12 @@ jobs:
           files: |
             artifacts/windows-x86_64/gittop-*-windows-x86_64.zip
             artifacts/windows-x86_64/target/installer/*.exe
-            artifacts/linux-x86_64/gittop-*-linux-x86_64.tar.gz
-            artifacts/linux-x86_64/dist/*.deb
-            artifacts/linux-x86_64/dist/*.rpm
+            artifacts/linux-gnu-x86_64/gittop-*-linux-gnu-x86_64.tar.gz
+            artifacts/linux-gnu-x86_64/dist/*.deb
+            artifacts/linux-gnu-x86_64/dist/*.rpm
+            artifacts/linux-musl-x86_64/gittop-*-linux-musl-x86_64.tar.gz
+            artifacts/linux-musl-x86_64/dist/*.deb
+            artifacts/linux-musl-x86_64/dist/*.rpm
             SHA256SUMS.txt
 
       # Save release info for downstream workflows (e.g., AUR)
@@ -288,6 +303,7 @@ jobs:
         with:
           name: |
             windows-x86_64
-            linux-x86_64
+            linux-gnu-x86_64
+            linux-musl-x86_64
 
       - uses: kesin11/actions-timeline@v2

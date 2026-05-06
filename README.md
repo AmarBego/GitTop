@@ -18,7 +18,7 @@
   </a>
   <br/>
   <a href="#linux">
-    <img src="https://img.shields.io/badge/Flatpak-Supported-4A90D9?style=flat-square&logo=flathub&logoColor=white" alt="Flatpak">
+    <img src="https://img.shields.io/badge/Flatpak-Pending-4A90D9?style=flat-square&logo=flathub&logoColor=white" alt="Flatpak">
   </a>
   <a href="#linux">
     <img src="https://img.shields.io/badge/AUR-Supported-1793D1?style=flat-square&logo=arch-linux&logoColor=white" alt="AUR">
@@ -27,7 +27,7 @@
     <img src="https://img.shields.io/badge/COPR-Supported-294172?style=flat-square&logo=fedora&logoColor=white" alt="COPR">
   </a>
   <a href="#linux">
-    <img src="https://img.shields.io/badge/Snap-Supported-82BEA0?style=flat-square&logo=snapcraft&logoColor=white" alt="Snap">
+    <img src="https://img.shields.io/badge/Snap-Pending-red?style=flat-square&logo=snapcraft&logoColor=white" alt="Snap">
   </a>
 </p>
 
@@ -94,12 +94,10 @@ scoop install gittop
 ### Linux
 
 **Flatpak:**
+Download the `.flatpak` bundle from the [latest release](https://github.com/AmarBego/GitTop/releases/latest).
 ```bash
-# From Flathub (when published)
-# flatpak install flathub io.github.AmarBego.GitTop
-
-# Or install from bundled .flatpak file
-flatpak install gittop-VERSION.flatpak
+# Install from bundled .flatpak file
+flatpak install gittop-v0.4.0-linux-gnu-x86_64.flatpak
 flatpak run io.github.AmarBego.GitTop
 ```
 
@@ -118,16 +116,18 @@ sudo dnf copr enable amarbego/gittop
 sudo dnf install gittop
 ```
 
-**Ubuntu/Debian (Snap):**
+~~**Ubuntu/Debian (Snap):**~~
 ```bash
-sudo snap install gittop
+# NOT MERGED sudo snap install gittop~~
 ```
 
-**Manual:** Download `gittop-linux-x86_64.tar.gz` from releases:
+**Manual:** Download `gittop-linux-gnu-x86_64.tar.gz` (or `-musl-` for Void Linux/Alpine) from releases:
+
 ```bash
-tar xzf gittop-linux-x86_64.tar.gz
-./gittop-linux-x86_64/gittop
+tar xzf gittop-v0.4.0-linux-gnu-x86_64.tar.gz
+./gittop-v0.4.0-linux-gnu-x86_64/gittop
 ```
+
 
 ## Building from Source
 

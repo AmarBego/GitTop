@@ -17,4 +17,5 @@ packaging/chocolatey/*.nupkg
 Thumbs.db
 
 # Binaries
-gittop-linux-x86_64
+gittop-linux-gnu-x86_64
+gittop-linux-musl-x86_64

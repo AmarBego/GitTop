@@ -28,7 +28,8 @@ This is the core workflow. It listens for any tag starting with `v*` (like `v0.1
 *   **Packages** the installers:
     *   `gittop-X.Y.Z-setup.exe` (Inno Setup)
     *   `gittop-windows-x86_64.zip` (Portable)
-    *   `gittop-linux-x86_64.tar.gz`
+    *   `gittop-linux-gnu-x86_64.tar.gz`
+    *   `gittop-linux-musl-x86_64.tar.gz`
 *   **Creates the GitHub Release**: Uploads all artifacts and checksums.
 *   **Exports Metadata**: Saves a `release-meta` artifact containing the version tag and whether it's a pre-release.
 
