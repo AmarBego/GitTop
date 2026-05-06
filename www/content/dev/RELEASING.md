@@ -78,9 +78,12 @@ Once the tag is pushed, the `release.yml` workflow kicks in:
 1.  **Builds** binaries and installers for Windows and Linux.
 2.  **Creates a GitHub Release** with the artifacts:
     - `gittop-windows-x86_64.zip`
+    - `gittop-windows-aarch64.zip`
     - `gittop-X.Y.Z-setup.exe`
     - `gittop-linux-gnu-x86_64.tar.gz`
     - `gittop-linux-musl-x86_64.tar.gz`
+    - `gittop-linux-gnu-aarch64.tar.gz`
+    - `gittop-linux-musl-aarch64.tar.gz`
     - `SHA256SUMS.txt`
 3.  **Updates Package Managers** (Stable releases only):
     - **Scoop**: Updates the manifest in our bucket.

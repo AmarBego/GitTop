@@ -19,3 +19,5 @@ Thumbs.db
 # Binaries
 gittop-linux-gnu-x86_64
 gittop-linux-musl-x86_64
+gittop-linux-gnu-aarch64
+gittop-linux-musl-aarch64

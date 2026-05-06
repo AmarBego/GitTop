@@ -327,9 +327,7 @@ WantedBy=default.target
         }
 
         // Fallback to XDG autostart
-        xdg_autostart_path()
-            .map(|p| p.exists())
-            .unwrap_or(false)
+        xdg_autostart_path().map(|p| p.exists()).unwrap_or(false)
     }
 
     pub fn enable() -> Result<(), OnBootError> {
@@ -409,16 +407,12 @@ X-GNOME-Autostart-enabled=true
         }
 
         // Always try to remove XDG autostart file
-        if let Some(desktop_path) = xdg_autostart_path().filter(|p| p.exists()) {
-            if let Err(e) = fs::remove_file(&desktop_path) {
-                error = Some(OnBootError::Io(e));
-            }
+        if let Some(desktop_path) = xdg_autostart_path().filter(|p| p.exists())
+            && let Err(e) = fs::remove_file(&desktop_path)
+        {
+            error = Some(OnBootError::Io(e));
         }
 
-        if let Some(e) = error {
-            Err(e)
-        } else {
-            Ok(())
-        }
+        if let Some(e) = error { Err(e) } else { Ok(()) }
     }
 }

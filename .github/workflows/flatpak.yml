@@ -107,12 +107,22 @@ jobs:
           echo "Generated sources with $(grep -c '"url"' packaging/flatpak/generated-sources.json) crates"
           echo "::endgroup::"
 
-      - name: Build Flatpak
+      - name: Build Flatpak (x86_64)
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: gittop-${{ needs.check.outputs.version }}-linux-gnu-x86_64.flatpak
           manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.ci.yml
           cache-key: flatpak-builder-${{ github.sha }}
+          arch: x86_64
+          upload-artifact: false
+
+      - name: Build Flatpak (aarch64)
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: gittop-${{ needs.check.outputs.version }}-linux-gnu-aarch64.flatpak
+          manifest-path: packaging/flatpak/io.github.AmarBego.GitTop.ci.yml
+          cache-key: flatpak-builder-aarch64-${{ github.sha }}
+          arch: aarch64
           upload-artifact: false
 
       - name: Upload Flatpak to Release
@@ -123,6 +133,7 @@ jobs:
 
           gh release upload ${{ needs.check.outputs.tag }} \
             gittop-${VERSION}-linux-gnu-x86_64.flatpak \
+            gittop-${VERSION}-linux-gnu-aarch64.flatpak \
             --clobber \
             --repo AmarBego/GitTop
 
@@ -130,6 +141,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: flatpak-bundle
-          path: gittop-${{ needs.check.outputs.version }}-linux-gnu-x86_64.flatpak
+          path: |
+            gittop-${{ needs.check.outputs.version }}-linux-gnu-x86_64.flatpak
+            gittop-${{ needs.check.outputs.version }}-linux-gnu-aarch64.flatpak
 
       - uses: kesin11/actions-timeline@v2
