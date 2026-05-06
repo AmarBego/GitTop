@@ -123,14 +123,20 @@ jobs:
             exit 0
           fi
 
-          git checkout -b "$BRANCH"
+          git checkout -B "$BRANCH"
           git commit -m "scoop: update to ${{ needs.check.outputs.tag }}"
-          git push origin "$BRANCH"
+          git push origin "$BRANCH" --force
 
-          gh pr create \
-            --title "scoop: update to ${{ needs.check.outputs.tag }}" \
-            --body "Automated Scoop manifest update for release ${{ needs.check.outputs.tag }}" \
-            --base main \
-            --head "$BRANCH"
+          # Check if PR already exists
+          PR_EXISTS=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number // empty')
+          if [ -z "$PR_EXISTS" ]; then
+            gh pr create \
+              --title "scoop: update to ${{ needs.check.outputs.tag }}" \
+              --body "Automated Scoop manifest update for release ${{ needs.check.outputs.tag }}" \
+              --base main \
+              --head "$BRANCH"
+          else
+            echo "PR already exists: $PR_EXISTS"
+          fi
 
       - uses: kesin11/actions-timeline@v2
