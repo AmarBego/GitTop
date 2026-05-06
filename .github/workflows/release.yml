@@ -73,16 +73,9 @@ jobs:
       - name: Build EXE installer (Inno Setup)
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
-          # We need to tell InnoSetup which arch we are building for
-          $archParams = @()
-          if ("${{ matrix.arch }}" -eq "aarch64") {
-            $archParams = @("/DArchitecturesAllowed=arm64", "/DArchitecturesInstallIn64BitMode=arm64")
-          }
           & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" `
-            /DMyAppVersion="$version" `
+            /DMyAppVersion="${{ steps.version.outputs.version }}" `
             /DAppArch="${{ matrix.arch }}" `
-            @archParams `
             packaging/innosetup/gittop.iss
 
       - name: Packaging Windows release
@@ -213,9 +206,9 @@ jobs:
           mkdir -p target/release
           cp target/${{ matrix.target }}/release/${{ env.APP_NAME }} target/release/
 
-          # Generate .deb
-          if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cargo deb --no-build --target ${{ matrix.target }}
+          # Generate .deb (musl variant skips $auto shlibdeps and declares no deps)
+          if [ "${{ matrix.libc }}" = "musl" ]; then
+            cargo deb --no-build --target ${{ matrix.target }} --variant musl
           else
             cargo deb --no-build --target ${{ matrix.target }}
           fi

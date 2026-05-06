@@ -11,7 +11,7 @@ license = "AGPL-3.0-only"
 maintainer = "AmarBego <begovicamar@proton.me>"
 copyright = "2026, AmarBego"
 license-file = ["LICENSE.md", "4"]
-depends = "$auto"
+depends = "libc6, libgcc-s1"
 section = "utils"
 assets = [
     [
@@ -35,6 +35,10 @@ assets = [
         "644",
     ],
 ]
+
+[package.metadata.deb.variants.musl]
+name = "gittop"
+depends = ""
 
 [package.metadata.generate-rpm]
 assets = [

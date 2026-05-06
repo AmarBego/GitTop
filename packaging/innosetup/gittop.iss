@@ -7,6 +7,18 @@
 #define MyAppExeName "gittop.exe"
 #define MyAppDataFolder "GitTop"
 
+#ifndef AppArch
+  #define AppArch "x86_64"
+#endif
+
+#if AppArch == "aarch64"
+  #define MyAppTarget "aarch64-pc-windows-msvc"
+  #define ArchAllowed "arm64"
+#else
+  #define MyAppTarget "x86_64-pc-windows-msvc"
+  #define ArchAllowed "x64compatible"
+#endif
+
 [Setup]
 AppId={{9C1A2F74-5A9F-4F71-8C7B-9CDAE2F5E0B6}
 AppName={#MyAppName}
@@ -19,13 +31,13 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\..\target\installer
-OutputBaseFilename=gittop-{#MyAppVersion}-windows-x86_64-setup
+OutputBaseFilename=gittop-{#MyAppVersion}-windows-{#AppArch}-setup
 SetupIconFile=..\..\assets\images\favicon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed={#ArchAllowed}
+ArchitecturesInstallIn64BitMode={#ArchAllowed}
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
@@ -37,7 +49,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "startupicon"; Description: "Start GitTop when Windows starts"; GroupDescription: "Startup:"; Flags: unchecked
 
 [Files]
-Source: "..\..\target\x86_64-pc-windows-msvc\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\target\{#MyAppTarget}\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\README.txt"; DestDir: "{app}"; Flags: ignoreversion
 
