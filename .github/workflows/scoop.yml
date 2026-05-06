@@ -5,6 +5,11 @@ on:
     workflows: ["Release"]
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Release Workflow Run ID"
+        required: true
 
 jobs:
   check:
@@ -13,7 +18,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       tag: ${{ steps.release.outputs.tag }}
@@ -26,7 +31,7 @@ jobs:
           name: release-meta
           path: release-meta
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
 
       - name: Read release info
         id: release
