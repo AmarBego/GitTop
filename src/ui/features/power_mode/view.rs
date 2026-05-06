@@ -31,7 +31,19 @@ pub fn app_layout<'a>(
                 screen.selected_notification(),
                 screen.selected_details(),
                 screen.notification_details.is_loading,
-                settings.icon_theme
+                settings.icon_theme,
+                notification_details::view::LabelViewArgs {
+                    input: &screen.notification_details.label_input,
+                    available: &screen.notification_details.available_labels,
+                    loading: screen.notification_details.labels_loading,
+                    pending_ops: &screen.notification_details.pending_label_ops,
+                    error: screen.notification_details.label_error.as_deref(),
+                    check_runs: &screen.notification_details.check_runs,
+                    checks_loading: screen.notification_details.checks_loading,
+                    comments: screen.notification_details.comments.as_deref(),
+                    comments_loading: screen.notification_details.comments_loading,
+                    comments_error: screen.notification_details.comments_error.as_deref(),
+                },
             )
         ]
         .height(Fill)
