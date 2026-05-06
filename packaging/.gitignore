@@ -1,5 +1,6 @@
-gittop-linux-x86_64.tar.gz
-gittop-linux-x86_64-*.tar.gz
+gittop-linux-gnu-x86_64.tar.gz
+gittop-linux-musl-x86_64.tar.gz
+gittop-linux-*-*.tar.gz
 gittop-bin-*.pkg.tar.zst
 pkg/
 src/

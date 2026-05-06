@@ -6,7 +6,7 @@ License:        AGPL-3.0-only
 URL:            https://github.com/AmarBego/GitTop
 
 # Pre-built binary tarball from GitHub releases
-Source0:        https://github.com/AmarBego/GitTop/releases/download/v%{version}/gittop-%{version}-linux-x86_64.tar.gz
+Source0:        https://github.com/AmarBego/GitTop/releases/download/v%{version}/gittop-%{version}-linux-gnu-x86_64.tar.gz
 
 # We're packaging a pre-built binary
 %global debug_package %{nil}
@@ -17,7 +17,7 @@ GitTop is a lightweight desktop client for GitHub notifications.
 No browser engine required. Pure Rust. Pure performance.
 
 %prep
-%setup -q -n gittop-%{version}-linux-x86_64
+%setup -q -n gittop-%{version}-linux-gnu-x86_64
 
 %build
 # Binary is pre-built, nothing to do

@@ -201,14 +201,21 @@ pub mod tray {
     }
 }
 
-/// Release memory back to the OS (glibc only).
+/// Release memory back to the OS.
 pub fn trim_memory() {
     #[cfg(target_env = "gnu")]
     {
+        // glibc's malloc_trim can release free memory back to the system.
         unsafe extern "C" {
             safe fn malloc_trim(pad: usize) -> i32;
         }
         malloc_trim(0);
+    }
+
+    #[cfg(target_env = "musl")]
+    {
+        // musl's allocator (mallocng) is more aggressive at returning memory to the OS,
+        // and doesn't provide a direct equivalent to malloc_trim.
     }
 }
 
@@ -280,92 +287,132 @@ WantedBy=default.target
         systemd_user_dir().map(|p| p.join("gittop.service"))
     }
 
+    fn xdg_autostart_dir() -> Option<PathBuf> {
+        dirs::config_dir().map(|p| p.join("autostart"))
+    }
+
+    fn xdg_autostart_path() -> Option<PathBuf> {
+        xdg_autostart_dir().map(|p| p.join("gittop.desktop"))
+    }
+
     fn has_systemd() -> bool {
-        Command::new("systemctl")
-            .arg("--user")
-            .arg("--version")
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
+        #[cfg(target_env = "musl")]
+        {
+            // Musl-based systems like Void Linux typically don't use systemd.
+            false
+        }
+        #[cfg(not(target_env = "musl"))]
+        {
+            Command::new("systemctl")
+                .arg("--user")
+                .arg("--version")
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        }
     }
 
     pub fn is_enabled() -> bool {
-        if !has_systemd() {
-            return false;
+        // Check systemd first
+        if has_systemd() {
+            let systemd_enabled = Command::new("systemctl")
+                .args(["--user", "is-enabled", "gittop.service"])
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+
+            if systemd_enabled {
+                return true;
+            }
         }
 
-        Command::new("systemctl")
-            .args(["--user", "is-enabled", "gittop.service"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
+        // Fallback to XDG autostart
+        xdg_autostart_path().map(|p| p.exists()).unwrap_or(false)
     }
 
     pub fn enable() -> Result<(), OnBootError> {
-        if !has_systemd() {
-            return Err(OnBootError::NotSupported);
-        }
-
         let exec_path = std::env::current_exe()
             .map_err(OnBootError::Io)?
             .to_string_lossy()
             .to_string();
 
-        let service_content = SYSTEMD_SERVICE_TEMPLATE.replace("{EXEC_PATH}", &exec_path);
+        if has_systemd() {
+            let service_content = SYSTEMD_SERVICE_TEMPLATE.replace("{EXEC_PATH}", &exec_path);
+            let service_dir = systemd_user_dir().ok_or(OnBootError::NotSupported)?;
+            fs::create_dir_all(&service_dir)?;
+            let service_path = systemd_service_path().ok_or(OnBootError::NotSupported)?;
+            fs::write(&service_path, service_content)?;
 
-        let service_dir = systemd_user_dir().ok_or(OnBootError::NotSupported)?;
-        fs::create_dir_all(&service_dir)?;
+            let reload = Command::new("systemctl")
+                .args(["--user", "daemon-reload"])
+                .output()?;
 
-        let service_path = systemd_service_path().ok_or(OnBootError::NotSupported)?;
-        fs::write(&service_path, service_content)?;
+            if reload.status.success() {
+                let enable = Command::new("systemctl")
+                    .args(["--user", "enable", "gittop.service"])
+                    .output()?;
 
-        let reload = Command::new("systemctl")
-            .args(["--user", "daemon-reload"])
-            .output()?;
-
-        if !reload.status.success() {
-            return Err(OnBootError::CommandFailed(
-                String::from_utf8_lossy(&reload.stderr).to_string(),
-            ));
+                if enable.status.success() {
+                    return Ok(());
+                }
+            }
+            // If systemd fails for some reason (e.g. broken user session), fall through to XDG
         }
 
-        let enable = Command::new("systemctl")
-            .args(["--user", "enable", "gittop.service"])
-            .output()?;
+        // XDG Autostart Fallback (Universal)
+        let autostart_dir = xdg_autostart_dir().ok_or(OnBootError::NotSupported)?;
+        fs::create_dir_all(&autostart_dir)?;
 
-        if !enable.status.success() {
-            return Err(OnBootError::CommandFailed(
-                String::from_utf8_lossy(&enable.stderr).to_string(),
-            ));
-        }
+        let desktop_content = format!(
+            r#"[Desktop Entry]
+Name=GitTop
+Comment=GitHub Notifications Manager
+Exec={}
+Icon=gittop
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+X-GNOME-Autostart-enabled=true
+"#,
+            exec_path
+        );
+
+        let desktop_path = xdg_autostart_path().ok_or(OnBootError::NotSupported)?;
+        fs::write(&desktop_path, desktop_content)?;
 
         Ok(())
     }
 
     pub fn disable() -> Result<(), OnBootError> {
-        if !has_systemd() {
-            return Err(OnBootError::NotSupported);
+        let mut error = None;
+
+        // Try disabling systemd
+        if has_systemd() {
+            let disable = Command::new("systemctl")
+                .args(["--user", "--quiet", "disable", "gittop.service"])
+                .output()?;
+
+            if disable.status.success() {
+                if let Some(service_path) = systemd_service_path().filter(|p| p.exists()) {
+                    let _ = fs::remove_file(&service_path);
+                }
+                let _ = Command::new("systemctl")
+                    .args(["--user", "daemon-reload"])
+                    .output();
+            } else {
+                error = Some(OnBootError::CommandFailed(
+                    String::from_utf8_lossy(&disable.stderr).to_string(),
+                ));
+            }
         }
 
-        let disable = Command::new("systemctl")
-            .args(["--user", "--quiet", "disable", "gittop.service"])
-            .output()?;
-
-        // With --quiet, systemctl returns success even if unit doesn't exist
-        if !disable.status.success() {
-            return Err(OnBootError::CommandFailed(
-                String::from_utf8_lossy(&disable.stderr).to_string(),
-            ));
+        // Always try to remove XDG autostart file
+        if let Some(desktop_path) = xdg_autostart_path().filter(|p| p.exists())
+            && let Err(e) = fs::remove_file(&desktop_path)
+        {
+            error = Some(OnBootError::Io(e));
         }
 
-        if let Some(service_path) = systemd_service_path().filter(|p| p.exists()) {
-            fs::remove_file(&service_path)?;
-        }
-
-        let _ = Command::new("systemctl")
-            .args(["--user", "daemon-reload"])
-            .output();
-
-        Ok(())
+        if let Some(e) = error { Err(e) } else { Ok(()) }
     }
 }
