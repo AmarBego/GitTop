@@ -116,6 +116,17 @@ jobs:
           arch: x86_64
           upload-artifact: false
 
+      - name: Install Docker (required for QEMU)
+        run: |
+          curl https://download.docker.com/linux/static/stable/x86_64/docker-26.0.0.tgz --output ./docker.tgz
+          tar xzvf docker.tgz
+          mv docker/* /usr/bin
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       - name: Build Flatpak (aarch64)
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:

@@ -67,6 +67,18 @@ jobs:
     if: ${{ needs.check.outputs.should_build == 'true' }}
 
     steps:
+      - name: Sync Winget Fork
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          # Sync the fork to avoid "forked repository could not be synced" errors
+          $user = gh api user -q .login
+          if ($user) {
+            Write-Host "Attempting to sync $user/winget-pkgs"
+            # Run in cmd so we can ignore the exit code if the fork doesn't exist yet
+            cmd.exe /c "gh repo sync $user/winget-pkgs --source microsoft/winget-pkgs --force || exit 0"
+          }
+
       - name: Install wingetcreate
         run: |
           Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe

@@ -68,33 +68,36 @@ jobs:
         with:
           ref: main
 
-      - name: Get checksum from release
+      - name: Get checksums from release
         id: checksum
         run: |
           VERSION="${{ needs.check.outputs.version }}"
           curl -L -o SHA256SUMS.txt "https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/SHA256SUMS.txt"
 
-          # Extract checksum for the Windows zip (format: "hash  path/to/file.zip")
-          CHECKSUM=$(grep "gittop-${VERSION}-windows-x86_64\.zip$" SHA256SUMS.txt | cut -d' ' -f1)
-
-          if [ -z "$CHECKSUM" ]; then
-            echo "::error::Could not find checksum for gittop-windows-x86_64.zip in SHA256SUMS.txt"
-            exit 1
-          fi
-
-          echo "checksum=$CHECKSUM" >> $GITHUB_OUTPUT
-          echo "Checksum: $CHECKSUM"
+          for arch in x86_64 aarch64; do
+            SUM=$(grep "gittop-${VERSION}-windows-${arch}\.zip$" SHA256SUMS.txt | cut -d' ' -f1)
+            if [ -z "$SUM" ]; then
+              echo "::error::Could not find checksum for gittop-${VERSION}-windows-${arch}.zip in SHA256SUMS.txt"
+              exit 1
+            fi
+            echo "checksum_${arch}=$SUM" >> $GITHUB_OUTPUT
+            echo "${arch}: $SUM"
+          done
 
       - name: Update Scoop manifest
         run: |
           VERSION="${{ needs.check.outputs.version }}"
-          CHECKSUM="${{ steps.checksum.outputs.checksum }}"
+          HASH_X64="${{ steps.checksum.outputs.checksum_x86_64 }}"
+          HASH_ARM64="${{ steps.checksum.outputs.checksum_aarch64 }}"
 
-          # Update the manifest using jq for proper JSON manipulation
-          jq --arg ver "$VERSION" --arg hash "$CHECKSUM" '
+          jq --arg ver "$VERSION" --arg x64 "$HASH_X64" --arg arm64 "$HASH_ARM64" '
             .version = $ver |
             .architecture."64bit".url = "https://github.com/AmarBego/GitTop/releases/download/v\($ver)/gittop-\($ver)-windows-x86_64.zip" |
-            .architecture."64bit".hash = $hash
+            .architecture."64bit".hash = $x64 |
+            .architecture."64bit".extract_dir = "gittop-\($ver)-windows-x86_64" |
+            .architecture."arm64".url = "https://github.com/AmarBego/GitTop/releases/download/v\($ver)/gittop-\($ver)-windows-aarch64.zip" |
+            .architecture."arm64".hash = $arm64 |
+            .architecture."arm64".extract_dir = "gittop-\($ver)-windows-aarch64"
           ' bucket/gittop.json > bucket/gittop.json.tmp && mv bucket/gittop.json.tmp bucket/gittop.json
 
           echo "Updated bucket/gittop.json:"
@@ -102,7 +105,7 @@ jobs:
 
       - name: Create PR for Scoop update
         env:
-          GH_TOKEN: ${{ secrets.SCOOP_PR_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="scoop-update-${{ needs.check.outputs.version }}"
 

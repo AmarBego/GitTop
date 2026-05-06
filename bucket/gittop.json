@@ -10,10 +10,15 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/AmarBego/GitTop/releases/download/v0.4.0/gittop-0.4.0-windows-x86_64.zip",
-      "hash": "cf94a4771468ea793d4d20845d85b299c9b1d7ef5c1a16df9580aeeed0734b0e"
+      "hash": "cf94a4771468ea793d4d20845d85b299c9b1d7ef5c1a16df9580aeeed0734b0e",
+      "extract_dir": "gittop-0.4.0-windows-x86_64"
+    },
+    "arm64": {
+      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.4.0/gittop-0.4.0-windows-aarch64.zip",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "extract_dir": "gittop-0.4.0-windows-aarch64"
     }
   },
-  "extract_dir": "gittop-windows-x86_64",
   "bin": "gittop.exe",
   "shortcuts": [
     [
@@ -25,7 +30,12 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-windows-x86_64.zip"
+        "url": "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-windows-x86_64.zip",
+        "extract_dir": "gittop-$version-windows-x86_64"
+      },
+      "arm64": {
+        "url": "https://github.com/AmarBego/GitTop/releases/download/v$version/gittop-$version-windows-aarch64.zip",
+        "extract_dir": "gittop-$version-windows-aarch64"
       }
     }
   }

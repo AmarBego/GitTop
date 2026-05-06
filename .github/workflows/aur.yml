@@ -74,23 +74,25 @@ jobs:
           VERSION="${{ needs.check.outputs.tag }}"
           VERSION="${VERSION#v}"
 
-          # Download tarball and calculate checksum
-          URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-gnu-x86_64.tar.gz"
-          curl -L -o /tmp/gittop.tar.gz "$URL"
-          CHECKSUM=$(sha256sum /tmp/gittop.tar.gz | cut -d' ' -f1)
-          rm /tmp/gittop.tar.gz
+          PKGBUILD=./packaging/aur/stable-bin/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" "$PKGBUILD"
 
-          # Update PKGBUILD
-          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" ./packaging/aur/stable-bin/PKGBUILD
-          sed -i "s/^sha256sums=.*/sha256sums=('${CHECKSUM}')/" ./packaging/aur/stable-bin/PKGBUILD
+          # Per-arch tarball download + checksum
+          for arch in x86_64 aarch64; do
+            URL="https://github.com/AmarBego/GitTop/releases/download/v${VERSION}/gittop-${VERSION}-linux-gnu-${arch}.tar.gz"
+            curl -L -o "/tmp/gittop-${arch}.tar.gz" "$URL"
+            SUM=$(sha256sum "/tmp/gittop-${arch}.tar.gz" | cut -d' ' -f1)
+            rm "/tmp/gittop-${arch}.tar.gz"
+            sed -i "s/^sha256sums_${arch}=.*/sha256sums_${arch}=('${SUM}')/" "$PKGBUILD"
+            echo "${arch}: ${SUM}"
+          done
 
           echo "Updated PKGBUILD to version: $VERSION"
-          echo "Checksum: $CHECKSUM"
-          grep -E "^(pkgver|sha256sums)=" ./packaging/aur/stable-bin/PKGBUILD
+          grep -E "^(pkgver|sha256sums_)" "$PKGBUILD"
 
       # Publish to AUR (checksums already updated, no need for updpkgsums)
       - name: Publish gittop-bin
-        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
         with:
           pkgname: gittop-bin
           pkgbuild: ./packaging/aur/stable-bin/PKGBUILD
