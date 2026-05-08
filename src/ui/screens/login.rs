@@ -476,9 +476,7 @@ impl LoginScreen {
 
         let storage_options = [CredentialStorage::Keyring, CredentialStorage::EncryptedFile];
         let inline_picker = row![
-            text("Switch storage:")
-                .size(12)
-                .color(p.text_secondary),
+            text("Switch storage:").size(12).color(p.text_secondary),
             Space::new().width(8),
             pick_list(
                 storage_options,

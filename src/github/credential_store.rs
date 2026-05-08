@@ -139,22 +139,13 @@ mod keyring_backend {
     }
 
     impl Backend for KeyringBackend {
-        fn save(
-            &self,
-            service: &str,
-            account: &str,
-            secret: &str,
-        ) -> Result<(), CredentialError> {
+        fn save(&self, service: &str, account: &str, secret: &str) -> Result<(), CredentialError> {
             entry(service, account)?
                 .set_password(secret)
                 .map_err(|e| CredentialError::Backend(redact_secrets(&e.to_string())))
         }
 
-        fn load(
-            &self,
-            service: &str,
-            account: &str,
-        ) -> Result<Option<String>, CredentialError> {
+        fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialError> {
             match entry(service, account)?.get_password() {
                 Ok(v) => Ok(Some(v)),
                 Err(::keyring::Error::NoEntry) => Ok(None),
@@ -249,9 +240,8 @@ mod file_backend {
     fn read_envelope() -> Result<Envelope, CredentialError> {
         let path = data_path()?;
         match std::fs::read_to_string(&path) {
-            Ok(s) => serde_json::from_str(&s).map_err(|e| {
-                CredentialError::Backend(format!("parse credentials.enc: {}", e))
-            }),
+            Ok(s) => serde_json::from_str(&s)
+                .map_err(|e| CredentialError::Backend(format!("parse credentials.enc: {}", e))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Envelope::default()),
             Err(e) => Err(CredentialError::Backend(format!(
                 "read {}: {}",
@@ -278,12 +268,7 @@ mod file_backend {
     }
 
     impl Backend for FileBackend {
-        fn save(
-            &self,
-            service: &str,
-            account: &str,
-            secret: &str,
-        ) -> Result<(), CredentialError> {
+        fn save(&self, service: &str, account: &str, secret: &str) -> Result<(), CredentialError> {
             let cipher = cipher()?;
             let mut nonce_bytes = [0u8; 12];
             OsRng.fill_bytes(&mut nonce_bytes);
@@ -298,15 +283,12 @@ mod file_backend {
             blob.extend_from_slice(&ct);
 
             let mut env = read_envelope()?;
-            env.entries.insert(compose_key(service, account), B64.encode(&blob));
+            env.entries
+                .insert(compose_key(service, account), B64.encode(&blob));
             write_envelope(&env)
         }
 
-        fn load(
-            &self,
-            service: &str,
-            account: &str,
-        ) -> Result<Option<String>, CredentialError> {
+        fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialError> {
             let env = read_envelope()?;
             let Some(encoded) = env.entries.get(&compose_key(service, account)) else {
                 return Ok(None);

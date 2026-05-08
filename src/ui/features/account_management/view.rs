@@ -161,7 +161,7 @@ fn view_credential_storage_section(settings: &AppSettings) -> Element<'_, Accoun
         content = content.push(
             text(
                 "\u{26A0} System keyring not reachable on this machine. \
-                 Switch to Encrypted File to make tokens persist across restarts."
+                 Switch to Encrypted File to make tokens persist across restarts.",
             )
             .size(12)
             .color(p.accent_danger),
@@ -172,7 +172,7 @@ fn view_credential_storage_section(settings: &AppSettings) -> Element<'_, Accoun
             text(
                 "Tokens are encrypted at rest with a key stored in the GitTop \
                  data directory. Treat your home directory as sensitive — \
-                 anyone who can read both files can decrypt the tokens."
+                 anyone who can read both files can decrypt the tokens.",
             )
             .size(11)
             .color(p.text_secondary),

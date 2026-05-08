@@ -43,8 +43,7 @@ pub fn save_proxy_credentials(
     password: &str,
 ) -> Result<(), ProxyKeyringError> {
     let credentials = format!("{}:{}", username, password);
-    credential_store::save(SERVICE_NAME, &account_key(proxy_url), &credentials)
-        .map_err(Into::into)
+    credential_store::save(SERVICE_NAME, &account_key(proxy_url), &credentials).map_err(Into::into)
 }
 
 pub fn load_proxy_credentials(
