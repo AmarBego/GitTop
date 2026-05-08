@@ -276,6 +276,9 @@ fn main() -> iced::Result {
     }
 
     platform::enable_dark_mode();
+    // Must run before tray init / first toast so Windows attributes
+    // notifications and taskbar entries to GitTop, not PowerShell.
+    platform::init_app_identity();
 
     let _tray = match tray::TrayManager::new() {
         Ok(t) => Some(t),

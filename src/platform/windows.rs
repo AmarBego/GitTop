@@ -230,6 +230,104 @@ pub fn trim_working_set() {
     }
 }
 
+/// AppUserModelID — identifies GitTop to Windows so toast notifications,
+/// taskbar grouping, and the Action Center attribute them to "GitTop"
+/// instead of the host process (PowerShell, the launcher, etc).
+pub const AUMID: &str = "com.AmarBego.GitTop";
+
+/// Register the AUMID in HKCU and bind it to this process.
+///
+/// Without this, `tauri-winrt-notification` falls back to PowerShell's AUMID
+/// and Windows shows toasts under PowerShell (and may suppress them in
+/// Focus Assist). Idempotent — safe to call on every launch.
+pub fn init_aumid() {
+    register_aumid_in_registry();
+    set_current_process_aumid();
+}
+
+/// Bind the AUMID to the current process so subsequent shell APIs
+/// (taskbar, toasts, jump lists) see GitTop as the originator.
+fn set_current_process_aumid() {
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+    use windows::core::HSTRING;
+
+    let aumid = HSTRING::from(AUMID);
+    // SAFETY: HSTRING outlives the call; function is documented as safe to
+    // call once per process before any shell APIs are invoked.
+    let _ = unsafe { SetCurrentProcessExplicitAppUserModelID(&aumid) };
+}
+
+/// Write HKCU\Software\Classes\AppUserModelId\<AUMID>\{DisplayName,IconUri}.
+/// This is what gives Action Center the "GitTop" name and icon.
+fn register_aumid_in_registry() {
+    use windows::Win32::System::Registry::{
+        HKEY, HKEY_CURRENT_USER, KEY_WRITE, REG_SZ, RegCloseKey, RegCreateKeyExW, RegSetValueExW,
+    };
+    use windows::core::HSTRING;
+
+    let icon_path = ensure_aumid_icon_on_disk();
+
+    let subkey = HSTRING::from(format!(r"Software\Classes\AppUserModelId\{}", AUMID));
+    let mut hkey = HKEY::default();
+
+    // SAFETY: Standard registry create-or-open. Valid hive, valid wide
+    // string, output pointer, no security descriptor needed for HKCU.
+    let result = unsafe {
+        RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            &subkey,
+            None,
+            None,
+            Default::default(),
+            KEY_WRITE,
+            None,
+            &mut hkey,
+            None,
+        )
+    };
+    if result.is_err() {
+        tracing::warn!(?result, "Failed to create AUMID registry key");
+        return;
+    }
+
+    write_reg_string(hkey, "DisplayName", "GitTop");
+    if let Some(path) = icon_path.as_deref() {
+        write_reg_string(hkey, "IconUri", path);
+    }
+
+    // SAFETY: hkey produced by RegCreateKeyExW above, infallible to close.
+    let _ = unsafe { RegCloseKey(hkey) };
+
+    fn write_reg_string(hkey: HKEY, name: &str, value: &str) {
+        let name_w = HSTRING::from(name);
+        let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: wide buffer outlives the call; byte length matches u16 count.
+        let bytes: &[u8] =
+            unsafe { std::slice::from_raw_parts(wide.as_ptr() as *const u8, wide.len() * 2) };
+        let _ = unsafe { RegSetValueExW(hkey, &name_w, Some(0), REG_SZ, Some(bytes)) };
+    }
+}
+
+/// Extract the toast icon to %LOCALAPPDATA%\GitTop\icon.png so the registry
+/// can reference it by absolute path. Returns the path on success.
+/// Embedded PNG bytes are tiny so re-writing on every launch is cheap and
+/// keeps the on-disk copy fresh after upgrades.
+fn ensure_aumid_icon_on_disk() -> Option<String> {
+    const ICON_BYTES: &[u8] = include_bytes!("../../assets/images/GitTop-256x256.png");
+
+    let dir = dirs::data_local_dir()?.join("GitTop");
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        tracing::warn!(error = %e, "Failed to create LocalAppData/GitTop directory");
+        return None;
+    }
+    let path = dir.join("toast-icon.png");
+    if let Err(e) = std::fs::write(&path, ICON_BYTES) {
+        tracing::warn!(error = %e, "Failed to write toast icon to disk");
+        return None;
+    }
+    Some(path.to_string_lossy().into_owned())
+}
+
 /// Send a native Windows toast notification.
 /// Uses WinRT toasts - fire and forget, no resident memory.
 pub fn notify(
@@ -239,7 +337,7 @@ pub fn notify(
 ) -> Result<(), tauri_winrt_notification::Error> {
     use tauri_winrt_notification::{Duration, Toast};
 
-    let mut toast = Toast::new(Toast::POWERSHELL_APP_ID)
+    let mut toast = Toast::new(AUMID)
         .title(title)
         .text1(body)
         .duration(Duration::Short);
