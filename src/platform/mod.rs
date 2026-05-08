@@ -15,6 +15,9 @@ pub(crate) mod linux;
 #[cfg(target_os = "freebsd")]
 pub(crate) mod freebsd;
 
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+pub(crate) mod ipc;
+
 // ============================================================================
 // Platform dispatch macros
 // ============================================================================
@@ -59,6 +62,7 @@ macro_rules! platform_return {
 
 /// Focus an existing application window (for single-instance support).
 /// Called when a second instance tries to launch.
+#[cfg(any(windows, target_os = "macos"))]
 pub fn focus_existing_window() {
     platform_call!(focus_existing_window);
 }
@@ -137,6 +141,15 @@ pub fn notify(
 /// On Windows/macOS, uses normal application mode.
 pub fn run_app() -> iced::Result {
     platform_return!(run_app);
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+pub fn build_initial_window_settings() -> (iced::window::Id, iced::Task<crate::ui::app::Message>) {
+    #[cfg(target_os = "linux")]
+    return linux::build_initial_window_settings();
+
+    #[cfg(target_os = "freebsd")]
+    return freebsd::build_initial_window_settings();
 }
 
 // ============================================================================

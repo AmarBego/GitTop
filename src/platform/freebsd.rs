@@ -1,10 +1,88 @@
 //! FreeBSD-specific platform implementations.
 
-/// Focus an existing GitTop window.
-/// TODO: Implement using X11 window activation.
-pub fn focus_existing_window() {
-    // FreeBSD typically uses X11, similar to Linux.
-    // For now, this is a no-op.
+use crate::settings::AppSettings;
+use crate::tray::TrayCommand;
+use crate::ui::App;
+use iced::{Font, daemon, window};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Mutex, OnceLock};
+
+// ============================================================================
+// Cross-thread tray command bus (shared by tray and IPC listener)
+// ============================================================================
+
+struct CommandBus {
+    tx: Sender<TrayCommand>,
+    rx: Mutex<Receiver<TrayCommand>>,
+}
+
+static COMMAND_BUS: OnceLock<CommandBus> = OnceLock::new();
+
+fn command_bus() -> &'static CommandBus {
+    COMMAND_BUS.get_or_init(|| {
+        let (tx, rx) = mpsc::channel();
+        CommandBus {
+            tx,
+            rx: Mutex::new(rx),
+        }
+    })
+}
+
+pub(crate) fn command_sender() -> Sender<TrayCommand> {
+    command_bus().tx.clone()
+}
+
+pub(crate) fn poll_command() -> Option<TrayCommand> {
+    command_bus().rx.lock().ok()?.try_recv().ok()
+}
+
+/// Run the iced application using daemon mode.
+pub fn run_app() -> iced::Result {
+    daemon(App::new_for_daemon, App::update, App::view_for_daemon)
+        .title(App::title_for_daemon)
+        .theme(App::theme_for_daemon)
+        .subscription(App::subscription)
+        .antialiasing(true)
+        .default_font(Font::DEFAULT)
+        .run()
+}
+
+/// Build window settings for spawning from daemon.
+pub fn build_initial_window_settings() -> (window::Id, iced::Task<crate::ui::app::Message>) {
+    let settings = AppSettings::load();
+
+    let size = iced::Size::new(
+        if settings.window_width >= 100.0 {
+            settings.window_width
+        } else {
+            800.0
+        },
+        if settings.window_height >= 100.0 {
+            settings.window_height
+        } else {
+            640.0
+        },
+    );
+
+    let position = match (settings.window_x, settings.window_y) {
+        (Some(x), Some(y)) if x > -10000 && y > -10000 => {
+            window::Position::Specific(iced::Point::new(x as f32, y as f32))
+        }
+        _ => window::Position::Centered,
+    };
+
+    let window_settings = window::Settings {
+        size,
+        position,
+        platform_specific: window::settings::PlatformSpecific {
+            application_id: "gittop".to_string(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let (id, task) = window::open(window_settings);
+    (id, task.discard())
 }
 
 /// Enable dark mode for system UI elements.
@@ -17,11 +95,7 @@ pub fn enable_dark_mode() {
 pub mod tray {
     use crate::tray::TrayCommand;
     use ksni::{self, Icon, Tray, menu::StandardItem};
-    use std::sync::mpsc::{self, Receiver, Sender};
-    use std::sync::{Mutex, OnceLock};
-
-    /// Global receiver for tray commands (set during TrayManager::new).
-    static COMMAND_RECEIVER: OnceLock<Mutex<Receiver<TrayCommand>>> = OnceLock::new();
+    use std::sync::mpsc::Sender;
 
     struct GitTopTray {
         tx: Sender<TrayCommand>,
@@ -121,14 +195,9 @@ pub mod tray {
         pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
             use ksni::blocking::TrayMethods;
 
-            let (tx, rx) = mpsc::channel();
-
-            // Store receiver in global so poll_global_events can access it
-            COMMAND_RECEIVER
-                .set(Mutex::new(rx))
-                .map_err(|_| "TrayManager already initialized")?;
-
-            let tray = GitTopTray { tx };
+            let tray = GitTopTray {
+                tx: super::command_sender(),
+            };
 
             // Use blocking spawn API - spawns tray service in background thread
             let handle = tray.spawn()?;
@@ -137,7 +206,7 @@ pub mod tray {
         }
 
         pub fn poll_global_events() -> Option<TrayCommand> {
-            COMMAND_RECEIVER.get()?.lock().ok()?.try_recv().ok()
+            super::poll_command()
         }
     }
 }

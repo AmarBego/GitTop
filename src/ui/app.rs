@@ -604,25 +604,33 @@ impl App {
     // Daemon Mode Support (Linux)
     // ========================================================================
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn new_for_daemon() -> (Self, Task<Message>) {
         let (app, restore_task) = Self::new();
-        let (window_id, open_task) = crate::platform::linux::build_initial_window_settings();
-        state::set_window_id(window_id);
-        (app, Task::batch([restore_task, open_task.discard()]))
+
+        let open_task = if crate::START_HIDDEN.load(std::sync::atomic::Ordering::Relaxed) {
+            state::set_hidden(true);
+            Task::none()
+        } else {
+            let (window_id, task) = crate::platform::build_initial_window_settings();
+            state::set_window_id(window_id);
+            task.discard()
+        };
+
+        (app, Task::batch([restore_task, open_task]))
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn view_for_daemon(&self, _window_id: window::Id) -> Element<'_, Message> {
         self.view()
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn title_for_daemon(&self, _window_id: window::Id) -> String {
         self.title()
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub fn theme_for_daemon(&self, _window_id: window::Id) -> Theme {
         self.theme()
     }

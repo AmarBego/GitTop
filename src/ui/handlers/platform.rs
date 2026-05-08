@@ -54,18 +54,25 @@ pub fn handle_tray_poll(notification_screen: Option<&mut NotificationsScreen>) -
         TrayCommand::ShowWindow => {
             let was_hidden = state::restore_from_hidden();
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             let window_task = if was_hidden {
-                let (id, open_task) = crate::platform::linux::build_initial_window_settings();
+                let (id, open_task) = crate::platform::build_initial_window_settings();
                 state::set_window_id(id);
                 open_task
             } else {
+                // Wayland strictly forbids `gain_focus` (focus stealing prevention).
+                // The most reliable way to bring the app to the front from a background
+                // tray/IPC event is to destroy the old surface and map a new one.
                 state::get_window_id()
-                    .map(window::gain_focus)
+                    .map(|old_id| {
+                        let (new_id, open_task) = crate::platform::build_initial_window_settings();
+                        state::set_window_id(new_id);
+                        Task::batch([window::close(old_id), open_task])
+                    })
                     .unwrap_or_else(Task::none)
             };
 
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
             let window_task = state::get_window_id()
                 .map(|id| {
                     Task::batch([
@@ -143,7 +150,7 @@ pub fn handle_window_event(
             Task::none()
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         window::Event::Closed => {
             if ctx.minimize_to_tray {
                 state::set_hidden(true);
@@ -188,12 +195,12 @@ pub fn enter_tray_mode(
 
     crate::platform::trim_memory();
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         window::close(window_id)
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
     {
         window::set_mode(window_id, window::Mode::Hidden)
     }

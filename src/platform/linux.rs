@@ -1,8 +1,44 @@
 //! Linux-specific platform implementations.
 
 use crate::settings::AppSettings;
+use crate::tray::TrayCommand;
 use crate::ui::App;
 use iced::{Font, daemon, window};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Mutex, OnceLock};
+
+// ============================================================================
+// Cross-thread tray command bus
+// ============================================================================
+//
+// Both the ksni tray and the IPC listener push `TrayCommand`s here; the iced
+// subscription drains them via `poll_command`. Lazily initialized so callers
+// don't have to order tray init vs. IPC init.
+
+struct CommandBus {
+    tx: Sender<TrayCommand>,
+    rx: Mutex<Receiver<TrayCommand>>,
+}
+
+static COMMAND_BUS: OnceLock<CommandBus> = OnceLock::new();
+
+fn command_bus() -> &'static CommandBus {
+    COMMAND_BUS.get_or_init(|| {
+        let (tx, rx) = mpsc::channel();
+        CommandBus {
+            tx,
+            rx: Mutex::new(rx),
+        }
+    })
+}
+
+pub(crate) fn command_sender() -> Sender<TrayCommand> {
+    command_bus().tx.clone()
+}
+
+pub(crate) fn poll_command() -> Option<TrayCommand> {
+    command_bus().rx.lock().ok()?.try_recv().ok()
+}
 
 /// Run the iced application using daemon mode.
 /// Daemon mode allows the app to continue running with zero windows,
@@ -55,15 +91,6 @@ pub fn build_initial_window_settings() -> (window::Id, iced::Task<crate::ui::app
     (id, task.discard())
 }
 
-/// Focus an existing GitTop window from another process (single-instance detection).
-/// Called when a second GitTop instance tries to launch.
-///
-/// Note: This is different from iced's `window::gain_focus()` used in app.rs,
-/// which works within the same process for tray "Show" functionality.
-pub fn focus_existing_window() {
-    // Wayland doesn't support focusing windows from other processes.
-}
-
 /// Linux context menus follow GTK/Qt theme settings.
 pub fn enable_dark_mode() {}
 
@@ -71,11 +98,7 @@ pub fn enable_dark_mode() {}
 pub mod tray {
     use crate::tray::TrayCommand;
     use ksni::{self, Icon, Tray, menu::StandardItem};
-    use std::sync::mpsc::{self, Receiver, Sender};
-    use std::sync::{Mutex, OnceLock};
-
-    /// Global receiver for tray commands (set during TrayManager::new).
-    static COMMAND_RECEIVER: OnceLock<Mutex<Receiver<TrayCommand>>> = OnceLock::new();
+    use std::sync::mpsc::Sender;
 
     struct GitTopTray {
         tx: Sender<TrayCommand>,
@@ -176,14 +199,9 @@ pub mod tray {
         pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
             use ksni::blocking::TrayMethods;
 
-            let (tx, rx) = mpsc::channel();
-
-            // Store receiver in global so poll_global_events can access it
-            COMMAND_RECEIVER
-                .set(Mutex::new(rx))
-                .map_err(|_| "TrayManager already initialized")?;
-
-            let tray = GitTopTray { tx };
+            let tray = GitTopTray {
+                tx: super::command_sender(),
+            };
 
             // Check if running in Flatpak (file exists)
             let is_flatpak = std::path::Path::new("/.flatpak-info").exists();
@@ -196,7 +214,7 @@ pub mod tray {
         }
 
         pub fn poll_global_events() -> Option<TrayCommand> {
-            COMMAND_RECEIVER.get()?.lock().ok()?.try_recv().ok()
+            super::poll_command()
         }
     }
 }
@@ -270,7 +288,7 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart="{EXEC_PATH}"
+ExecStart="{EXEC_PATH}" --hidden
 PassEnvironment=DISPLAY WAYLAND_DISPLAY XDG_RUNTIME_DIR
 Restart=on-failure
 RestartSec=5
@@ -367,7 +385,7 @@ WantedBy=default.target
             r#"[Desktop Entry]
 Name=GitTop
 Comment=GitHub Notifications Manager
-Exec={}
+Exec={} --hidden
 Icon=gittop
 Terminal=false
 Type=Application
