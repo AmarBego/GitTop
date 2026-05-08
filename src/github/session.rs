@@ -22,6 +22,9 @@ pub enum SessionError {
     #[error("Account not found: {0}")]
     AccountNotFound(String),
 
+    #[error("Token revoked for {0}")]
+    TokenRevoked(String),
+
     #[error("Network error: {0}")]
     NetworkError(String),
 }
@@ -61,9 +64,17 @@ impl SessionManager {
             match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
                 Ok((client, user)) => (client, user),
                 Err(GitHubError::Unauthorized) => {
-                    // Token expired/revoked from GitHub (401), clean up
-                    let _ = keyring::delete_token(username);
-                    return Err(SessionError::AccountNotFound(username.to_string()));
+                    // Token expired/revoked from GitHub (401), clean up the keyring
+                    // entry. Distinct from AccountNotFound so callers can tell apart
+                    // "GitHub said this token is dead" from "we couldn't read it back".
+                    if let Err(e) = keyring::delete_token(username) {
+                        tracing::warn!(
+                            username = %username,
+                            error = %e,
+                            "Failed to delete revoked token from keyring"
+                        );
+                    }
+                    return Err(SessionError::TokenRevoked(username.to_string()));
                 }
                 Err(GitHubError::Request(msg)) => {
                     // Connection/network error - keep account, report network issue

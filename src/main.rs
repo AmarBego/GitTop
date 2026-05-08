@@ -243,6 +243,13 @@ fn log_startup_diagnostics() {
     );
 
     tracing::info!(
+        storage_setting = %settings.credential_storage,
+        native_backend = github::native_backend_name(),
+        keyring_writable = github::keyring_available(),
+        "Credential storage diagnostic"
+    );
+
+    tracing::info!(
         rules_enabled = rules.enabled,
         rule_set = %rules.name,
         account_rules = rules.account_rules.len(),

@@ -67,8 +67,31 @@ pub fn update(
         AccountMessage::RemoveAccount(username) => {
             settings.remove_account(&username);
             let _ = settings.save();
-            let _ = keyring::delete_token(&username);
+            if let Err(e) = keyring::delete_token(&username) {
+                tracing::warn!(
+                    username = %username,
+                    error = %e,
+                    "Failed to delete token from keyring during account removal"
+                );
+            }
             tracing::info!(account_count = settings.accounts.len(), "Account removed");
+            Task::none()
+        }
+        AccountMessage::CredentialStorageChanged(storage) => {
+            // Switching backends does not migrate existing credentials —
+            // entries written to the old backend stay there. Affected users
+            // need to re-add their accounts; the view shows a static notice
+            // explaining that.
+            if settings.credential_storage == storage {
+                return Task::none();
+            }
+            tracing::info!(
+                from = %settings.credential_storage,
+                to = %storage,
+                "Credential storage backend changed"
+            );
+            settings.credential_storage = storage;
+            let _ = settings.save();
             Task::none()
         }
     }

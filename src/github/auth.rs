@@ -1,17 +1,23 @@
-//! Authentication module for secure credential storage and validation.
+//! Authentication module for credential validation and the legacy single-token
+//! storage slot.
+//!
+//! Most token persistence now lives in `keyring.rs` (multi-account, keyed by
+//! username). This module retains the older single-token entry for backward
+//! compatibility — it's written on every successful auth and cleared on
+//! logout, but no code reads it back. Both writes and the delete dispatch
+//! through the central `credential_store` so they honor the user's
+//! `CredentialStorage` setting.
 
-use keyring::Entry;
 use thiserror::Error;
 
 use super::client::{GitHubClient, GitHubError};
+use super::credential_store;
 use super::redaction::redact_secrets;
 use super::types::UserInfo;
 
-/// Service name for keyring storage.
 const SERVICE_NAME: &str = "gittop";
 const ACCOUNT_NAME: &str = "github_pat";
 
-/// Authentication-specific errors.
 #[derive(Debug, Error, Clone)]
 pub enum AuthError {
     #[error("Keyring error: {0}")]
@@ -21,29 +27,16 @@ pub enum AuthError {
     GitHub(#[from] GitHubError),
 }
 
-/// Creates a new keyring entry.
-fn get_entry() -> Result<Entry, AuthError> {
-    Entry::new(SERVICE_NAME, ACCOUNT_NAME)
+/// Saves the token to the legacy single-account slot.
+pub fn save_token(token: &str) -> Result<(), AuthError> {
+    credential_store::save(SERVICE_NAME, ACCOUNT_NAME, token)
         .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))
 }
 
-/// Saves the token to secure storage.
-pub fn save_token(token: &str) -> Result<(), AuthError> {
-    let entry = get_entry()?;
-    entry
-        .set_password(token)
-        .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))?;
-    Ok(())
-}
-
-/// Deletes the stored token.
+/// Deletes the legacy single-account slot.
 pub fn delete_token() -> Result<(), AuthError> {
-    let entry = get_entry()?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
-        Err(e) => Err(AuthError::Keyring(redact_secrets(&e.to_string()))),
-    }
+    credential_store::delete(SERVICE_NAME, ACCOUNT_NAME)
+        .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))
 }
 
 /// Full authentication flow: validate token, save to keyring, return user info.

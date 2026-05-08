@@ -1,7 +1,7 @@
-use iced::widget::{Space, button, column, container, row, text, text_input};
+use iced::widget::{Space, button, column, container, pick_list, row, text, text_input};
 use iced::{Alignment, Element, Fill};
 
-use crate::settings::{AppSettings, StoredAccount};
+use crate::settings::{AppSettings, CredentialStorage, StoredAccount};
 use crate::ui::screens::settings::components::{setting_card, tab_title};
 use crate::ui::{icons, theme};
 
@@ -24,6 +24,8 @@ pub fn view<'a>(
         view_add_account_section(state, settings),
         Space::new().height(16),
         view_accounts_list(settings),
+        Space::new().height(16),
+        view_credential_storage_section(settings),
     ]
     .spacing(4)
     .padding(24)
@@ -114,6 +116,70 @@ fn view_accounts_list(settings: &AppSettings) -> Element<'static, AccountMessage
     .spacing(8)
     .extend(account_items)
     .into()
+}
+
+/// Storage backend selector + warning when the chosen backend doesn't work.
+fn view_credential_storage_section(settings: &AppSettings) -> Element<'_, AccountMessage> {
+    let p = theme::palette();
+    let icon_theme = settings.icon_theme;
+
+    let options = [CredentialStorage::Keyring, CredentialStorage::EncryptedFile];
+    let selector = pick_list(
+        options,
+        Some(settings.credential_storage),
+        AccountMessage::CredentialStorageChanged,
+    )
+    .text_size(13)
+    .padding([6, 12]);
+
+    let mut content = column![
+        row![
+            icons::icon_settings(14.0, p.accent, icon_theme),
+            Space::new().width(8),
+            text("Credential Storage").size(14).color(p.text_primary),
+        ]
+        .align_y(Alignment::Center),
+        Space::new().height(8),
+        text(
+            "Where GitHub tokens and proxy credentials are kept. \
+             System Keyring uses Secret Service / Credential Manager / \
+             Keychain. Encrypted File falls back to a local file when no \
+             secret service is running."
+        )
+        .size(11)
+        .color(p.text_secondary),
+        Space::new().height(12),
+        selector,
+    ]
+    .spacing(2);
+
+    // Surface the same warning here so users browsing settings see why
+    // their tokens aren't sticking, even if they skipped the login banner.
+    let keyring_chosen = settings.credential_storage == CredentialStorage::Keyring;
+    if keyring_chosen && !crate::github::keyring_available() {
+        content = content.push(Space::new().height(10));
+        content = content.push(
+            text(
+                "\u{26A0} System keyring not reachable on this machine. \
+                 Switch to Encrypted File to make tokens persist across restarts."
+            )
+            .size(12)
+            .color(p.accent_danger),
+        );
+    } else if settings.credential_storage == CredentialStorage::EncryptedFile {
+        content = content.push(Space::new().height(10));
+        content = content.push(
+            text(
+                "Tokens are encrypted at rest with a key stored in the GitTop \
+                 data directory. Treat your home directory as sensitive — \
+                 anyone who can read both files can decrypt the tokens."
+            )
+            .size(11)
+            .color(p.text_secondary),
+        );
+    }
+
+    setting_card(content)
 }
 
 fn view_account_item(

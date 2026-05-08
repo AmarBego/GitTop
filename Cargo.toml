@@ -127,6 +127,12 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tracing-appender = "0.2"
 
+# Authenticated encryption for the file-based credential fallback (used when
+# the user has no working Secret Service / Credential Manager / Keychain).
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "getrandom"] }
+sha2 = { version = "0.10", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
 # =============================================================================
 # Platform-specific dependencies
 # =============================================================================
