@@ -19,10 +19,10 @@ No browser engine required. Pure Rust. Pure performance.
 
 %prep
 %ifarch x86_64
-%setup -q -n gittop-%{version}-linux-gnu-x86_64 -T -a 0
+%setup -q -n gittop-%{version}-linux-gnu-x86_64 -T -b 0
 %endif
 %ifarch aarch64
-%setup -q -n gittop-%{version}-linux-gnu-aarch64 -T -a 1
+%setup -q -n gittop-%{version}-linux-gnu-aarch64 -T -b 1
 %endif
 
 %build
@@ -46,3 +46,5 @@ install -m 644 gittop.png %{buildroot}%{_datadir}/icons/hicolor/256x256/apps/git
 %doc README.txt
 
 %changelog
+* Sat May 09 2026 AmarBego <begovicamar@proton.me> - 0.5.1-1
+- Initial release of v0.5.1
