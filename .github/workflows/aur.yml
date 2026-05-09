@@ -111,6 +111,52 @@ jobs:
 
       - uses: kesin11/actions-timeline@v2
 
+  # Job for stable releases (gittop) — built from source
+  aur-stable:
+    name: Update gittop (AUR)
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ needs.check.outputs.should_build == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.tag }}
+
+      - name: Update PKGBUILD version and checksum
+        run: |
+          VERSION="${{ needs.check.outputs.tag }}"
+          VERSION="${VERSION#v}"
+
+          PKGBUILD=./packaging/aur/stable/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" "$PKGBUILD"
+
+          URL="https://github.com/AmarBego/GitTop/archive/refs/tags/v${VERSION}.tar.gz"
+          curl -L -o "/tmp/source.tar.gz" "$URL"
+          SUM=$(sha256sum "/tmp/source.tar.gz" | cut -d' ' -f1)
+          rm "/tmp/source.tar.gz"
+          sed -i "s/^sha256sums=.*/sha256sums=('${SUM}')/" "$PKGBUILD"
+
+          echo "Updated PKGBUILD to version: $VERSION"
+          grep -E "^(pkgver|pkgrel|sha256sums)" "$PKGBUILD"
+
+      - name: Publish gittop
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
+        with:
+          pkgname: gittop
+          pkgbuild: ./packaging/aur/stable/PKGBUILD
+          assets: ./packaging/aur/stable/gittop.install
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update to ${{ needs.check.outputs.tag }}
+          ssh_keyscan_types: ed25519
+          updpkgsums: false
+
+      - uses: kesin11/actions-timeline@v2
+
   # TODO: Job for beta releases (gittop-beta-bin)
   # aur-beta-bin:
   #   name: Update gittop-beta-bin (AUR)
