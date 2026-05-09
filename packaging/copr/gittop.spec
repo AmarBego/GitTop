@@ -18,11 +18,12 @@ GitTop is a lightweight desktop client for GitHub notifications.
 No browser engine required. Pure Rust. Pure performance.
 
 %prep
+%setup -q -c -T -n %{name}-%{version}
 %ifarch x86_64
-%setup -q -n gittop-%{version}-linux-gnu-x86_64 -T -b 0
+tar -xf %{SOURCE0} --strip-components=1
 %endif
 %ifarch aarch64
-%setup -q -n gittop-%{version}-linux-gnu-aarch64 -T -b 1
+tar -xf %{SOURCE1} --strip-components=1
 %endif
 
 %build
