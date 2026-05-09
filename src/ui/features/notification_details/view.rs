@@ -193,28 +193,33 @@ fn view_issue<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
 
     if !issue.labels.is_empty() {
-        let mut label_row = row![].spacing(4);
-        for label in issue.labels.iter().take(5) {
-            label_row = label_row.push(view_label(&label.name, &label.color));
+        let mut wrap = iced_aw::Wrap::new().spacing(4.0).line_spacing(4.0);
+        for label in issue.labels.iter() {
+            wrap = wrap.push(view_label(&label.name, &label.color));
         }
-        col = col.push(label_row);
+        col = col.push(wrap);
         col = col.push(Space::new().height(16));
     }
 
@@ -296,26 +301,29 @@ fn view_pull_request<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
 
     if !pr.labels.is_empty() {
-        let mut label_rows = column![].spacing(4);
-        let mut current_row = row![].spacing(4);
-        let mut row_count = 0;
+        let mut wrap = iced_aw::Wrap::new().spacing(4.0).line_spacing(4.0);
 
         for label in &pr.labels {
             let is_pending = label_args.pending_ops.contains(&label.name);
@@ -327,18 +335,9 @@ fn view_pull_request<'a>(
                 repo.to_string(),
                 pr_number,
             );
-            current_row = current_row.push(label_element);
-            row_count += 1;
-            if row_count >= 4 {
-                label_rows = label_rows.push(current_row);
-                current_row = row![].spacing(4);
-                row_count = 0;
-            }
+            wrap = wrap.push(label_element);
         }
-        if row_count > 0 {
-            label_rows = label_rows.push(current_row);
-        }
-        col = col.push(label_rows);
+        col = col.push(wrap);
         col = col.push(Space::new().height(16));
     }
 
@@ -456,8 +455,14 @@ fn view_checks<'a>(
                 row![
                     icon,
                     Space::new().width(8),
-                    text(&run.name).size(11).color(p.text_secondary),
-                    Space::new().width(Fill),
+                    container(
+                        text(&run.name)
+                            .size(11)
+                            .color(p.text_secondary)
+                            .wrapping(iced::widget::text::Wrapping::WordOrGlyph)
+                    )
+                    .width(Fill),
+                    Space::new().width(8),
                     text(&run.status).size(10).color(p.text_muted),
                 ]
                 .align_y(Alignment::Center),
@@ -748,18 +753,23 @@ fn view_discussion<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
@@ -1036,7 +1046,11 @@ fn truncate_text(text: &str, max_len: usize) -> std::borrow::Cow<'_, str> {
     if text.len() <= max_len {
         std::borrow::Cow::Borrowed(text)
     } else {
-        std::borrow::Cow::Owned(format!("{}...", &text[..max_len]))
+        let mut idx = max_len;
+        while !text.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        std::borrow::Cow::Owned(format!("{}...", &text[..idx]))
     }
 }
 
@@ -1081,7 +1095,10 @@ fn view_comments_section<'a>(
                             ]
                             .align_y(Alignment::Center),
                             Space::new().height(6),
-                            text(body).size(13).color(p.text_primary),
+                            text(body)
+                                .size(13)
+                                .color(p.text_primary)
+                                .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
                         ])
                         .padding(12)
                         .width(Fill)

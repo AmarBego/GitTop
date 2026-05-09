@@ -312,6 +312,7 @@ fn main() -> iced::Result {
     unsafe { std::env::set_var("WGPU_BACKEND", "gl") };
 
     init_logging();
+    github::init_keyring();
     diagnostics::install_panic_hook();
     log_startup_diagnostics();
 
@@ -336,6 +337,7 @@ fn main() -> iced::Result {
     };
 
     let result = platform::run_app();
+    github::unset_keyring();
     if let Err(e) = result.as_ref() {
         diagnostics::write_fatal_error(e);
     }
