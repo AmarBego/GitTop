@@ -414,10 +414,23 @@ pub mod on_boot {
     }
 
     pub fn enable() -> Result<(), OnBootError> {
-        let exec_path = std::env::current_exe()
+        let mut exec_path = std::env::current_exe()
             .map_err(OnBootError::Io)?
             .to_string_lossy()
             .to_string();
+
+        if exec_path.starts_with(r"\\?\") {
+            exec_path = exec_path[4..].to_string();
+        }
+
+        if let Some(apps_idx) = exec_path.to_lowercase().find(r"\scoop\apps\gittop\") {
+            let after_apps = &exec_path[apps_idx + 19..];
+            if let Some(slash_idx) = after_apps.find('\\') {
+                let prefix = &exec_path[..apps_idx + 19];
+                let suffix = &after_apps[slash_idx..];
+                exec_path = format!("{}current{}", prefix, suffix);
+            }
+        }
 
         let quoted_path = format!("\"{}\"", exec_path);
 
