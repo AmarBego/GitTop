@@ -1,6 +1,6 @@
 [package]
 name = "GitTop"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2024"
 description = "Why spin up a browser just to check your GitHub notifications?"
 authors = ["AmarBego"]
@@ -126,6 +126,12 @@ single-instance = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tracing-appender = "0.2"
+
+# Authenticated encryption for the file-based credential fallback (used when
+# the user has no working Secret Service / Credential Manager / Keychain).
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "getrandom"] }
+sha2 = { version = "0.10", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 
 # =============================================================================
 # Platform-specific dependencies

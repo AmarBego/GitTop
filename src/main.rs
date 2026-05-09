@@ -13,7 +13,6 @@ mod tray;
 mod ui;
 mod update_checker;
 
-use single_instance::SingleInstance;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -21,10 +20,14 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 /// Mutex name for single instance detection
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 const SINGLE_INSTANCE_MUTEX: &str = "GitTop-SingleInstance-Mutex-7a8b9c0d";
 
 /// Global mock notification count (set via CLI)
 pub static MOCK_NOTIFICATION_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+/// Global flag for starting hidden (set via CLI)
+pub static START_HIDDEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
 
@@ -35,7 +38,9 @@ fn parse_cli_args() {
     let mut args = std::env::args().skip(1).peekable();
 
     while let Some(arg) = args.next() {
-        if matches!(arg.as_str(), "--mock-notifications" | "-m")
+        if arg == "--hidden" {
+            START_HIDDEN.store(true, Ordering::Relaxed);
+        } else if matches!(arg.as_str(), "--mock-notifications" | "-m")
             && let Some(Ok(count)) = args.next().map(|s| s.parse::<usize>())
         {
             MOCK_NOTIFICATION_COUNT.store(count, Ordering::Relaxed);
@@ -131,7 +136,7 @@ fn add_dependency_filters(
 
     for target in NOISY_TARGETS {
         if !env_mentions_target(env_value, target)
-            && let Ok(directive) = format!("{target}=warn").parse()
+            && let Ok(directive) = format!("{target}=error").parse()
         {
             filter = filter.add_directive(directive);
         }
@@ -243,6 +248,13 @@ fn log_startup_diagnostics() {
     );
 
     tracing::info!(
+        storage_setting = %settings.credential_storage,
+        native_backend = github::native_backend_name(),
+        keyring_writable = github::keyring_available(),
+        "Credential storage diagnostic"
+    );
+
+    tracing::info!(
         rules_enabled = rules.enabled,
         rule_set = %rules.name,
         account_rules = rules.account_rules.len(),
@@ -252,6 +264,45 @@ fn log_startup_diagnostics() {
         high_impact_rules = rules.get_high_impact_rules().len(),
         "Rules snapshot"
     );
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn check_single_instance() -> bool {
+    // Keep it static so it doesn't drop and release the mutex
+    static INSTANCE: std::sync::OnceLock<single_instance::SingleInstance> =
+        std::sync::OnceLock::new();
+    let instance = INSTANCE.get_or_init(|| {
+        single_instance::SingleInstance::new(SINGLE_INSTANCE_MUTEX)
+            .expect("Failed to create single-instance mutex")
+    });
+
+    if instance.is_single() {
+        true
+    } else {
+        platform::focus_existing_window();
+        false
+    }
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+fn check_single_instance() -> bool {
+    #[cfg(target_os = "linux")]
+    let tx = platform::linux::command_sender();
+    #[cfg(target_os = "freebsd")]
+    let tx = platform::freebsd::command_sender();
+
+    match platform::ipc::acquire(tx) {
+        platform::ipc::AcquireResult::Primary(server) => {
+            // Keep the server alive by leaking it
+            Box::leak(Box::new(server));
+            true
+        }
+        platform::ipc::AcquireResult::Secondary => false,
+        platform::ipc::AcquireResult::Unavailable(err) => {
+            tracing::warn!("IPC singleton unavailable: {}", err);
+            true
+        }
+    }
 }
 
 fn main() -> iced::Result {
@@ -267,11 +318,7 @@ fn main() -> iced::Result {
     // Parse CLI arguments (e.g., --mock-notifications 1000)
     parse_cli_args();
 
-    let instance =
-        SingleInstance::new(SINGLE_INSTANCE_MUTEX).expect("Failed to create single-instance mutex");
-
-    if !instance.is_single() {
-        platform::focus_existing_window();
+    if !check_single_instance() {
         return Ok(());
     }
 

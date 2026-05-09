@@ -89,6 +89,33 @@ impl TryFrom<u8> for AppTheme {
     }
 }
 
+/// Where to persist GitHub tokens and proxy credentials.
+///
+/// `Keyring` (default) talks to the OS secret store: Secret Service via D-Bus
+/// on Linux/FreeBSD, Credential Manager on Windows, Keychain on macOS.
+///
+/// `EncryptedFile` writes to `~/.local/share/GitTop/credentials.enc` (or the
+/// platform equivalent) using ChaCha20-Poly1305 with a random 32-byte key
+/// stored alongside the data. This is the fallback for systems with no
+/// running secret service. Security note: the key sits next to the file,
+/// so this is closer to "obfuscated at rest" than real protection — anyone
+/// with read access to the data dir can decrypt. Use Keyring when available.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum CredentialStorage {
+    #[default]
+    Keyring,
+    EncryptedFile,
+}
+
+impl std::fmt::Display for CredentialStorage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Keyring => write!(f, "System Keyring"),
+            Self::EncryptedFile => write!(f, "Encrypted File"),
+        }
+    }
+}
+
 /// Stored account information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredAccount {
@@ -138,6 +165,9 @@ pub struct AppSettings {
     /// Check for updates on startup (opt-in, default: false)
     #[serde(default)]
     pub check_for_updates: bool,
+    /// Backend used for token / proxy credential persistence.
+    #[serde(default)]
+    pub credential_storage: CredentialStorage,
 }
 
 fn default_minimize_to_tray() -> bool {
@@ -186,6 +216,7 @@ impl Default for AppSettings {
             show_details_panel: true,
             proxy: ProxySettings::default(),
             check_for_updates: false,
+            credential_storage: CredentialStorage::default(),
         }
     }
 }

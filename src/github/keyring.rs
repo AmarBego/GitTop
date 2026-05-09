@@ -1,55 +1,46 @@
-//! Account Keyring - Secure per-account credential storage.
+//! Account credential storage — secure per-account token persistence.
 //!
-//! Uses the system keyring to store GitHub PATs keyed by username.
-//! Format: service="gittop", user="gittop-{username}"
+//! Stores GitHub PATs keyed by username via the central credential_store
+//! abstraction, which dispatches between the OS keyring and an encrypted
+//! file based on the user's `CredentialStorage` setting.
+//!
+//! Format: service="gittop", account="gittop-{username}".
 
-use keyring::Entry;
 use thiserror::Error;
 
-use super::redaction::redact_secrets;
+use super::credential_store::{self, CredentialError};
 
-/// Service name for keyring storage.
 const SERVICE_NAME: &str = "gittop";
 
-/// Keyring-specific errors.
+/// Account-credential errors. Kept as a distinct type for callers that
+/// want to type-discriminate, but it just wraps `CredentialError`.
 #[derive(Debug, Error, Clone)]
 pub enum KeyringError {
     #[error("Keyring error: {0}")]
     Internal(String),
 }
 
-/// Creates a keyring entry for a specific username.
-fn get_entry(username: &str) -> Result<Entry, KeyringError> {
-    let key = format!("gittop-{}", username);
-    Entry::new(SERVICE_NAME, &key)
-        .map_err(|e| KeyringError::Internal(redact_secrets(&e.to_string())))
+impl From<CredentialError> for KeyringError {
+    fn from(e: CredentialError) -> Self {
+        KeyringError::Internal(e.to_string())
+    }
+}
+
+fn account_key(username: &str) -> String {
+    format!("gittop-{}", username)
 }
 
 /// Saves a token for a specific account.
 pub fn save_token(username: &str, token: &str) -> Result<(), KeyringError> {
-    let entry = get_entry(username)?;
-    entry
-        .set_password(token)
-        .map_err(|e| KeyringError::Internal(redact_secrets(&e.to_string())))?;
-    Ok(())
+    credential_store::save(SERVICE_NAME, &account_key(username), token).map_err(Into::into)
 }
 
 /// Loads the token for a specific account.
 pub fn load_token(username: &str) -> Result<Option<String>, KeyringError> {
-    let entry = get_entry(username)?;
-    match entry.get_password() {
-        Ok(token) => Ok(Some(token)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => Err(KeyringError::Internal(redact_secrets(&e.to_string()))),
-    }
+    credential_store::load(SERVICE_NAME, &account_key(username)).map_err(Into::into)
 }
 
 /// Deletes the token for a specific account.
 pub fn delete_token(username: &str) -> Result<(), KeyringError> {
-    let entry = get_entry(username)?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
-        Err(e) => Err(KeyringError::Internal(redact_secrets(&e.to_string()))),
-    }
+    credential_store::delete(SERVICE_NAME, &account_key(username)).map_err(Into::into)
 }

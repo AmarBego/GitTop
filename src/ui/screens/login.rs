@@ -1,11 +1,11 @@
 //! Login screen - Personal Access Token entry.
 
-use iced::widget::{Space, button, column, container, row, text, text_input, toggler};
+use iced::widget::{Space, button, column, container, pick_list, row, text, text_input, toggler};
 use iced::{Alignment, Element, Fill, Length, Task};
 
 use crate::diagnostics::CrashNotice;
 use crate::github::{GitHubClient, UserInfo, auth, proxy_keyring};
-use crate::settings::AppSettings;
+use crate::settings::{AppSettings, CredentialStorage};
 use crate::ui::theme;
 
 #[derive(Debug, Clone, Default)]
@@ -19,6 +19,14 @@ pub struct LoginScreen {
     proxy_username: String,
     proxy_password: String,
     crash_notice: Option<CrashNotice>,
+    /// Tracked locally so the user can switch backends from the login screen
+    /// before they have an account. Mirrors `AppSettings::credential_storage`,
+    /// written back on every change.
+    credential_storage: CredentialStorage,
+    /// True when the user picked Keyring storage but the system keyring
+    /// isn't usable (no Secret Service running, locked collection, etc).
+    /// Drives the "tokens won't persist" banner above the form.
+    keyring_storage_unavailable: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +43,7 @@ pub enum LoginMessage {
     ProxyUsernameChanged(String),
     ProxyPasswordChanged(String),
     SubmitProxySettings,
+    CredentialStorageChanged(CredentialStorage),
     DismissCrashNotice,
 }
 
@@ -52,6 +61,11 @@ impl LoginScreen {
             (String::new(), String::new())
         };
 
+        // Probe is cached via OnceLock; cheap on every call after the first.
+        let credential_storage = settings.credential_storage;
+        let keyring_storage_unavailable =
+            credential_storage == CredentialStorage::Keyring && !crate::github::keyring_available();
+
         Self {
             token_input: String::new(),
             is_loading: false,
@@ -62,6 +76,8 @@ impl LoginScreen {
             proxy_username,
             proxy_password,
             crash_notice: crate::diagnostics::load_crash_notice(),
+            credential_storage,
+            keyring_storage_unavailable,
         }
     }
 
@@ -170,6 +186,20 @@ impl LoginScreen {
                 self.showing_proxy_settings = false;
                 Task::none()
             }
+            LoginMessage::CredentialStorageChanged(choice) => {
+                self.credential_storage = choice;
+                self.keyring_storage_unavailable =
+                    choice == CredentialStorage::Keyring && !crate::github::keyring_available();
+
+                let mut settings = AppSettings::load();
+                settings.credential_storage = choice;
+                if let Err(e) = settings.save() {
+                    tracing::warn!(error = %e, "Failed to save credential_storage setting");
+                } else {
+                    tracing::info!(storage = %choice, "Credential storage changed from login screen");
+                }
+                Task::none()
+            }
             LoginMessage::DismissCrashNotice => {
                 crate::diagnostics::clear_crash_notice();
                 self.crash_notice = None;
@@ -268,6 +298,20 @@ impl LoginScreen {
             Space::new().width(0).height(0).into()
         };
 
+        let storage_options = [CredentialStorage::Keyring, CredentialStorage::EncryptedFile];
+        let storage_picker = row![
+            text("Storage:").size(11).style(theme::muted_text),
+            Space::new().width(6),
+            pick_list(
+                storage_options,
+                Some(self.credential_storage),
+                LoginMessage::CredentialStorageChanged,
+            )
+            .text_size(11)
+            .padding([2, 8]),
+        ]
+        .align_y(Alignment::Center);
+
         let help_text = column![
             button(text("Generate New Token").size(12))
                 .style(theme::ghost_button)
@@ -280,6 +324,7 @@ impl LoginScreen {
                 .style(theme::ghost_button)
                 .on_press(LoginMessage::ToggleProxySettings)
                 .padding(4),
+            storage_picker,
         ]
         .spacing(4)
         .align_x(Alignment::Center);
@@ -301,6 +346,9 @@ impl LoginScreen {
         let mut content = column![].align_x(Alignment::Center);
         if let Some(notice) = crash_notice {
             content = content.push(notice).push(Space::new().height(24));
+        }
+        if let Some(banner) = self.view_keyring_warning() {
+            content = content.push(banner).push(Space::new().height(24));
         }
         content = content
             .push(logo)
@@ -415,6 +463,63 @@ impl LoginScreen {
             .padding(32)
             .style(theme::app_container)
             .into()
+    }
+
+    /// Banner shown when the chosen storage backend is the system keyring
+    /// but the keyring isn't reachable. Without this, the user logs in,
+    /// closes the app, and finds their token gone — with no explanation.
+    fn view_keyring_warning(&self) -> Option<Element<'_, LoginMessage>> {
+        if !self.keyring_storage_unavailable {
+            return None;
+        }
+        let p = theme::palette();
+
+        let storage_options = [CredentialStorage::Keyring, CredentialStorage::EncryptedFile];
+        let inline_picker = row![
+            text("Switch storage:").size(12).color(p.text_secondary),
+            Space::new().width(8),
+            pick_list(
+                storage_options,
+                Some(self.credential_storage),
+                LoginMessage::CredentialStorageChanged,
+            )
+            .text_size(12)
+            .padding([4, 10]),
+        ]
+        .align_y(Alignment::Center);
+
+        let content = column![
+            text("System keyring unavailable")
+                .size(14)
+                .color(p.text_primary),
+            Space::new().height(4),
+            text(
+                "Tokens won't persist across restarts. Switch to encrypted-file \
+                 storage below, or start a Secret Service provider \
+                 (gnome-keyring / kwallet / keepassxc)."
+            )
+            .size(12)
+            .color(p.text_secondary),
+            Space::new().height(8),
+            inline_picker,
+        ]
+        .spacing(2);
+
+        Some(
+            container(content)
+                .padding(12)
+                .width(Length::Fixed(480.0))
+                .style(move |_| container::Style {
+                    background: Some(iced::Background::Color(p.bg_control)),
+                    border: iced::Border {
+                        radius: 6.0.into(),
+                        width: 1.0,
+                        color: p.accent_danger,
+                    },
+                    ..Default::default()
+                })
+                .into(),
+        )
     }
 
     fn view_crash_notice(&self) -> Option<Element<'_, LoginMessage>> {
