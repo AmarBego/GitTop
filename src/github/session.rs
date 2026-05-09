@@ -77,7 +77,11 @@ impl SessionManager {
                 // entry. Distinct from AccountNotFound so callers can tell apart
                 // "GitHub said this token is dead" from "we couldn't read it back".
                 let username_clone = username.to_string();
-                if let Err(e) = tokio::task::spawn_blocking(move || keyring::delete_token(&username_clone)).await.unwrap_or(Err(KeyringError::Internal("Join error".into()))) {
+                if let Err(e) =
+                    tokio::task::spawn_blocking(move || keyring::delete_token(&username_clone))
+                        .await
+                        .unwrap_or(Err(KeyringError::Internal("Join error".into())))
+                {
                     tracing::warn!(
                         username = %username,
                         error = %e,

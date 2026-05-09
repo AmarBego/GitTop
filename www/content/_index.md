@@ -118,6 +118,23 @@ sudo dnf install gittop</code></pre>
         <h4>Ubuntu/Debian (Snap)</h4>
         <pre><code>sudo snap install gittop</code></pre>
       </div>
+      <div class="install-method">
+        <h4>Void Linux</h4>
+        <p>Via <a href="https://github.com/VUP-Linux/vup">VUP</a> with <code>vuru</code>:</p>
+        <pre><code>vuru install gittop</code></pre>
+        <p>Or manually via <code>xbps-install</code> for your architecture:</p>
+        <pre><code># x86_64 (glibc)
+sudo xbps-install -R https://github.com/VUP-Linux/vup/releases/download/productivity-x86_64-current -S gittop
+
+# x86_64 (musl)
+sudo xbps-install -R https://github.com/VUP-Linux/vup/releases/download/productivity-x86_64-musl-current -S gittop
+
+# aarch64 (glibc)
+sudo xbps-install -R https://github.com/VUP-Linux/vup/releases/download/productivity-aarch64-current -S gittop
+
+# aarch64 (musl)
+sudo xbps-install -R https://github.com/VUP-Linux/vup/releases/download/productivity-aarch64-musl-current -S gittop</code></pre>
+      </div>
     </div>
   </div>
 </div>

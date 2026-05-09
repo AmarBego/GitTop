@@ -29,6 +29,9 @@
   <a href="#linux">
     <img src="https://img.shields.io/badge/Snap-Pending-red?style=flat-square&logo=snapcraft&logoColor=white" alt="Snap">
   </a>
+  <a hred="#linux">
+    <img src="https://img.shields.io/badge/Void-Supported?style=flat-square&logo=voidlinux&logoColor=White" alt="VUP">
+  </a>
 </p>
 
 <h1></h1>
@@ -119,6 +122,14 @@ sudo dnf install gittop
 ~~**Ubuntu/Debian (Snap):**~~
 ```bash
 # NOT MERGED sudo snap install gittop~~
+```
+
+**Void Linux:**
+Supported via [VUP](https://github.com/VUP-Linux/vup) (my other project) 
+
+If using `vuru` package manager from VUP (x86_64, aamd64, musl, gnu):
+```bash
+vuru install gittop
 ```
 
 **Manual:** Download `gittop-linux-gnu-x86_64.tar.gz` (or `-musl-` for Void Linux/Alpine) from releases:
