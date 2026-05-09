@@ -215,11 +215,11 @@ fn view_issue<'a>(
     }
 
     if !issue.labels.is_empty() {
-        let mut label_row = row![].spacing(4);
-        for label in issue.labels.iter().take(5) {
-            label_row = label_row.push(view_label(&label.name, &label.color));
+        let mut wrap = iced_aw::Wrap::new().spacing(4.0).line_spacing(4.0);
+        for label in issue.labels.iter() {
+            wrap = wrap.push(view_label(&label.name, &label.color));
         }
-        col = col.push(label_row);
+        col = col.push(wrap);
         col = col.push(Space::new().height(16));
     }
 
@@ -323,9 +323,7 @@ fn view_pull_request<'a>(
     }
 
     if !pr.labels.is_empty() {
-        let mut label_rows = column![].spacing(4);
-        let mut current_row = row![].spacing(4);
-        let mut row_count = 0;
+        let mut wrap = iced_aw::Wrap::new().spacing(4.0).line_spacing(4.0);
 
         for label in &pr.labels {
             let is_pending = label_args.pending_ops.contains(&label.name);
@@ -337,18 +335,9 @@ fn view_pull_request<'a>(
                 repo.to_string(),
                 pr_number,
             );
-            current_row = current_row.push(label_element);
-            row_count += 1;
-            if row_count >= 4 {
-                label_rows = label_rows.push(current_row);
-                current_row = row![].spacing(4);
-                row_count = 0;
-            }
+            wrap = wrap.push(label_element);
         }
-        if row_count > 0 {
-            label_rows = label_rows.push(current_row);
-        }
-        col = col.push(label_rows);
+        col = col.push(wrap);
         col = col.push(Space::new().height(16));
     }
 
@@ -466,8 +455,14 @@ fn view_checks<'a>(
                 row![
                     icon,
                     Space::new().width(8),
-                    text(&run.name).size(11).color(p.text_secondary),
-                    Space::new().width(Fill),
+                    container(
+                        text(&run.name)
+                            .size(11)
+                            .color(p.text_secondary)
+                            .wrapping(iced::widget::text::Wrapping::WordOrGlyph)
+                    )
+                    .width(Fill),
+                    Space::new().width(8),
                     text(&run.status).size(10).color(p.text_muted),
                 ]
                 .align_y(Alignment::Center),

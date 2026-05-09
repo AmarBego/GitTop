@@ -67,9 +67,7 @@ iced = { version = "0.14.0", default-features = false, features = [
 
 
 # Iced additional widgets - context menus
-iced_aw = { version = "0.14.1", default-features = false, features = [
-    "context_menu",
-] }
+iced_aw = { version = "0.14.1", default-features = false, features = ["context_menu", "wrap"] }
 
 # Async runtime
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
