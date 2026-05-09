@@ -171,6 +171,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
 ] }
 notify-rust = { version = "4", default-features = false, features = ["zbus", "serde", "async"] }
 zbus-secret-service-keyring-store = "1"
+secret-service = { version = "5.1.0", default-features = false, features = ["rt-tokio-crypto-rust"] }
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
 
@@ -182,6 +183,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
 ] }
 notify-rust = { version = "4", default-features = false, features = ["zbus", "serde", "async"] }
 zbus-secret-service-keyring-store = "1"
+secret-service = { version = "5.1.0", default-features = false, features = ["rt-tokio-crypto-rust"] }
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
 
