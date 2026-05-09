@@ -104,7 +104,13 @@ impl NotificationsScreen {
 
     pub fn enter_low_memory_mode(&mut self) {
         self.processing.enter_low_memory_mode();
-        self.error_message = None;
+        self.notification_details.enter_low_memory_mode();
+        self.bulk_actions.clear();
+        self.thread_actions.pending_mark_read.clear();
+        self.thread_actions.pending_mark_read.shrink_to_fit();
+        self.thread_actions.pending_mark_done.clear();
+        self.thread_actions.pending_mark_done.shrink_to_fit();
+        self.thread_actions.pending_mark_all = false;
         self.error_message = None;
         self.list_state.reset();
 

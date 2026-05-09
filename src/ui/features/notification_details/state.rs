@@ -34,4 +34,22 @@ impl NotificationDetailsState {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn enter_low_memory_mode(&mut self) {
+        self.selected_id = None;
+        self.details = None;
+        self.detail_error = None;
+        self.is_loading = false;
+        self.label_input.clear();
+        self.available_labels = Vec::new();
+        self.labels_loading = false;
+        self.pending_label_ops.clear();
+        self.label_error = None;
+        self.check_runs = Vec::new();
+        self.checks_loading = false;
+        self.comments = None;
+        self.comments_loading = false;
+        self.comments_error = None;
+        self.avatar_handle = None;
+    }
 }

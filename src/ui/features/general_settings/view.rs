@@ -20,25 +20,38 @@ pub fn view(
             .size(12)
             .color(p.text_secondary),
         Space::new().height(16),
-        view_theme(settings),
-        Space::new().height(8),
-        view_icons(settings),
-        Space::new().height(8),
-        view_minimize_to_tray(settings),
-        Space::new().height(8),
-        view_start_on_boot(state.start_on_boot_enabled),
-        Space::new().height(8),
-        view_check_for_updates(settings),
-        Space::new().height(8),
-        view_notification_avatars(settings),
-        Space::new().height(24),
-        text("Display").size(13).color(p.text_muted),
-        Space::new().height(8),
-        view_notification_scale(settings),
-        Space::new().height(8),
-        view_sidebar_scale(settings),
-        Space::new().height(8),
-        view_sidebar_width(settings),
+        settings_group(
+            "Appearance",
+            column![
+                view_theme(settings),
+                Space::new().height(8),
+                view_icons(settings),
+                Space::new().height(8),
+                view_notification_avatars(settings),
+            ],
+        ),
+        Space::new().height(16),
+        settings_group(
+            "App Behavior",
+            column![
+                view_minimize_to_tray(settings),
+                Space::new().height(8),
+                view_start_on_boot(state.start_on_boot_enabled),
+            ],
+        ),
+        Space::new().height(16),
+        settings_group("GitHub", column![view_check_for_updates(settings),],),
+        Space::new().height(16),
+        settings_group(
+            "Display",
+            column![
+                view_notification_scale(settings),
+                Space::new().height(8),
+                view_sidebar_scale(settings),
+                Space::new().height(8),
+                view_sidebar_width(settings),
+            ],
+        ),
     ]
     .spacing(4)
     .padding(24)
@@ -190,6 +203,21 @@ fn view_sidebar_width(settings: &AppSettings) -> Element<'static, GeneralMessage
 // ============================================================================
 // Helpers
 // ============================================================================
+
+fn settings_group<'a>(
+    title: &'static str,
+    content: iced::widget::Column<'a, GeneralMessage>,
+) -> Element<'a, GeneralMessage> {
+    let p = theme::palette();
+
+    column![
+        text(title).size(13).color(p.text_muted),
+        Space::new().height(8),
+        content,
+    ]
+    .width(Fill)
+    .into()
+}
 
 fn toggle_card<'a>(
     title: &'static str,
