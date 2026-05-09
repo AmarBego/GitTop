@@ -70,8 +70,6 @@ jobs:
     if: ${{ needs.check.outputs.should_build == 'true' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check.outputs.tag }}
 
       # Update pkgver and sha256sums in PKGBUILD
       - name: Update PKGBUILD version and checksum
@@ -122,8 +120,6 @@ jobs:
     if: ${{ needs.check.outputs.should_build == 'true' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check.outputs.tag }}
 
       - name: Update PKGBUILD version and checksum
         run: |
