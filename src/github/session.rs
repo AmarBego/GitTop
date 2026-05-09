@@ -52,52 +52,62 @@ impl SessionManager {
 
     /// Restore a session for a known username (loads token from keyring).
     pub async fn restore_account(&mut self, username: &str) -> Result<(), SessionError> {
-        let token = keyring::load_token(username)?
+        let username_clone = username.to_string();
+        let token = tokio::task::spawn_blocking(move || keyring::load_token(&username_clone))
+            .await
+            .map_err(|e| KeyringError::Internal(format!("Spawn blocking failed: {}", e)))??
             .ok_or_else(|| SessionError::AccountNotFound(username.to_string()))?;
 
         // Load proxy settings
         let settings = crate::settings::AppSettings::load();
-        let proxy_settings = &settings.proxy;
+        let proxy_settings = settings.proxy;
 
         // Validate the token using GitHubClient with proxy
-        let (client, user) =
-            match GitHubClient::validate_token_with_proxy(&token, proxy_settings).await {
-                Ok((client, user)) => (client, user),
-                Err(GitHubError::Unauthorized) => {
-                    // Token expired/revoked from GitHub (401), clean up the keyring
-                    // entry. Distinct from AccountNotFound so callers can tell apart
-                    // "GitHub said this token is dead" from "we couldn't read it back".
-                    if let Err(e) = keyring::delete_token(username) {
-                        tracing::warn!(
-                            username = %username,
-                            error = %e,
-                            "Failed to delete revoked token from keyring"
-                        );
-                    }
-                    return Err(SessionError::TokenRevoked(username.to_string()));
+        let token_clone = token.clone();
+        let proxy_settings_clone = proxy_settings.clone();
+        let (client, user) = match GitHubClient::validate_token_with_proxy(
+            &token_clone,
+            &proxy_settings_clone,
+        )
+        .await
+        {
+            Ok((client, user)) => (client, user),
+            Err(GitHubError::Unauthorized) => {
+                // Token expired/revoked from GitHub (401), clean up the keyring
+                // entry. Distinct from AccountNotFound so callers can tell apart
+                // "GitHub said this token is dead" from "we couldn't read it back".
+                let username_clone = username.to_string();
+                if let Err(e) = tokio::task::spawn_blocking(move || keyring::delete_token(&username_clone)).await.unwrap_or(Err(KeyringError::Internal("Join error".into()))) {
+                    tracing::warn!(
+                        username = %username,
+                        error = %e,
+                        "Failed to delete revoked token from keyring"
+                    );
                 }
-                Err(GitHubError::Request(msg)) => {
-                    // Connection/network error - keep account, report network issue
-                    return Err(SessionError::NetworkError(redact_secrets(&msg)));
-                }
-                Err(GitHubError::Api { status, message }) => {
-                    // API error that's NOT from GitHub auth:
-                    // - 407 = Proxy authentication required
-                    // - Other statuses could be proxy/network issues
-                    // Don't delete token for these
-                    let safe_message = redact_secrets(&message);
-                    return Err(SessionError::NetworkError(format!(
-                        "API error (status {}): {}",
-                        status, safe_message
-                    )));
-                }
-                Err(GitHubError::RateLimited) => {
-                    // Rate limited - definitely keep account, just can't fetch now
-                    return Err(SessionError::NetworkError(
-                        "GitHub rate limit exceeded".to_string(),
-                    ));
-                }
-            };
+                return Err(SessionError::TokenRevoked(username.to_string()));
+            }
+            Err(GitHubError::Request(msg)) => {
+                // Connection/network error - keep account, report network issue
+                return Err(SessionError::NetworkError(redact_secrets(&msg)));
+            }
+            Err(GitHubError::Api { status, message }) => {
+                // API error that's NOT from GitHub auth:
+                // - 407 = Proxy authentication required
+                // - Other statuses could be proxy/network issues
+                // Don't delete token for these
+                let safe_message = redact_secrets(&message);
+                return Err(SessionError::NetworkError(format!(
+                    "API error (status {}): {}",
+                    status, safe_message
+                )));
+            }
+            Err(GitHubError::RateLimited) => {
+                // Rate limited - definitely keep account, just can't fetch now
+                return Err(SessionError::NetworkError(
+                    "GitHub rate limit exceeded".to_string(),
+                ));
+            }
+        };
 
         // Create session
         let session = Session {

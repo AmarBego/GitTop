@@ -189,7 +189,14 @@ impl GitHubClient {
             });
         }
 
-        let client = Self::new_with_proxy(token, proxy_settings)?;
+        let token_clone = token.to_string();
+        let proxy_settings_clone = proxy_settings.clone();
+        let client = tokio::task::spawn_blocking(move || {
+            Self::new_with_proxy(&token_clone, &proxy_settings_clone)
+        })
+        .await
+        .map_err(|e| GitHubError::Request(format!("Spawn blocking failed: {}", e)))??;
+
         let user = client.get_authenticated_user().await?;
         Ok((client, user))
     }

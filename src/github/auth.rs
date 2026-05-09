@@ -58,7 +58,10 @@ pub async fn authenticate(
 
     // Load proxy credentials from keyring if settings indicate they exist
     let (username, password) = if proxy_settings.has_credentials {
-        super::proxy_keyring::load_proxy_credentials(&proxy_settings.url)
+        let url = proxy_settings.url.clone();
+        tokio::task::spawn_blocking(move || super::proxy_keyring::load_proxy_credentials(&url))
+            .await
+            .map_err(|e| AuthError::Keyring(format!("Spawn blocking failed: {}", e)))?
             .map_err(|e| AuthError::Keyring(redact_secrets(&e.to_string())))?
             .map(|(u, p)| (Some(u), Some(p)))
             .unwrap_or((None, None))
@@ -74,7 +77,10 @@ pub async fn authenticate(
     let user = client.get_authenticated_user().await?;
 
     // Save to secure storage
-    save_token(token)?;
+    let token_clone = token.to_string();
+    tokio::task::spawn_blocking(move || save_token(&token_clone))
+        .await
+        .map_err(|e| AuthError::Keyring(format!("Spawn blocking failed: {}", e)))??;
 
     Ok((client, user))
 }

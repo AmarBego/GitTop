@@ -28,16 +28,27 @@ pub fn update(
 
             Task::perform(
                 async move {
-                    let client =
-                        GitHubClient::new(&token).map_err(|e| format!("Invalid token: {}", e))?;
+                    let token_clone = token.clone();
+                    let client = tokio::task::spawn_blocking(move || {
+                        GitHubClient::new(token_clone)
+                    })
+                    .await
+                    .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
+                    .map_err(|e| format!("Invalid token: {}", e))?;
 
                     let user = client
                         .get_authenticated_user()
                         .await
                         .map_err(|e| format!("Validation failed: {}", e))?;
 
-                    keyring::save_token(&user.login, &token)
-                        .map_err(|e| format!("Failed to save token: {}", e))?;
+                    let login_clone = user.login.clone();
+                    let token_clone = token.clone();
+                    tokio::task::spawn_blocking(move || {
+                        keyring::save_token(&login_clone, &token_clone)
+                    })
+                    .await
+                    .map_err(|e| format!("Failed to spawn blocking task: {}", e))?
+                    .map_err(|e| format!("Failed to save token: {}", e))?;
 
                     Ok(user.login)
                 },
