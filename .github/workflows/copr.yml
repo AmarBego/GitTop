@@ -87,11 +87,9 @@ jobs:
       # Fetch packaging files from main branch in case they don't exist in the tag
       - name: Fetch packaging files from main
         run: |
-          # Check if packaging/copr exists in the current checkout
-          if [ ! -f "packaging/copr/gittop.spec" ]; then
-            echo "::notice::Spec file not found in tag, fetching from main branch"
-            git checkout origin/main -- packaging/copr/
-          fi
+          # Always fetch the latest packaging files from main so fixes apply to older tags
+          echo "::notice::Fetching latest packaging files from main branch"
+          git checkout origin/main -- packaging/copr/
 
       - name: Install dependencies
         run: |
