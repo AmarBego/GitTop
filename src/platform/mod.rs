@@ -69,6 +69,14 @@ pub fn enable_dark_mode() {
     platform_call!(enable_dark_mode);
 }
 
+/// Register the GitTop AppUserModelID with Windows so toast notifications
+/// and taskbar grouping show "GitTop" instead of the host process. No-op
+/// on non-Windows platforms.
+pub fn init_app_identity() {
+    #[cfg(windows)]
+    windows::init_aumid();
+}
+
 /// Aggressively reduce memory footprint.
 /// Trims working set on Windows, may trigger GC hints on other platforms.
 /// Call when minimizing to tray.
