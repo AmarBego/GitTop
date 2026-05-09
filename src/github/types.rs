@@ -165,7 +165,7 @@ pub struct Repository {
     pub id: u64,
     pub name: String,
     pub full_name: String,
-    pub owner: Owner,
+    pub owner: Option<Owner>,
     pub html_url: String,
     pub private: bool,
 }
@@ -203,6 +203,13 @@ pub struct NotificationView {
 impl NotificationView {
     /// Create a NotificationView from a Notification with the account name.
     pub fn from_notification(n: Notification, account: impl Into<String>) -> Self {
+        let avatar_url = n
+            .repository
+            .owner
+            .as_ref()
+            .map(|owner| owner.avatar_url.clone())
+            .unwrap_or_default();
+
         Self {
             id: n.id,
             title: n.subject.title,
@@ -214,7 +221,7 @@ impl NotificationView {
             updated_at: n.updated_at,
             url: n.subject.url,
             latest_comment_url: n.subject.latest_comment_url,
-            avatar_url: n.repository.owner.avatar_url,
+            avatar_url,
             is_private: n.repository.private,
             account: account.into(),
         }

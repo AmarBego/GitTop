@@ -8,12 +8,14 @@
 
 use crate::github::NotificationSubjectDetail;
 use crate::github::subject_details::{CheckRun, CommentDetails, Label};
+use iced::widget::image;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct NotificationDetailsState {
     pub selected_id: Option<String>,
     pub details: Option<NotificationSubjectDetail>,
+    pub detail_error: Option<String>,
     pub is_loading: bool,
     pub label_input: String,
     pub available_labels: Vec<Label>,
@@ -25,10 +27,29 @@ pub struct NotificationDetailsState {
     pub comments: Option<Vec<CommentDetails>>,
     pub comments_loading: bool,
     pub comments_error: Option<String>,
+    pub avatar_handle: Option<image::Handle>,
 }
 
 impl NotificationDetailsState {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn enter_low_memory_mode(&mut self) {
+        self.selected_id = None;
+        self.details = None;
+        self.detail_error = None;
+        self.is_loading = false;
+        self.label_input.clear();
+        self.available_labels = Vec::new();
+        self.labels_loading = false;
+        self.pending_label_ops.clear();
+        self.label_error = None;
+        self.check_runs = Vec::new();
+        self.checks_loading = false;
+        self.comments = None;
+        self.comments_loading = false;
+        self.comments_error = None;
+        self.avatar_handle = None;
     }
 }

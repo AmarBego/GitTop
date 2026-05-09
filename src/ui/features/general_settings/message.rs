@@ -4,6 +4,7 @@ pub enum GeneralMessage {
     ToggleIconTheme(bool),
     ToggleMinimizeToTray(bool),
     ToggleCheckForUpdates(bool),
+    ToggleNotificationAvatars(bool),
     SetNotificationFontScale(f32),
     SetSidebarFontScale(f32),
     SetSidebarWidth(f32),

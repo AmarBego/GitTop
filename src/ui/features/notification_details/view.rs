@@ -1,5 +1,5 @@
-use iced::widget::{Space, button, column, container, row, scrollable, text, text_input};
-use iced::{Alignment, Color, Element, Fill, Length};
+use iced::widget::{Space, button, column, container, image, row, scrollable, text, text_input};
+use iced::{Alignment, Color, ContentFit, Element, Fill, Length};
 
 use crate::github::NotificationView;
 use crate::github::subject_details::{
@@ -31,6 +31,8 @@ pub fn view<'a>(
     notification: Option<&'a NotificationView>,
     details: Option<&'a NotificationSubjectDetail>,
     is_loading: bool,
+    detail_error: Option<&'a str>,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
@@ -39,10 +41,12 @@ pub fn view<'a>(
     let content: Element<'a, NotificationMessage> = if is_loading {
         view_loading(&p)
     } else if let Some(notif) = notification {
-        if let Some(detail) = details {
-            view_details(notif, detail, icon_theme, &p, label_args)
+        if let Some(error) = detail_error {
+            view_detail_error(notif, error, avatar_handle, icon_theme, &p)
+        } else if let Some(detail) = details {
+            view_details(notif, detail, avatar_handle, icon_theme, &p, label_args)
         } else {
-            view_notification_header(notif, &p, icon_theme)
+            view_notification_header(notif, avatar_handle, &p, icon_theme)
         }
     } else {
         view_empty_state(&p)
@@ -91,15 +95,68 @@ fn view_empty_state<'a>(p: &theme::ThemePalette) -> Element<'a, NotificationMess
     .into()
 }
 
+fn view_detail_error<'a>(
+    notif: &'a NotificationView,
+    error: &'a str,
+    avatar_handle: Option<&'a image::Handle>,
+    icon_theme: IconTheme,
+    p: &theme::ThemePalette,
+) -> Element<'a, NotificationMessage> {
+    let bg_control = p.bg_control;
+    let border_subtle = p.border_subtle;
+    let accent_warning = p.accent_warning;
+    let text_primary = p.text_primary;
+    let text_secondary = p.text_secondary;
+    let text_muted = p.text_muted;
+
+    column![
+        view_repo_context(notif, avatar_handle, p, true),
+        Space::new().height(16),
+        row![
+            icons::icon_info(14.0, accent_warning, icon_theme),
+            Space::new().width(8),
+            text("Details unavailable").size(14).color(text_primary),
+        ]
+        .align_y(Alignment::Center),
+        Space::new().height(8),
+        text("This notification item could not be loaded. It may have been deleted, moved, or the repository may no longer exist.")
+            .size(12)
+            .color(text_secondary)
+            .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+        Space::new().height(12),
+        container(
+            text(error)
+                .size(11)
+                .color(text_muted)
+                .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+        )
+        .padding(10)
+        .width(Fill)
+        .style(move |_| container::Style {
+            background: Some(iced::Background::Color(bg_control)),
+            border: iced::Border {
+                radius: 6.0.into(),
+                color: border_subtle,
+                width: 1.0,
+            },
+            ..Default::default()
+        }),
+        Space::new().height(16),
+        view_action_buttons(&notif.id, notif.unread, icon_theme),
+    ]
+    .padding(24)
+    .width(Fill)
+    .into()
+}
+
 fn view_notification_header<'a>(
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     p: &theme::ThemePalette,
     icon_theme: IconTheme,
 ) -> Element<'a, NotificationMessage> {
     column![
-        text(&notif.repo_full_name).size(12).color(p.text_secondary),
-        Space::new().height(4),
-        text(&notif.title).size(18).color(p.text_primary),
+        view_repo_context(notif, avatar_handle, p, true),
         Space::new().height(16),
         text(format!("Reason: {}", notif.reason.label()))
             .size(12)
@@ -115,29 +172,35 @@ fn view_notification_header<'a>(
 fn view_details<'a>(
     notif: &'a NotificationView,
     detail: &'a NotificationSubjectDetail,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
     label_args: LabelViewArgs<'a>,
 ) -> Element<'a, NotificationMessage> {
     let content: Element<'a, NotificationMessage> = match detail {
         NotificationSubjectDetail::Issue(issue) => {
-            view_issue(issue, notif, icon_theme, p, label_args)
+            view_issue(issue, notif, avatar_handle, icon_theme, p, label_args)
         }
         NotificationSubjectDetail::PullRequest(pr) => {
-            view_pull_request(pr, notif, icon_theme, p, label_args)
+            view_pull_request(pr, notif, avatar_handle, icon_theme, p, label_args)
         }
         NotificationSubjectDetail::Comment {
             comment,
             context_title,
-        } => view_comment(comment, context_title, notif, icon_theme, p),
+        } => view_comment(comment, context_title, notif, avatar_handle, icon_theme, p),
         NotificationSubjectDetail::Discussion(discussion) => {
-            view_discussion(discussion, notif, icon_theme, p)
+            view_discussion(discussion, notif, avatar_handle, icon_theme, p)
         }
-        NotificationSubjectDetail::SecurityAlert { title, severity } => {
-            view_security_alert(title, severity.as_deref(), notif, icon_theme, p)
-        }
+        NotificationSubjectDetail::SecurityAlert { title, severity } => view_security_alert(
+            title,
+            severity.as_deref(),
+            notif,
+            avatar_handle,
+            icon_theme,
+            p,
+        ),
         NotificationSubjectDetail::Unsupported { subject_type } => {
-            view_unsupported(subject_type, notif, icon_theme, p)
+            view_unsupported(subject_type, notif, avatar_handle, icon_theme, p)
         }
     };
 
@@ -151,6 +214,7 @@ fn view_details<'a>(
 fn view_issue<'a>(
     issue: &'a IssueDetails,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
     label_args: LabelViewArgs<'a>,
@@ -168,6 +232,8 @@ fn view_issue<'a>(
     let text_muted = p.text_muted;
 
     let mut col = column![
+        view_repo_context(notif, avatar_handle, p, false),
+        Space::new().height(16),
         row![
             icons::icon_issue(14.0, state_color, icon_theme),
             Space::new().width(8),
@@ -246,6 +312,7 @@ fn view_issue<'a>(
 fn view_pull_request<'a>(
     pr: &'a PullRequestDetails,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
     label_args: LabelViewArgs<'a>,
@@ -276,6 +343,8 @@ fn view_pull_request<'a>(
     let pr_number = pr.number;
 
     let mut col = column![
+        view_repo_context(notif, avatar_handle, p, false),
+        Space::new().height(16),
         row![
             icons::icon_pull_request(14.0, state_color, icon_theme),
             Space::new().width(8),
@@ -633,6 +702,7 @@ fn view_comment<'a>(
     comment: &'a CommentDetails,
     context_title: &'a str,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
 ) -> Element<'a, NotificationMessage> {
@@ -643,6 +713,8 @@ fn view_comment<'a>(
     let accent = p.accent;
 
     column![
+        view_repo_context(notif, avatar_handle, p, false),
+        Space::new().height(16),
         row![
             icons::icon_at(14.0, accent, icon_theme),
             Space::new().width(8),
@@ -677,6 +749,7 @@ fn view_comment<'a>(
 fn view_discussion<'a>(
     discussion: &'a DiscussionDetails,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
 ) -> Element<'a, NotificationMessage> {
@@ -700,8 +773,8 @@ fn view_discussion<'a>(
         .unwrap_or_else(|| "Discussion".to_string());
 
     let mut col = column![
-        text(&notif.repo_full_name).size(11).color(text_muted),
-        Space::new().height(6),
+        view_repo_context(notif, avatar_handle, p, false),
+        Space::new().height(16)
     ]
     .width(Fill);
 
@@ -791,6 +864,7 @@ fn view_security_alert<'a>(
     title: &'a str,
     severity: Option<&'a str>,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
 ) -> Element<'a, NotificationMessage> {
@@ -804,6 +878,8 @@ fn view_security_alert<'a>(
     let accent_danger = p.accent_danger;
 
     column![
+        view_repo_context(notif, avatar_handle, p, false),
+        Space::new().height(16),
         row![
             icons::icon_security(14.0, accent_danger, icon_theme),
             Space::new().width(8),
@@ -838,13 +914,12 @@ fn view_security_alert<'a>(
 fn view_unsupported<'a>(
     subject_type: &'a str,
     notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
     icon_theme: IconTheme,
     p: &theme::ThemePalette,
 ) -> Element<'a, NotificationMessage> {
     column![
-        text(&notif.repo_full_name).size(12).color(p.text_secondary),
-        Space::new().height(4),
-        text(&notif.title).size(16).color(p.text_primary),
+        view_repo_context(notif, avatar_handle, p, true),
         Space::new().height(16),
         text(format!("Type: {}", subject_type))
             .size(12)
@@ -859,6 +934,106 @@ fn view_unsupported<'a>(
     .padding(24)
     .width(Fill)
     .into()
+}
+
+fn view_repo_context<'a>(
+    notif: &'a NotificationView,
+    avatar_handle: Option<&'a image::Handle>,
+    p: &theme::ThemePalette,
+    show_title: bool,
+) -> Element<'a, NotificationMessage> {
+    let mut text_column =
+        column![text(&notif.repo_full_name).size(12).color(p.text_secondary)].width(Fill);
+
+    if show_title {
+        text_column = text_column.push(Space::new().height(3));
+        text_column = text_column.push(
+            text(&notif.title)
+                .size(16)
+                .color(p.text_primary)
+                .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+        );
+    }
+
+    row![
+        repo_owner_avatar(notif.repo_owner(), avatar_handle, 40.0, p),
+        Space::new().width(12),
+        text_column,
+    ]
+    .align_y(Alignment::Center)
+    .width(Fill)
+    .into()
+}
+
+fn repo_owner_avatar(
+    owner: &str,
+    avatar_handle: Option<&image::Handle>,
+    size: f32,
+    p: &theme::ThemePalette,
+) -> Element<'static, NotificationMessage> {
+    if let Some(handle) = avatar_handle {
+        return container(
+            image(handle)
+                .width(size)
+                .height(size)
+                .content_fit(ContentFit::Cover)
+                .border_radius(size / 2.0),
+        )
+        .width(size)
+        .height(size)
+        .into();
+    }
+
+    let accent = avatar_color(owner, p);
+    let initials = owner_initials(owner);
+
+    container(
+        text(initials)
+            .size((size * 0.42).max(10.0))
+            .color(accent)
+            .align_x(Alignment::Center),
+    )
+    .width(size)
+    .height(size)
+    .align_x(Alignment::Center)
+    .align_y(Alignment::Center)
+    .style(move |_| container::Style {
+        background: Some(iced::Background::Color(Color::from_rgba(
+            accent.r, accent.g, accent.b, 0.14,
+        ))),
+        border: iced::Border {
+            radius: (size / 2.0).into(),
+            color: Color::from_rgba(accent.r, accent.g, accent.b, 0.2),
+            width: 1.0,
+        },
+        ..Default::default()
+    })
+    .into()
+}
+
+fn owner_initials(owner: &str) -> String {
+    owner
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter_map(|part| part.chars().next())
+        .take(2)
+        .collect::<String>()
+        .to_ascii_uppercase()
+}
+
+fn avatar_color(owner: &str, p: &theme::ThemePalette) -> Color {
+    let colors = [
+        p.accent,
+        p.accent_success,
+        p.accent_purple,
+        p.accent_warning,
+        p.accent_danger,
+        p.text_secondary,
+    ];
+    let hash = owner.bytes().fold(0usize, |hash, byte| {
+        hash.wrapping_mul(31).wrapping_add(byte as usize)
+    });
+
+    colors[hash % colors.len()]
 }
 
 fn view_action_buttons(

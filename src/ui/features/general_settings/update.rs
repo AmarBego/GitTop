@@ -62,6 +62,12 @@ pub fn update(
             tracing::info!(enabled, "Check for updates setting updated");
             Task::none()
         }
+        GeneralMessage::ToggleNotificationAvatars(enabled) => {
+            settings.show_notification_avatars = enabled;
+            persist_settings(settings);
+            tracing::info!(enabled, "Notification avatars setting updated");
+            Task::none()
+        }
         GeneralMessage::ToggleStartOnBoot(enabled) => {
             tracing::info!(enabled, "Start-on-boot toggle requested");
             // Perform the operation asynchronously and report result

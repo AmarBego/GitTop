@@ -1,7 +1,7 @@
 //! GitHub API client using Personal Access Tokens.
 
-use reqwest::header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderValue, USER_AGENT};
-use serde::Deserialize;
+use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue, USER_AGENT};
+use serde::{Deserialize, de::DeserializeOwned};
 use thiserror::Error;
 
 use super::types::{Notification, NotificationView, UserInfo};
@@ -29,6 +29,16 @@ impl From<reqwest::Error> for GitHubError {
     fn from(e: reqwest::Error) -> Self {
         GitHubError::Request(e.to_string())
     }
+}
+
+fn body_snippet(body: &str) -> String {
+    const MAX_CHARS: usize = 500;
+
+    let mut snippet: String = body.chars().take(MAX_CHARS).collect();
+    if body.chars().count() > MAX_CHARS {
+        snippet.push_str("...");
+    }
+    snippet
 }
 
 /// Raw GitHub user response.
@@ -147,6 +157,37 @@ impl GitHubClient {
         }
     }
 
+    async fn decode_json<T>(response: reqwest::Response, endpoint: &str) -> Result<T, GitHubError>
+    where
+        T: DeserializeOwned,
+    {
+        let status = response.status();
+        let content_type = response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("<missing>")
+            .to_string();
+
+        let body = response.text().await.map_err(|e| {
+            GitHubError::Request(format!(
+                "Failed to read response body from {} (status {}, content-type {}): {}",
+                endpoint, status, content_type, e
+            ))
+        })?;
+
+        serde_json::from_str(&body).map_err(|e| {
+            GitHubError::Request(format!(
+                "Failed to decode JSON response from {} (status {}, content-type {}): {}; body: {}",
+                endpoint,
+                status,
+                content_type,
+                e,
+                body_snippet(&body)
+            ))
+        })
+    }
+
     /// Fetches the authenticated user's information.
     /// This is used to validate the token and get user details.
     pub async fn get_authenticated_user(&self) -> Result<UserInfo, GitHubError> {
@@ -155,7 +196,7 @@ impl GitHubClient {
         let response = self.client.get(&url).send().await?;
         let response = Self::handle_response(response).await?;
 
-        let user: GitHubUser = response.json().await?;
+        let user: GitHubUser = Self::decode_json(response, &url).await?;
         Ok(UserInfo {
             login: user.login,
             name: user.name,
@@ -210,7 +251,7 @@ impl GitHubClient {
 
         let response = self.client.get(&url).send().await?;
         let response = Self::handle_response(response).await?;
-        Ok(response.json().await?)
+        Self::decode_json(response, &url).await
     }
 
     /// Fetches notifications and converts them to frontend-friendly format.

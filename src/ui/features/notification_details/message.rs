@@ -19,4 +19,5 @@ pub enum NotificationDetailsMessage {
     ChecksLoaded(Result<CheckRunsResponse, GitHubError>),
     LoadComments(String),
     CommentsLoaded(Result<Vec<CommentDetails>, GitHubError>),
+    AvatarLoaded(String, Result<Vec<u8>, String>),
 }
