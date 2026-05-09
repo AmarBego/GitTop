@@ -68,7 +68,7 @@ pub fn delete(service: &str, account: &str) -> Result<(), CredentialError> {
 pub fn native_backend_name() -> &'static str {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
-        "linux-keyutils (kernel session keyring)"
+        "Secret Service (via zbus)"
     }
     #[cfg(target_os = "windows")]
     {
@@ -89,6 +89,50 @@ pub fn native_backend_name() -> &'static str {
     }
 }
 
+/// Initialize the global keyring store for the current platform.
+/// Must be called once at application startup.
+pub fn init_keyring() {
+    #[cfg(target_os = "windows")]
+    let store = windows_native_keyring_store::Store::new()
+        .map(|s| s as std::sync::Arc<keyring_core::api::CredentialStore>);
+
+    #[cfg(target_os = "macos")]
+    let store = apple_native_keyring_store::Store::new()
+        .map(|s| s as std::sync::Arc<keyring_core::api::CredentialStore>);
+
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    let store = zbus_secret_service_keyring_store::Store::new()
+        .map(|s| s as std::sync::Arc<keyring_core::api::CredentialStore>);
+
+    #[cfg(not(any(
+        target_os = "windows",
+        target_os = "macos",
+        target_os = "linux",
+        target_os = "freebsd"
+    )))]
+    let store: Result<std::sync::Arc<keyring_core::api::CredentialStore>, _> =
+        Err(keyring_core::Error::NoStore);
+
+    match store {
+        Ok(s) => {
+            keyring_core::set_default_store(s);
+            tracing::info!(backend = native_backend_name(), "Keyring store initialized");
+        }
+        Err(e) => {
+            tracing::warn!(
+                backend = native_backend_name(),
+                error = %e,
+                "Keyring store initialization failed"
+            );
+        }
+    }
+}
+
+/// Release the global keyring store.
+pub fn unset_keyring() {
+    keyring_core::unset_default_store();
+}
+
 /// Probe whether the system keyring is reachable for writes. Used at startup
 /// to decide whether to surface a "tokens won't persist" warning to the user.
 ///
@@ -103,7 +147,7 @@ pub fn keyring_available() -> bool {
     use std::sync::OnceLock;
     static CACHED: OnceLock<bool> = OnceLock::new();
     *CACHED.get_or_init(|| {
-        use ::keyring::Entry;
+        use keyring_core::Entry;
         const PROBE_SERVICE: &str = "gittop-keyring-probe";
         const PROBE_ACCOUNT: &str = "probe";
         let Ok(entry) = Entry::new(PROBE_SERVICE, PROBE_ACCOUNT) else {
@@ -129,7 +173,7 @@ pub fn keyring_available() -> bool {
 
 mod keyring_backend {
     use super::{Backend, CredentialError, redact_secrets};
-    use ::keyring::Entry;
+    use keyring_core::Entry;
 
     pub struct KeyringBackend;
 
@@ -148,7 +192,7 @@ mod keyring_backend {
         fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialError> {
             match entry(service, account)?.get_password() {
                 Ok(v) => Ok(Some(v)),
-                Err(::keyring::Error::NoEntry) => Ok(None),
+                Err(keyring_core::Error::NoEntry) => Ok(None),
                 Err(e) => Err(CredentialError::Backend(redact_secrets(&e.to_string()))),
             }
         }
@@ -156,7 +200,7 @@ mod keyring_backend {
         fn delete(&self, service: &str, account: &str) -> Result<(), CredentialError> {
             match entry(service, account)?.delete_credential() {
                 Ok(()) => Ok(()),
-                Err(::keyring::Error::NoEntry) => Ok(()),
+                Err(keyring_core::Error::NoEntry) => Ok(()),
                 Err(e) => Err(CredentialError::Backend(redact_secrets(&e.to_string()))),
             }
         }

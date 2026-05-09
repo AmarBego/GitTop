@@ -67,7 +67,7 @@ iced = { version = "0.14.0", default-features = false, features = [
 
 
 # Iced additional widgets - context menus
-iced_aw = { version = "0.13", default-features = false, features = [
+iced_aw = { version = "0.14.1", default-features = false, features = [
     "context_menu",
 ] }
 
@@ -107,6 +107,9 @@ icondata_core = "0.1"
 # Cross-platform directories
 dirs = "6.0.0"
 
+# Keyring core API for secret management
+keyring-core = "1"
+
 # UUID generation for rule IDs
 uuid = { version = "1", features = ["v4", "serde"] }
 
@@ -130,7 +133,7 @@ tracing-appender = "0.2"
 # Authenticated encryption for the file-based credential fallback (used when
 # the user has no working Secret Service / Credential Manager / Keychain).
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc", "getrandom"] }
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11.0", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 
 # =============================================================================
@@ -151,16 +154,16 @@ windows = { version = "0.62.2", features = [
     "Win32_Security",
 ] }
 tauri-winrt-notification = "0.7"
-keyring = { version = "3", features = ["windows-native"] }
+windows-native-keyring-store = "1"
 # System tray (native on Windows)
-tray-icon = { version = "0.21.2", default-features = false }
+tray-icon = { version = "0.24.0", default-features = false }
 
 # macOS-specific APIs
 [target.'cfg(target_os = "macos")'.dependencies]
 mac-notification-sys = "0.6"
-keyring = { version = "3", features = ["apple-native"] }
+apple-native-keyring-store = "1"
 # System tray (native on macOS)
-tray-icon = { version = "0.21.2", default-features = false }
+tray-icon = { version = "0.24.0", default-features = false }
 
 # Linux-specific APIs
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -169,7 +172,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
     "x11",
 ] }
 notify-rust = { version = "4", default-features = false, features = ["zbus", "serde", "async"] }
-keyring = { version = "3", default-features = false, features = ["linux-native"] }
+zbus-secret-service-keyring-store = "1"
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
 
@@ -180,7 +183,7 @@ iced = { version = "0.14.0-dev", default-features = false, features = [
     "x11",
 ] }
 notify-rust = { version = "4", default-features = false, features = ["zbus", "serde", "async"] }
-keyring = { version = "3", default-features = false, features = ["linux-native"] }
+zbus-secret-service-keyring-store = "1"
 # Pure-Rust system tray via StatusNotifierItem
 ksni = { version = "0.3", features = ["blocking"] }
 
