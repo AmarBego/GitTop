@@ -193,18 +193,23 @@ fn view_issue<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
@@ -296,18 +301,23 @@ fn view_pull_request<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
@@ -748,18 +758,23 @@ fn view_discussion<'a>(
     {
         let truncated = truncate_text(body, 1500);
         col = col.push(
-            container(text(truncated).size(13).color(text_secondary))
-                .padding(12)
-                .width(Fill)
-                .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(bg_control)),
-                    border: iced::Border {
-                        radius: 6.0.into(),
-                        color: border_subtle,
-                        width: 1.0,
-                    },
-                    ..Default::default()
-                }),
+            container(
+                text(truncated)
+                    .size(13)
+                    .color(text_secondary)
+                    .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
+            )
+            .padding(12)
+            .width(Fill)
+            .style(move |_| container::Style {
+                background: Some(iced::Background::Color(bg_control)),
+                border: iced::Border {
+                    radius: 6.0.into(),
+                    color: border_subtle,
+                    width: 1.0,
+                },
+                ..Default::default()
+            }),
         );
         col = col.push(Space::new().height(16));
     }
@@ -1085,7 +1100,10 @@ fn view_comments_section<'a>(
                             ]
                             .align_y(Alignment::Center),
                             Space::new().height(6),
-                            text(body).size(13).color(p.text_primary),
+                            text(body)
+                                .size(13)
+                                .color(p.text_primary)
+                                .wrapping(iced::widget::text::Wrapping::WordOrGlyph),
                         ])
                         .padding(12)
                         .width(Fill)
