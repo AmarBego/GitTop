@@ -1036,7 +1036,11 @@ fn truncate_text(text: &str, max_len: usize) -> std::borrow::Cow<'_, str> {
     if text.len() <= max_len {
         std::borrow::Cow::Borrowed(text)
     } else {
-        std::borrow::Cow::Owned(format!("{}...", &text[..max_len]))
+        let mut idx = max_len;
+        while !text.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        std::borrow::Cow::Owned(format!("{}...", &text[..idx]))
     }
 }
 
