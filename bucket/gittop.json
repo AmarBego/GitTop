@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A lightweight GitHub notifications client. Why spin up a browser just to check your GitHub notifications?",
   "homepage": "https://github.com/AmarBego/GitTop",
   "license": {
@@ -9,14 +9,14 @@
   "notes": "User settings are stored in '$env:APPDATA\\GitTop'. Remove this folder manually for a clean uninstall.",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.5.0/gittop-0.5.0-windows-x86_64.zip",
-      "hash": "2b25eee3abd6a0cce96a4613c752c8d7e2c84209a1b0aa81fe0b9ec9093513c4",
-      "extract_dir": "gittop-0.5.0-windows-x86_64"
+      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.5.1/gittop-0.5.1-windows-x86_64.zip",
+      "hash": "851c15df24b25cc3bb78ba574946a6921d4f59bf6e9c5b1f800efbed52822735",
+      "extract_dir": "gittop-0.5.1-windows-x86_64"
     },
     "arm64": {
-      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.5.0/gittop-0.5.0-windows-aarch64.zip",
-      "hash": "5b9168d456fee49022be0d456f999f03b0bb7c33b033ef8392963aca19528b23",
-      "extract_dir": "gittop-0.5.0-windows-aarch64"
+      "url": "https://github.com/AmarBego/GitTop/releases/download/v0.5.1/gittop-0.5.1-windows-aarch64.zip",
+      "hash": "c197b8abe371510046a6824b2bc5403d405153b1ffec9077e5390fa4c7733f9d",
+      "extract_dir": "gittop-0.5.1-windows-aarch64"
     }
   },
   "bin": "gittop.exe",
