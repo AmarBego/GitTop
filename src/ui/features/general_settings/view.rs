@@ -29,6 +29,8 @@ pub fn view(
         view_start_on_boot(state.start_on_boot_enabled),
         Space::new().height(8),
         view_check_for_updates(settings),
+        Space::new().height(8),
+        view_notification_avatars(settings),
         Space::new().height(24),
         text("Display").size(13).color(p.text_muted),
         Space::new().height(8),
@@ -130,6 +132,22 @@ fn view_check_for_updates(settings: &AppSettings) -> Element<'static, GeneralMes
         desc,
         enabled,
         GeneralMessage::ToggleCheckForUpdates,
+    )
+}
+
+fn view_notification_avatars(settings: &AppSettings) -> Element<'static, GeneralMessage> {
+    let enabled = settings.show_notification_avatars;
+    let desc = if enabled {
+        "Loads the selected notification's repo avatar in details (Default)"
+    } else {
+        "Uses initials only and keeps avatar image bytes out of memory"
+    };
+
+    toggle_card(
+        "Notification Avatars",
+        desc,
+        enabled,
+        GeneralMessage::ToggleNotificationAvatars,
     )
 }
 

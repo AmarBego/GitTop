@@ -31,6 +31,11 @@ pub fn app_layout<'a>(
                 screen.selected_notification(),
                 screen.selected_details(),
                 screen.notification_details.is_loading,
+                screen.notification_details.detail_error.as_deref(),
+                settings
+                    .show_notification_avatars
+                    .then_some(screen.notification_details.avatar_handle.as_ref())
+                    .flatten(),
                 settings.icon_theme,
                 notification_details::view::LabelViewArgs {
                     input: &screen.notification_details.label_input,

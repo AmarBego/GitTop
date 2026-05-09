@@ -178,6 +178,7 @@ impl NotificationsScreen {
                     msg,
                     &self.processing.all_notifications,
                     &self.client,
+                    true,
                 );
                 task.map(NotificationMessage::Details)
             }
@@ -270,6 +271,16 @@ impl NotificationsScreen {
             },
 
             // Other messages handled normally
+            NotificationMessage::Details(msg) => {
+                let task = update_notification_details(
+                    &mut self.notification_details,
+                    msg,
+                    &self.processing.all_notifications,
+                    &self.client,
+                    ctx.settings.show_notification_avatars,
+                );
+                (task.map(NotificationMessage::Details), AppEffect::None)
+            }
             other => (self.update(other), AppEffect::None),
         }
     }

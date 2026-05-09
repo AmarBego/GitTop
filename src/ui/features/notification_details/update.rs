@@ -14,12 +14,19 @@ pub fn update_notification_details(
     message: NotificationDetailsMessage,
     notifications: &[NotificationView],
     client: &GitHubClient,
+    avatar_enabled: bool,
 ) -> Task<NotificationDetailsMessage> {
+    if !avatar_enabled {
+        state.avatar_handle = None;
+    }
+
     match message {
         NotificationDetailsMessage::Select(id) => {
             state.selected_id = Some(id.clone());
             state.details = None;
+            state.detail_error = None;
             state.is_loading = true;
+            state.avatar_handle = None;
             state.label_input.clear();
             state.label_error = None;
             state.available_labels.clear();
@@ -52,8 +59,13 @@ pub fn update_notification_details(
                 .find(|n| n.id == id)
                 .map(|n| n.title.clone())
                 .unwrap_or_default();
+            let avatar_url = notifications
+                .iter()
+                .find(|n| n.id == id)
+                .map(|n| n.avatar_url.clone())
+                .unwrap_or_default();
 
-            Task::perform(
+            let details_task = Task::perform(
                 async move {
                     client
                         .get_notification_details(
@@ -66,7 +78,22 @@ pub fn update_notification_details(
                         .await
                 },
                 move |result| NotificationDetailsMessage::SelectComplete(id.clone(), result),
-            )
+            );
+
+            if !avatar_enabled || avatar_url.is_empty() {
+                details_task
+            } else {
+                let avatar_id = state.selected_id.clone().unwrap_or_default();
+                Task::batch(vec![
+                    details_task,
+                    Task::perform(
+                        async move { fetch_avatar_bytes(&avatar_url).await },
+                        move |result| {
+                            NotificationDetailsMessage::AvatarLoaded(avatar_id.clone(), result)
+                        },
+                    ),
+                ])
+            }
         }
 
         NotificationDetailsMessage::SelectComplete(id, result) => {
@@ -75,6 +102,7 @@ pub fn update_notification_details(
                 match result {
                     Ok(details) => {
                         let is_pr = matches!(&details, NotificationSubjectDetail::PullRequest(_));
+                        state.detail_error = None;
                         state.details = Some(details.clone());
 
                         if is_pr && let Some(notif) = notifications.iter().find(|n| n.id == id) {
@@ -118,7 +146,8 @@ pub fn update_notification_details(
                         }
                     }
                     Err(e) => {
-                        tracing::error!(error = %e, "Failed to fetch notification details");
+                        tracing::warn!(error = %e, "Notification details unavailable");
+                        state.detail_error = Some(e.to_string());
                         state.details = None;
                     }
                 }
@@ -328,7 +357,59 @@ pub fn update_notification_details(
             }
             Task::none()
         }
+
+        NotificationDetailsMessage::AvatarLoaded(id, result) => {
+            if state.selected_id.as_ref() == Some(&id) {
+                match result {
+                    Ok(bytes) => {
+                        state.avatar_handle = Some(iced::widget::image::Handle::from_bytes(bytes))
+                    }
+                    Err(e) => {
+                        tracing::debug!(error = %e, "Failed to load notification avatar");
+                        state.avatar_handle = None;
+                    }
+                }
+            }
+            Task::none()
+        }
     }
+}
+
+async fn fetch_avatar_bytes(url: &str) -> Result<Vec<u8>, String> {
+    const MAX_AVATAR_BYTES: usize = 128 * 1024;
+
+    let url = avatar_url_with_size(url)?;
+    let response = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| e.to_string())?
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("avatar request failed with {}", response.status()));
+    }
+
+    if let Some(length) = response.content_length()
+        && length as usize > MAX_AVATAR_BYTES
+    {
+        return Err(format!("avatar too large: {} bytes", length));
+    }
+
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > MAX_AVATAR_BYTES {
+        return Err(format!("avatar too large: {} bytes", bytes.len()));
+    }
+
+    Ok(bytes.to_vec())
+}
+
+fn avatar_url_with_size(url: &str) -> Result<reqwest::Url, String> {
+    let mut url = reqwest::Url::parse(url).map_err(|e| e.to_string())?;
+    url.query_pairs_mut().append_pair("s", "80");
+    Ok(url)
 }
 
 fn split_repo_full_name(full_name: &str) -> (&str, &str) {

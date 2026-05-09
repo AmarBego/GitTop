@@ -8,12 +8,14 @@
 
 use crate::github::NotificationSubjectDetail;
 use crate::github::subject_details::{CheckRun, CommentDetails, Label};
+use iced::widget::image;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct NotificationDetailsState {
     pub selected_id: Option<String>,
     pub details: Option<NotificationSubjectDetail>,
+    pub detail_error: Option<String>,
     pub is_loading: bool,
     pub label_input: String,
     pub available_labels: Vec<Label>,
@@ -25,6 +27,7 @@ pub struct NotificationDetailsState {
     pub comments: Option<Vec<CommentDetails>>,
     pub comments_loading: bool,
     pub comments_error: Option<String>,
+    pub avatar_handle: Option<image::Handle>,
 }
 
 impl NotificationDetailsState {

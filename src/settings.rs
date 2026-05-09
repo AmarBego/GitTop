@@ -160,6 +160,8 @@ pub struct AppSettings {
     pub power_mode: bool,
     #[serde(default = "default_show_details_panel")]
     pub show_details_panel: bool,
+    #[serde(default = "default_show_notification_avatars")]
+    pub show_notification_avatars: bool,
     #[serde(default)]
     pub proxy: ProxySettings,
     /// Check for updates on startup (opt-in, default: false)
@@ -198,6 +200,10 @@ fn default_show_details_panel() -> bool {
     true
 }
 
+fn default_show_notification_avatars() -> bool {
+    true
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -214,6 +220,7 @@ impl Default for AppSettings {
             window_height: 640.0,
             power_mode: false,
             show_details_panel: true,
+            show_notification_avatars: true,
             proxy: ProxySettings::default(),
             check_for_updates: false,
             credential_storage: CredentialStorage::default(),
